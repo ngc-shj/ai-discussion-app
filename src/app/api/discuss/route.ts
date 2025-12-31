@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
-import { DiscussionRequest } from '@/types';
-import { runDiscussion } from '@/lib/discussion-engine';
+import { runDiscussion, DiscussionRequest } from '@/lib/discussion-engine';
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,6 +24,7 @@ export async function POST(request: NextRequest) {
             participants: body.participants,
             rounds,
             previousTurns: body.previousTurns,
+            searchResults: body.searchResults,
           })) {
             const data = JSON.stringify(progress);
             controller.enqueue(encoder.encode(`data: ${data}\n\n`));

@@ -134,3 +134,28 @@ export interface DiscussionSession {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// SearXNG検索結果
+export interface SearchResult {
+  title: string;
+  url: string;
+  content: string;
+  engine?: string;
+  publishedDate?: string;
+}
+
+// 検索設定
+export interface SearchConfig {
+  enabled: boolean;
+  query?: string; // カスタム検索クエリ（空の場合はトピックを使用）
+  maxResults: number;
+  searchType: 'web' | 'news' | 'images';
+  language?: string;
+  engines?: string[]; // 使用する検索エンジン
+}
+
+// 検索付き議論リクエスト
+export interface SearchBasedDiscussionRequest extends DiscussionRequest {
+  searchConfig?: SearchConfig;
+  searchResults?: SearchResult[];
+}

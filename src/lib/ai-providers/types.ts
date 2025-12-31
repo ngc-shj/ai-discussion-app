@@ -1,4 +1,4 @@
-import { AIProviderType, AIRequest, AIResponse } from '@/types';
+import { AIProviderType, AIRequest, AIResponse, SearchResult } from '@/types';
 
 // モデル情報
 export interface ModelInfo {
@@ -22,13 +22,36 @@ export interface PreviousTurnSummary {
   finalAnswer: string;
 }
 
+// 検索結果をフォーマット
+function formatSearchResults(searchResults: SearchResult[]): string {
+  if (!searchResults || searchResults.length === 0) {
+    return '';
+  }
+
+  const formattedResults = searchResults
+    .map((result, i) => {
+      let text = `${i + 1}. ${result.title}\n   URL: ${result.url}`;
+      if (result.content) {
+        text += `\n   内容: ${result.content}`;
+      }
+      if (result.publishedDate) {
+        text += `\n   日付: ${result.publishedDate}`;
+      }
+      return text;
+    })
+    .join('\n\n');
+
+  return `\n【最新の検索結果】\n以下は関連する最新の情報です。これらの情報を参考にして議論してください。\n\n${formattedResults}\n`;
+}
+
 // 議論用のシステムプロンプト
 export function createDiscussionPrompt(
   topic: string,
   previousMessages: Array<{ provider: string; content: string }>,
   isFirstRound: boolean,
   isFinalSummary: boolean,
-  previousTurns?: PreviousTurnSummary[]
+  previousTurns?: PreviousTurnSummary[],
+  searchResults?: SearchResult[]
 ): string {
   // 過去のターンのコンテキストを構築
   let previousContext = '';
@@ -39,6 +62,9 @@ export function createDiscussionPrompt(
     previousContext = `\n【これまでの議論の履歴】\n${turnsText}\n`;
   }
 
+  // 検索結果のコンテキストを構築
+  const searchContext = formatSearchResults(searchResults || []);
+
   if (isFinalSummary) {
     const allResponses = previousMessages
       .map((m) => `【${m.provider}の意見】\n${m.content}`)
@@ -46,7 +72,7 @@ export function createDiscussionPrompt(
 
     return `あなたは議論の統合者です。以下のトピックについて、複数のAIが議論を行いました。
 それぞれの意見を踏まえて、最終的な統合回答を作成してください。
-${previousContext}
+${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -58,12 +84,13 @@ ${allResponses}
 - 矛盾がある場合は、最も合理的な見解を採用してください
 - 最終的な結論を明確に述べてください
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
+- 検索結果がある場合は、最新の情報を考慮して回答してください
 - 統合回答は日本語で記述してください`;
   }
 
   if (isFirstRound) {
     return `あなたは議論に参加するAIアシスタントです。以下のトピックについて、あなたの見解を述べてください。
-${previousContext}
+${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -71,6 +98,7 @@ ${topic}
 - 論理的かつ建設的な意見を述べてください
 - 具体例があれば挙げてください
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
+- 検索結果がある場合は、最新の情報を参考にして回答してください
 - 回答は日本語で、簡潔にまとめてください（200-400文字程度）`;
   }
 
@@ -79,7 +107,7 @@ ${topic}
     .join('\n\n');
 
   return `あなたは議論に参加するAIアシスタントです。以下のトピックについて議論が進行中です。
-${previousContext}
+${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -91,5 +119,6 @@ ${previousResponses}
 - 同意する点、異なる視点、追加すべき観点などを明確にしてください
 - 建設的な議論を心がけてください
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
+- 検索結果がある場合は、最新の情報を参考にして回答してください
 - 回答は日本語で、簡潔にまとめてください（200-400文字程度）`;
 }
