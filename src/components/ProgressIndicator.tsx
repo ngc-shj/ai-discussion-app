@@ -2,6 +2,15 @@
 
 import { AIProviderType, DiscussionParticipant, DEFAULT_PROVIDERS, getOllamaModelColor } from '@/types';
 
+// 各参加者の実行状態
+export type ParticipantStatus = 'pending' | 'active' | 'completed' | 'error';
+
+export interface ParticipantProgress {
+  participant: DiscussionParticipant;
+  status: ParticipantStatus;
+  currentRound?: number;
+}
+
 interface ProgressIndicatorProps {
   isActive: boolean;
   currentRound: number;
@@ -12,6 +21,8 @@ interface ProgressIndicatorProps {
   currentProviderIndex: number;
   isSummarizing: boolean;
   isSearching?: boolean;
+  participants?: DiscussionParticipant[];
+  completedParticipants?: Set<string>;
 }
 
 export function ProgressIndicator({
@@ -24,6 +35,8 @@ export function ProgressIndicator({
   currentProviderIndex,
   isSummarizing,
   isSearching = false,
+  participants = [],
+  completedParticipants = new Set(),
 }: ProgressIndicatorProps) {
   if (!isActive && !isSearching) return null;
 
@@ -39,8 +52,94 @@ export function ProgressIndicator({
     : (currentRound - 1) * totalProviders + currentProviderIndex + 1;
   const progressPercent = (currentStep / totalSteps) * 100;
 
+  // 参加者のキーを生成
+  const getParticipantKey = (p: DiscussionParticipant) => `${p.provider}-${p.model}`;
+  const currentParticipantKey = currentParticipant ? getParticipantKey(currentParticipant) : null;
+
   return (
     <div className="px-3 py-2 md:px-4 md:py-3 bg-gray-800 border-t border-gray-700">
+      {/* 参加モデル一覧 */}
+      {participants.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {participants.map((p, index) => {
+            const key = getParticipantKey(p);
+            const isCurrentActive = key === currentParticipantKey && !isSummarizing && !isSearching;
+            const isCompleted = completedParticipants.has(key);
+            const isPending = !isCurrentActive && !isCompleted;
+
+            // モデル名を短縮表示
+            const shortName = p.model.includes('/')
+              ? p.model.split('/').pop()
+              : p.model.length > 15
+                ? p.model.slice(0, 12) + '...'
+                : p.model;
+
+            return (
+              <div
+                key={`${key}-${index}`}
+                className={`
+                  flex items-center gap-1.5 px-2 py-1 rounded-full text-xs
+                  transition-all duration-300
+                  ${isCurrentActive
+                    ? 'ring-2 ring-offset-1 ring-offset-gray-800 scale-105'
+                    : isCompleted
+                      ? 'opacity-60'
+                      : 'opacity-40'
+                  }
+                `}
+                style={{
+                  backgroundColor: `${p.color}20`,
+                  borderColor: p.color,
+                  borderWidth: '1px',
+                  // @ts-expect-error CSS custom property for ring color
+                  '--tw-ring-color': isCurrentActive ? p.color : undefined,
+                }}
+                title={`${p.displayName}${isCurrentActive ? ' (実行中)' : isCompleted ? ' (完了)' : ' (待機中)'}`}
+              >
+                {/* ステータスインジケーター */}
+                <div className="relative">
+                  <div
+                    className={`w-2.5 h-2.5 rounded-full ${isCurrentActive ? 'animate-pulse' : ''}`}
+                    style={{ backgroundColor: p.color }}
+                  />
+                  {isCompleted && (
+                    <svg
+                      className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 text-green-400"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+                {/* モデル名 */}
+                <span
+                  className={`font-medium ${isPending ? 'text-gray-500' : ''}`}
+                  style={{ color: isPending ? undefined : p.color }}
+                >
+                  {shortName}
+                </span>
+              </div>
+            );
+          })}
+          {/* 統合回答のインジケーター */}
+          <div
+            className={`
+              flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border
+              transition-all duration-300
+              ${isSummarizing
+                ? 'border-purple-400 bg-purple-400/20 ring-2 ring-purple-400 ring-offset-1 ring-offset-gray-800 scale-105'
+                : 'border-gray-600 bg-gray-700/50 opacity-40'
+              }
+            `}
+            title={isSummarizing ? '統合回答を生成中' : '統合回答 (待機中)'}
+          >
+            <div className={`w-2.5 h-2.5 rounded-full ${isSummarizing ? 'bg-purple-400 animate-pulse' : 'bg-gray-500'}`} />
+            <span className={isSummarizing ? 'text-purple-400 font-medium' : 'text-gray-500'}>統合</span>
+          </div>
+        </div>
+      )}
+
       {/* プログレスバー */}
       <div className="w-full h-1.5 md:h-2 bg-gray-700 rounded-full overflow-hidden mb-1.5 md:mb-2">
         <div
