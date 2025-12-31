@@ -1,4 +1,4 @@
-import { DiscussionSession, DiscussionTurn } from '@/types';
+import { DiscussionSession, DiscussionTurn, SearchResult } from '@/types';
 
 const DB_NAME = 'ai-discussion-db';
 const DB_VERSION = 1;
@@ -170,13 +170,15 @@ export function createNewSession(
 export function createNewTurn(
   topic: string,
   messages: DiscussionTurn['messages'],
-  finalAnswer: string
+  finalAnswer: string,
+  searchResults?: SearchResult[]
 ): DiscussionTurn {
   return {
     id: `turn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     topic,
     messages,
     finalAnswer,
+    searchResults,
     createdAt: new Date(),
   };
 }

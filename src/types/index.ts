@@ -121,6 +121,7 @@ export interface DiscussionTurn {
   topic: string;
   messages: DiscussionMessage[];
   finalAnswer: string;
+  searchResults?: SearchResult[];
   createdAt: Date;
 }
 
