@@ -1,36 +1,71 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Discussion Arena
 
-## Getting Started
+複数のAI（Claude、Ollama、OpenAI、Gemini）がラウンドロビン形式で議論し、最終的に統合回答を生成するWeb UIアプリケーション。
 
-First, run the development server:
+## 機能
+
+- **マルチAI議論**: 複数のAIモデルが順番に発言し、前の意見を踏まえて議論を深める
+- **ラウンドロビン形式**: 指定したラウンド数だけ各AIが順番に発言
+- **統合回答生成**: 議論終了後、全ての意見を統合した回答を自動生成
+- **リアルタイムストリーミング**: 各AIの回答をリアルタイムで表示
+- **セッション管理**: 議論履歴をIndexedDBに保存、複数セッションの管理が可能
+- **レスポンシブ対応**: PC・モバイル両対応のUI
+
+## 対応AIプロバイダー
+
+- **Claude** (Anthropic API)
+- **Ollama** (ローカル実行)
+- **OpenAI** (ChatGPT)
+- **Gemini** (Google AI)
+
+## セットアップ
+
+### 1. 依存関係のインストール
+
+```bash
+npm install
+```
+
+### 2. 環境変数の設定
+
+`.env.local`ファイルを作成し、使用するAPIキーを設定:
+
+```env
+# Anthropic (Claude)
+ANTHROPIC_API_KEY=your_api_key
+
+# OpenAI
+OPENAI_API_KEY=your_api_key
+
+# Google AI (Gemini)
+GOOGLE_AI_API_KEY=your_api_key
+
+# Ollama (ローカル実行の場合、デフォルトはlocalhost:11434)
+OLLAMA_BASE_URL=http://localhost:11434
+```
+
+### 3. 開発サーバーの起動
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+[http://localhost:3000](http://localhost:3000) をブラウザで開く。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 使い方
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. 右側の設定パネルで参加するAIモデルを選択
+2. ラウンド数を設定（1〜5）
+3. 議論したいトピックを入力して「議論開始」をクリック
+4. 各AIが順番に回答し、最後に統合回答が生成される
 
-## Learn More
+## 技術スタック
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **フレームワーク**: Next.js 14 (App Router)
+- **言語**: TypeScript
+- **スタイリング**: Tailwind CSS
+- **データ永続化**: IndexedDB (idb)
+- **AI SDK**:
+  - `@anthropic-ai/sdk` (Claude)
+  - `openai` (OpenAI)
+  - `@google/generative-ai` (Gemini)
