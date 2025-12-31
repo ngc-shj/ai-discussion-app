@@ -37,16 +37,16 @@ export class GeminiProvider implements AIProvider {
       }
 
       const data = await response.json();
-      // モデル名からバージョン情報を抽出してソート
-      const getModelPriority = (name: string): number => {
-        // 2.5 > 2.0 > 1.5 > 1.0 の順
-        if (name.includes('2.5')) return 100;
-        if (name.includes('2.0')) return 90;
-        if (name.includes('1.5')) return 80;
-        if (name.includes('1.0')) return 70;
-        // gemini-exp, gemini-2.0等の実験版は高優先度
-        if (name.includes('exp')) return 95;
-        return 50;
+      // モデル名からバージョン番号を抽出してソート用の数値を返す
+      const getModelVersion = (name: string): number => {
+        // gemini-X.Y 形式からバージョン番号を抽出 (例: gemini-2.5-flash → 2.5)
+        const versionMatch = name.match(/gemini-(\d+(?:\.\d+)?)/);
+        if (versionMatch) {
+          return parseFloat(versionMatch[1]);
+        }
+        // 実験版は高優先度として扱う
+        if (name.includes('exp')) return 999;
+        return 0;
       };
 
       const models = (data.models || [])
@@ -56,7 +56,7 @@ export class GeminiProvider implements AIProvider {
         .map((model: { name: string; displayName?: string }) => ({
           id: model.name.replace('models/', ''),
           name: model.displayName || model.name.replace('models/', ''),
-          priority: getModelPriority(model.name),
+          priority: getModelVersion(model.name),
         }));
 
       // 優先度降順でソート
