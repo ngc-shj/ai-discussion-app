@@ -101,6 +101,8 @@ export default function Home() {
     currentParticipant: null,
     isSummarizing: false,
   });
+  // 完了した参加者を追跡
+  const [completedParticipants, setCompletedParticipants] = useState<Set<string>>(new Set());
 
   // セッション一覧を読み込み
   useEffect(() => {
@@ -293,6 +295,7 @@ export default function Home() {
       setError(null);
       setIsLoading(true);
       setCurrentTopic(topic);
+      setCompletedParticipants(new Set());
       setProgress({
         currentRound: 1,
         totalRounds: rounds,
@@ -400,6 +403,15 @@ export default function Home() {
                 case 'message':
                   collectedMessages = [...collectedMessages, progressData.message];
                   setCurrentMessages(collectedMessages);
+                  // メッセージを受信したら、その参加者を完了としてマーク
+                  const messageParticipant = progressData.message;
+                  if (messageParticipant) {
+                    setCompletedParticipants(prev => {
+                      const newSet = new Set(prev);
+                      newSet.add(`${messageParticipant.provider}-${messageParticipant.model}`);
+                      return newSet;
+                    });
+                  }
                   break;
                 case 'summary':
                   collectedFinalAnswer = progressData.finalAnswer;
@@ -597,6 +609,8 @@ export default function Home() {
           currentProviderIndex={progress.currentParticipantIndex}
           isSummarizing={progress.isSummarizing}
           isSearching={isSearching}
+          participants={participants}
+          completedParticipants={completedParticipants}
         />
 
         {/* 入力フォーム */}
