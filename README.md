@@ -1,96 +1,224 @@
 # AI Discussion Arena
 
-複数のAI（Claude、Ollama、OpenAI、Gemini）がラウンドロビン形式で議論し、最終的に統合回答を生成するWeb UIアプリケーション。
+A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss topics in a round-robin format and generate integrated answers.
 
-## 機能
+[日本語版 README](README.ja.md)
 
-- **マルチAI議論**: 複数のAIモデルが順番に発言し、前の意見を踏まえて議論を深める
-- **ラウンドロビン形式**: 指定したラウンド数だけ各AIが順番に発言
-- **統合回答生成**: 議論終了後、全ての意見を統合した回答を自動生成
-- **リアルタイムストリーミング**: 各AIの回答をリアルタイムで表示
-- **Web検索統合**: SearXNGを使用して最新情報を検索し、議論に反映
-- **セッション管理**: 議論履歴をIndexedDBに保存、複数セッションの管理が可能
-- **レスポンシブ対応**: PC・モバイル両対応のUI
+## Features
 
-## 対応AIプロバイダー
+- **Multi-AI Discussion**: Multiple AI models take turns speaking, deepening the discussion based on previous opinions
+- **Round-Robin Format**: Each AI speaks in turn for the specified number of rounds
+- **Integrated Answer Generation**: Automatically generates an answer integrating all opinions after the discussion
+- **Real-time Streaming**: Display each AI's response in real-time
+- **Web Search Integration**: Search for the latest information using SearXNG and reflect it in the discussion
+- **Progress Visualization**: Visual display of selected models and their execution status (pending/active/completed)
+- **Session Management**: Save discussion history to IndexedDB, manage multiple sessions
+- **Responsive Design**: UI compatible with both PC and mobile devices
 
-- **Claude** (Anthropic API)
-- **Ollama** (ローカル実行)
-- **OpenAI** (ChatGPT)
-- **Gemini** (Google AI)
+## Supported AI Providers
 
-## セットアップ
+| Provider | Type | Requirements |
+|----------|------|--------------|
+| **Claude** | Cloud API | Anthropic API Key |
+| **Ollama** | Local | Ollama server running |
+| **OpenAI** | Cloud API | OpenAI API Key |
+| **Gemini** | Cloud API | Google AI API Key |
 
-### 1. リポジトリのクローン
+## Screenshots
+
+### Discussion View
+The main discussion panel showing AI conversations with model status indicators:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  [gemma2:2b ✓] [qwen3:4b ●] [統合]   ← Model chips │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ← Progress    │
+│  ● qwen3:4b is responding...   Round 1/2          │
+└─────────────────────────────────────────────────────┘
+```
+
+## Setup
+
+### Prerequisites
+
+- **Node.js** 18.x or later
+- **npm** or **yarn**
+- At least one AI provider configured:
+  - Anthropic API key for Claude
+  - Ollama installed and running for local models
+  - OpenAI API key for ChatGPT
+  - Google AI API key for Gemini
+
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/ngc-shj/ai-discussion-app.git
 cd ai-discussion-app
 ```
 
-### 2. 依存関係のインストール
+### 2. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 3. 環境変数の設定
+### 3. Configure Environment Variables
 
-`.env.local`ファイルを作成し、使用するAPIキーを設定:
+Create a `.env.local` file based on `.env.local.example`:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Edit `.env.local` and set your API keys:
 
 ```env
 # Anthropic (Claude)
-ANTHROPIC_API_KEY=your_api_key
+ANTHROPIC_API_KEY=sk-ant-xxxxx
 
 # OpenAI
-OPENAI_API_KEY=your_api_key
+OPENAI_API_KEY=sk-xxxxx
 
 # Google AI (Gemini)
-GOOGLE_AI_API_KEY=your_api_key
+GOOGLE_AI_API_KEY=xxxxx
 
-# Ollama (ローカル実行の場合、デフォルトはlocalhost:11434)
+# Ollama (default: localhost:11434)
 OLLAMA_BASE_URL=http://localhost:11434
 
-# SearXNG (Web検索機能を使用する場合)
+# SearXNG (optional, for web search feature)
 SEARXNG_BASE_URL=http://localhost:8080
 ```
 
-### 4. 開発サーバーの起動
+> **Note**: You only need to configure the providers you plan to use.
+
+### 4. Start Development Server
 
 ```bash
 npm run dev
 ```
 
-[http://localhost:3000](http://localhost:3000) をブラウザで開く。
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 使い方
+## Provider Setup Details
 
-1. 右側の設定パネルで参加するAIモデルを選択
-2. ラウンド数を設定（1〜5）
-3. （オプション）「Web検索を使用」を有効にして、最新情報を議論に反映
-4. 議論したいトピックを入力して「議論開始」をクリック
-5. 各AIが順番に回答し、最後に統合回答が生成される
+### Ollama (Local Models)
 
-### Web検索機能
+1. Install Ollama from [ollama.ai](https://ollama.ai/)
 
-設定パネルで「Web検索を使用」を有効にすると、議論開始前にトピックに関連する最新情報を検索し、各AIがその情報を参考に議論します。
+2. Pull models you want to use:
+   ```bash
+   ollama pull gemma2:2b
+   ollama pull qwen3:4b
+   ollama pull llama3.2:3b
+   ```
 
-- **検索タイプ**: Web検索またはニュース検索を選択
-- **検索結果数**: 3〜10件の検索結果を取得
+3. Ensure Ollama server is running:
+   ```bash
+   ollama serve
+   ```
 
-この機能を使用するには、SearXNGサーバーを別途セットアップする必要があります。
+### SearXNG (Web Search)
 
-## 技術スタック
+To use the web search feature, set up a SearXNG instance with JSON format enabled.
 
-- **フレームワーク**: Next.js 14 (App Router)
-- **言語**: TypeScript
-- **スタイリング**: Tailwind CSS
-- **データ永続化**: IndexedDB (idb)
-- **AI SDK**:
+**Recommended**: Use the pre-configured Docker setup from [ngc-shj/searxng-mcp-server](https://github.com/ngc-shj/searxng-mcp-server):
+
+```bash
+git clone https://github.com/ngc-shj/searxng-mcp-server.git
+cd searxng-mcp-server
+docker compose up -d
+```
+
+This setup already has JSON format output enabled.
+
+**Manual Setup** (if you prefer):
+
+1. Using Docker:
+
+   ```bash
+   docker run -d -p 8080:8080 searxng/searxng
+   ```
+
+2. Configure SearXNG to enable JSON format output:
+   - Edit `settings.yml` in your SearXNG instance
+   - Under `search.formats`, enable `json`
+
+3. Set `SEARXNG_BASE_URL` in your `.env.local`
+
+## Usage
+
+1. **Select AI Models**: In the right settings panel, check the AI models to participate
+2. **Set Rounds**: Choose the number of discussion rounds (1-5)
+3. **Enable Web Search** (Optional): Toggle "Web検索を使用" to search for latest information
+4. **Start Discussion**: Enter your topic and click "議論開始"
+5. **View Results**: Watch as each AI responds, followed by an integrated summary
+
+### Web Search Feature
+
+When enabled, the app searches for relevant information before the discussion starts:
+
+- **Search Type**: Web search or News search
+- **Result Count**: 3-10 search results
+- Results are displayed in a collapsible section and provided to all AI participants
+
+## Tech Stack
+
+- **Framework**: Next.js 14+ (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Data Persistence**: IndexedDB (idb)
+- **AI SDKs**:
   - `@anthropic-ai/sdk` (Claude)
   - `openai` (OpenAI)
   - `@google/generative-ai` (Gemini)
+- **Streaming**: Server-Sent Events (SSE)
 
-## ライセンス
+## Project Structure
 
-MIT License - 詳細は [LICENSE](LICENSE) ファイルを参照してください。
+```
+ai-discussion-app/
+├── src/
+│   ├── app/
+│   │   ├── page.tsx           # Main UI
+│   │   └── api/
+│   │       ├── discuss/       # Discussion API endpoint
+│   │       ├── models/        # Available models endpoint
+│   │       ├── providers/     # Provider availability check
+│   │       └── search/        # SearXNG search endpoint
+│   ├── components/
+│   │   ├── DiscussionPanel.tsx
+│   │   ├── ProgressIndicator.tsx
+│   │   ├── SettingsPanel.tsx
+│   │   └── ...
+│   ├── lib/
+│   │   ├── ai-providers/      # AI provider implementations
+│   │   ├── discussion-engine.ts
+│   │   └── session-storage.ts
+│   └── types/
+│       └── index.ts
+├── .env.local.example
+└── package.json
+```
+
+## Troubleshooting
+
+### "Provider not available" Error
+
+- **Ollama**: Ensure `ollama serve` is running and accessible at the configured URL
+- **Cloud APIs**: Verify your API keys are correctly set in `.env.local`
+- Check the browser console for detailed error messages
+
+### No Models Showing
+
+- For Ollama, ensure you've pulled at least one model (`ollama list` to check)
+- For cloud providers, verify API keys have the necessary permissions
+
+### Web Search Not Working
+
+- Ensure SearXNG is running and accessible
+- Check that JSON format is enabled in SearXNG settings
+- Verify `SEARXNG_BASE_URL` is correctly configured
+
+## License
+
+MIT License - See [LICENSE](LICENSE) file for details.
