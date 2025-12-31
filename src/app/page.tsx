@@ -461,7 +461,7 @@ export default function Home() {
 
         // 議論完了後、セッションにターンを追加して保存
         if (collectedFinalAnswer) {
-          const newTurn = createNewTurn(topic, collectedMessages, collectedFinalAnswer);
+          const newTurn = createNewTurn(topic, collectedMessages, collectedFinalAnswer, searchResults.length > 0 ? searchResults : undefined);
           const latestSession = currentSessionRef.current;
 
           if (latestSession) {

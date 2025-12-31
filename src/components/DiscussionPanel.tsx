@@ -136,6 +136,11 @@ function TurnDisplay({
         </div>
       </div>
 
+      {/* 検索結果を表示（過去のターン） */}
+      {turn.searchResults && turn.searchResults.length > 0 && (
+        <SearchResultsDisplay results={turn.searchResults} />
+      )}
+
       {/* AIの議論（折りたたみ） */}
       {turn.messages.length > 0 && (
         <div className="ml-10 md:ml-13 mb-2 md:mb-3">
