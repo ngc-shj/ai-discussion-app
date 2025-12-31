@@ -7,3 +7,4 @@ export { FinalAnswer } from './FinalAnswer';
 export { ProgressIndicator } from './ProgressIndicator';
 export { SessionSidebar } from './SessionSidebar';
 export { MobileHeader } from './MobileHeader';
+export { MarkdownRenderer } from './MarkdownRenderer';

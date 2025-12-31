@@ -1,6 +1,7 @@
 'use client';
 
 import { DiscussionMessage, DEFAULT_PROVIDERS, getOllamaModelColor } from '@/types';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface MessageBubbleProps {
   message: DiscussionMessage;
@@ -37,7 +38,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               <span className="text-gray-400">考え中...</span>
             </div>
           ) : (
-            <div className="whitespace-pre-wrap">{message.content}</div>
+            <MarkdownRenderer content={message.content} />
           )}
         </div>
       </div>
