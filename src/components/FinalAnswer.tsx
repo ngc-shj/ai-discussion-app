@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface FinalAnswerProps {
   answer: string;
@@ -65,7 +66,9 @@ export function FinalAnswer({ answer, isLoading }: FinalAnswerProps) {
           <span>議論を統合中...</span>
         </div>
       ) : (
-        <div className="max-h-40 md:max-h-48 overflow-y-auto text-gray-200 whitespace-pre-wrap text-sm md:text-base">{answer}</div>
+        <div className="max-h-64 md:max-h-96 overflow-y-auto text-gray-200 text-sm md:text-base">
+          <MarkdownRenderer content={answer} />
+        </div>
       )}
     </div>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DiscussionMessage, DiscussionTurn, SearchResult } from '@/types';
 import { MessageBubble } from './MessageBubble';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface DiscussionPanelProps {
   turns: DiscussionTurn[];
@@ -225,7 +226,9 @@ function TurnDisplay({
                   )}
                 </button>
               </div>
-              <div className="px-2 pb-2 md:px-3 md:pb-3 whitespace-pre-wrap">{turn.finalAnswer}</div>
+              <div className="px-2 pb-2 md:px-3 md:pb-3">
+                <MarkdownRenderer content={turn.finalAnswer} />
+              </div>
             </div>
           </div>
         </div>
@@ -421,7 +424,9 @@ function CurrentTurnDisplay({
                       )}
                     </button>
                   </div>
-                  <div className="px-2 pb-2 md:px-3 md:pb-3 whitespace-pre-wrap">{finalAnswer}</div>
+                  <div className="px-2 pb-2 md:px-3 md:pb-3">
+                    <MarkdownRenderer content={finalAnswer || ''} />
+                  </div>
                 </>
               )}
             </div>
