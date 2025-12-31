@@ -1,11 +1,12 @@
-import { DiscussionMessage, DiscussionRequest, DiscussionParticipant, PreviousTurnSummary } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult } from '@/types';
 import { createProvider, createDiscussionPrompt } from './ai-providers';
 
 export interface DiscussionProgress {
-  type: 'message' | 'summary' | 'error' | 'complete' | 'progress';
+  type: 'message' | 'summary' | 'error' | 'complete' | 'progress' | 'searching';
   message?: DiscussionMessage;
   finalAnswer?: string;
   error?: string;
+  searchResults?: SearchResult[];
   progress?: {
     currentRound: number;
     totalRounds: number;
@@ -16,11 +17,20 @@ export interface DiscussionProgress {
   };
 }
 
+// 議論リクエストの型定義
+export interface DiscussionRequest {
+  topic: string;
+  participants: DiscussionParticipant[];
+  rounds: number;
+  previousTurns?: PreviousTurnSummary[];
+  searchResults?: SearchResult[];
+}
+
 // 議論を実行するジェネレーター関数
 export async function* runDiscussion(
   request: DiscussionRequest
 ): AsyncGenerator<DiscussionProgress> {
-  const { topic, participants, rounds, previousTurns } = request;
+  const { topic, participants, rounds, previousTurns, searchResults } = request;
   const messages: DiscussionMessage[] = [];
   let messageId = 0;
 
@@ -49,6 +59,7 @@ export async function* runDiscussion(
       const isAvailable = await provider.isAvailable();
 
       if (!isAvailable) {
+        console.error(`Provider not available: ${participant.displayName} (${participant.provider}/${participant.model})`);
         yield {
           type: 'error',
           error: `${participant.displayName} is not available`,
@@ -67,7 +78,8 @@ export async function* runDiscussion(
         previousMessages,
         messages.length === 0,
         false,
-        turnContext
+        turnContext,
+        searchResults
       );
 
       // AIに問い合わせ
@@ -101,9 +113,11 @@ export async function* runDiscussion(
 
   // メッセージがない場合は統合回答を生成しない
   if (messages.length === 0) {
+    const providerNames = participants.map(p => p.displayName).join(', ');
+    console.error(`All providers failed. Attempted providers: ${providerNames}`);
     yield {
       type: 'error',
-      error: 'No messages were generated. All providers failed.',
+      error: `No messages were generated. All providers failed (${providerNames}).`,
     };
     return;
   }
@@ -136,7 +150,7 @@ export async function* runDiscussion(
       content: m.content,
     }));
 
-    const summaryPrompt = createDiscussionPrompt(topic, allMessages, false, true, turnContext);
+    const summaryPrompt = createDiscussionPrompt(topic, allMessages, false, true, turnContext, searchResults);
     const summaryResponse = await summaryProvider.generate({ prompt: summaryPrompt });
 
     if (!summaryResponse.error && summaryResponse.content) {

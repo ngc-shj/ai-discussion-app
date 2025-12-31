@@ -10,6 +10,8 @@ import {
   PreviousTurnSummary,
   DEFAULT_PROVIDERS,
   getOllamaModelColor,
+  SearchConfig,
+  SearchResult,
 } from '@/types';
 import {
   DiscussionPanel,
@@ -30,6 +32,14 @@ import {
 
 const STORAGE_KEY_PARTICIPANTS = 'ai-discussion-participants';
 const STORAGE_KEY_ROUNDS = 'ai-discussion-rounds';
+const STORAGE_KEY_SEARCH = 'ai-discussion-search';
+
+const DEFAULT_SEARCH_CONFIG: SearchConfig = {
+  enabled: false,
+  maxResults: 5,
+  searchType: 'web',
+  language: 'ja',
+};
 
 interface ProgressState {
   currentRound: number;
@@ -73,6 +83,9 @@ export default function Home() {
     gemini: [],
   });
   const [rounds, setRounds] = useState(2);
+  const [searchConfig, setSearchConfig] = useState<SearchConfig>(DEFAULT_SEARCH_CONFIG);
+  const [isSearching, setIsSearching] = useState(false);
+  const [currentSearchResults, setCurrentSearchResults] = useState<SearchResult[]>([]);
   const [availability, setAvailability] = useState<Record<AIProviderType, boolean>>({
     claude: false,
     ollama: false,
@@ -182,6 +195,17 @@ export default function Home() {
         setRounds(parsed);
       }
     }
+
+    // ローカルストレージから検索設定を復元
+    const savedSearch = localStorage.getItem(STORAGE_KEY_SEARCH);
+    if (savedSearch) {
+      try {
+        const parsed = JSON.parse(savedSearch);
+        setSearchConfig({ ...DEFAULT_SEARCH_CONFIG, ...parsed });
+      } catch {
+        // パースエラー時は無視
+      }
+    }
   }, []);
 
   // 参加者が変更されたらローカルストレージに保存
@@ -195,6 +219,11 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_ROUNDS, rounds.toString());
   }, [rounds]);
+
+  // 検索設定が変更されたらローカルストレージに保存
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SEARCH, JSON.stringify(searchConfig));
+  }, [searchConfig]);
 
   // 新しいセッションを開始
   const handleNewSession = useCallback(() => {
@@ -260,6 +289,7 @@ export default function Home() {
 
       setCurrentMessages([]);
       setCurrentFinalAnswer('');
+      setCurrentSearchResults([]);
       setError(null);
       setIsLoading(true);
       setCurrentTopic(topic);
@@ -271,6 +301,35 @@ export default function Home() {
         currentParticipant: participants[0],
         isSummarizing: false,
       });
+
+      // 検索が有効な場合、先に検索を実行
+      let searchResults: SearchResult[] = [];
+      if (searchConfig.enabled) {
+        setIsSearching(true);
+        try {
+          const searchQuery = searchConfig.query || topic;
+          const searchResponse = await fetch('/api/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: searchQuery,
+              type: searchConfig.searchType,
+              limit: searchConfig.maxResults,
+              language: searchConfig.language || 'ja',
+            }),
+          });
+          if (searchResponse.ok) {
+            const searchData = await searchResponse.json();
+            searchResults = searchData.results || [];
+            setCurrentSearchResults(searchResults);
+          }
+        } catch (err) {
+          console.error('Search failed:', err);
+          // 検索に失敗しても議論は続行
+        } finally {
+          setIsSearching(false);
+        }
+      }
 
       // 過去のターンを取得（継続議論用）- refを使って最新の値を取得
       let sessionAtStart = currentSessionRef.current;
@@ -303,6 +362,7 @@ export default function Home() {
             participants,
             rounds,
             previousTurns,
+            searchResults,
           }),
         });
 
@@ -348,7 +408,11 @@ export default function Home() {
                   break;
                 case 'error':
                   console.error('Discussion error:', progressData.error);
-                  setError(progressData.error);
+                  // 致命的なエラー（全プロバイダー失敗、統合回答生成失敗）のみ表示
+                  if (progressData.error.includes('No messages were generated') ||
+                      progressData.error.includes('Failed to generate summary with all')) {
+                    setError(progressData.error);
+                  }
                   break;
                 case 'complete':
                   setIsLoading(false);
@@ -405,6 +469,7 @@ export default function Home() {
           setCurrentTopic('');
           setCurrentMessages([]);
           setCurrentFinalAnswer('');
+          setCurrentSearchResults([]);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -412,7 +477,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [participants, rounds]
+    [participants, rounds, searchConfig]
   );
 
   return (
@@ -518,6 +583,7 @@ export default function Home() {
           currentFinalAnswer={currentFinalAnswer}
           isLoading={isLoading}
           isSummarizing={progress.isSummarizing}
+          searchResults={currentSearchResults}
         />
 
         {/* 進捗インジケーター */}
@@ -530,11 +596,12 @@ export default function Home() {
           totalProviders={progress.totalParticipants}
           currentProviderIndex={progress.currentParticipantIndex}
           isSummarizing={progress.isSummarizing}
+          isSearching={isSearching}
         />
 
         {/* 入力フォーム */}
         <div className="shrink-0">
-          <InputForm onSubmit={handleStartDiscussion} disabled={isLoading} />
+          <InputForm onSubmit={handleStartDiscussion} disabled={isLoading || isSearching} />
         </div>
       </div>
 
@@ -548,7 +615,9 @@ export default function Home() {
             availability={availability}
             rounds={rounds}
             onRoundsChange={setRounds}
-            disabled={isLoading}
+            searchConfig={searchConfig}
+            onSearchConfigChange={setSearchConfig}
+            disabled={isLoading || isSearching}
           />
         </div>
       )}
@@ -562,7 +631,9 @@ export default function Home() {
           availability={availability}
           rounds={rounds}
           onRoundsChange={setRounds}
-          disabled={isLoading}
+          searchConfig={searchConfig}
+          onSearchConfigChange={setSearchConfig}
+          disabled={isLoading || isSearching}
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
         />
