@@ -393,3 +393,64 @@ export interface DirectionGuide {
   focusAreas?: string[];   // 特に議論を深めたい領域
   avoidTopics?: string[];  // 避けたいトピック
 }
+
+// 議論の終了条件
+export type TerminationCondition =
+  | 'rounds'       // 指定ラウンド数で終了（デフォルト）
+  | 'consensus'    // 合意に達したら終了
+  | 'keyword'      // 特定キーワードで終了
+  | 'manual';      // 手動で終了
+
+// 終了条件の設定
+export interface TerminationConfig {
+  condition: TerminationCondition;
+  maxRounds: number;           // 最大ラウンド数（安全策）
+  consensusThreshold?: number; // 合意判定の閾値（0-1）
+  terminationKeywords?: string[]; // 終了キーワード
+}
+
+// 終了条件プリセット
+export interface TerminationPreset {
+  id: TerminationCondition;
+  name: string;
+  description: string;
+}
+
+// 終了条件プリセット一覧
+export const TERMINATION_PRESETS: TerminationPreset[] = [
+  {
+    id: 'rounds',
+    name: 'ラウンド数',
+    description: '指定したラウンド数で終了',
+  },
+  {
+    id: 'consensus',
+    name: '合意形成',
+    description: '参加者が合意に達したら終了',
+  },
+  {
+    id: 'keyword',
+    name: 'キーワード',
+    description: '特定のキーワードが出たら終了',
+  },
+  {
+    id: 'manual',
+    name: '手動',
+    description: 'ユーザーが手動で終了',
+  },
+];
+
+// メッセージへの投票/評価
+export interface MessageVote {
+  messageId: string;
+  vote: 'agree' | 'disagree' | 'neutral';
+  timestamp: Date;
+}
+
+// メッセージの評価集計
+export interface MessageRating {
+  messageId: string;
+  agrees: number;
+  disagrees: number;
+  neutrals: number;
+}

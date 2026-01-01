@@ -1,12 +1,13 @@
-import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult, ROLE_PRESETS, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult, ROLE_PRESETS, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig } from '@/types';
 import { createProvider, createDiscussionPrompt } from './ai-providers';
 
 export interface DiscussionProgress {
-  type: 'message' | 'summary' | 'error' | 'complete' | 'progress' | 'searching';
+  type: 'message' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'terminated';
   message?: DiscussionMessage;
   finalAnswer?: string;
   error?: string;
   searchResults?: SearchResult[];
+  terminationReason?: string;
   progress?: {
     currentRound: number;
     totalRounds: number;
@@ -28,22 +29,72 @@ export interface DiscussionRequest {
   discussionMode?: DiscussionMode;
   discussionDepth?: DiscussionDepth;
   directionGuide?: DirectionGuide;
+  terminationConfig?: TerminationConfig;
+}
+
+// 合意判定用のキーワード
+const CONSENSUS_KEYWORDS = [
+  '同意します', '賛成です', '合意です', '異論ありません',
+  '同じ意見です', '同感です', 'I agree', 'agreed',
+  '結論として', 'まとめると', '全員一致',
+];
+
+// 合意度をチェック
+function checkConsensus(messages: DiscussionMessage[], threshold: number): boolean {
+  if (messages.length < 2) return false;
+
+  // 最新ラウンドのメッセージを取得
+  const maxRound = Math.max(...messages.map(m => m.round));
+  const latestMessages = messages.filter(m => m.round === maxRound);
+
+  if (latestMessages.length < 2) return false;
+
+  // 各メッセージで合意キーワードをチェック
+  let consensusCount = 0;
+  for (const msg of latestMessages) {
+    const content = msg.content.toLowerCase();
+    if (CONSENSUS_KEYWORDS.some(kw => content.includes(kw.toLowerCase()))) {
+      consensusCount++;
+    }
+  }
+
+  const consensusRatio = consensusCount / latestMessages.length;
+  return consensusRatio >= threshold;
+}
+
+// 終了キーワードをチェック
+function checkTerminationKeywords(content: string, keywords: string[]): boolean {
+  const lowerContent = content.toLowerCase();
+  return keywords.some(kw => lowerContent.includes(kw.toLowerCase()));
 }
 
 // 議論を実行するジェネレーター関数
 export async function* runDiscussion(
   request: DiscussionRequest
 ): AsyncGenerator<DiscussionProgress> {
-  const { topic, participants, rounds, previousTurns, searchResults, userProfile, discussionMode, discussionDepth, directionGuide } = request;
+  const { topic, participants, rounds, previousTurns, searchResults, userProfile, discussionMode, discussionDepth, directionGuide, terminationConfig } = request;
   const messages: DiscussionMessage[] = [];
   let messageId = 0;
+  let terminated = false;
+  let terminationReason = '';
 
   // 過去のターンの要約を準備（最新5件まで）
   const turnContext: PreviousTurnSummary[] | undefined = previousTurns?.slice(-5);
 
+  // 終了条件の設定（デフォルト: ラウンド数）
+  const termConfig: TerminationConfig = terminationConfig || {
+    condition: 'rounds',
+    maxRounds: rounds,
+  };
+
+  // 実際の最大ラウンド数
+  const effectiveMaxRounds = termConfig.condition === 'manual'
+    ? termConfig.maxRounds
+    : Math.min(rounds, termConfig.maxRounds);
+
   // 各ラウンドで全参加者が発言
-  for (let round = 1; round <= rounds; round++) {
-    for (let pIndex = 0; pIndex < participants.length; pIndex++) {
+  for (let round = 1; round <= effectiveMaxRounds && !terminated; round++) {
+    for (let pIndex = 0; pIndex < participants.length && !terminated; pIndex++) {
       const participant = participants[pIndex];
 
       // 進捗情報を送信
@@ -130,6 +181,34 @@ export async function* runDiscussion(
         type: 'message',
         message,
       };
+
+      // 終了条件のチェック（ラウンド終了後）
+      if (pIndex === participants.length - 1) {
+        // 合意形成による終了
+        if (termConfig.condition === 'consensus') {
+          const threshold = termConfig.consensusThreshold || 0.7;
+          if (checkConsensus(messages, threshold)) {
+            terminated = true;
+            terminationReason = '参加者間で合意が形成されました';
+            yield {
+              type: 'terminated',
+              terminationReason,
+            };
+          }
+        }
+
+        // キーワードによる終了
+        if (termConfig.condition === 'keyword' && termConfig.terminationKeywords) {
+          if (checkTerminationKeywords(message.content, termConfig.terminationKeywords)) {
+            terminated = true;
+            terminationReason = '終了キーワードが検出されました';
+            yield {
+              type: 'terminated',
+              terminationReason,
+            };
+          }
+        }
+      }
     }
   }
 

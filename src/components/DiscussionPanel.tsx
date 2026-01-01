@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { DiscussionMessage, DiscussionTurn, SearchResult } from '@/types';
+import { DiscussionMessage, DiscussionTurn, SearchResult, MessageVote } from '@/types';
 import { MessageBubble } from './MessageBubble';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
@@ -14,6 +14,8 @@ interface DiscussionPanelProps {
   isSummarizing: boolean;
   searchResults?: SearchResult[];
   onFollowUp?: (topic: string, previousAnswer: string) => void;
+  messageVotes?: MessageVote[];
+  onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
 }
 
 // 検索結果を表示するコンポーネント
@@ -87,12 +89,16 @@ function TurnDisplay({
   defaultExpanded,
   onFollowUp,
   disabled,
+  messageVotes,
+  onVote,
 }: {
   turn: DiscussionTurn;
   isLatest: boolean;
   defaultExpanded: boolean;
   onFollowUp?: (topic: string, previousAnswer: string) => void;
   disabled?: boolean;
+  messageVotes?: MessageVote[];
+  onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [copied, setCopied] = useState(false);
@@ -193,7 +199,12 @@ function TurnDisplay({
           {isExpanded && (
             <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-gray-700 max-h-48 md:max-h-64 overflow-y-auto">
               {turn.messages.map((message) => (
-                <MessageBubble key={message.id} message={message} />
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  vote={messageVotes?.find(v => v.messageId === message.id)?.vote}
+                  onVote={onVote ? (vote) => onVote(message.id, vote) : undefined}
+                />
               ))}
             </div>
           )}
@@ -273,6 +284,8 @@ function CurrentTurnDisplay({
   isSummarizing,
   searchResults,
   onFollowUp,
+  messageVotes,
+  onVote,
 }: {
   topic: string;
   messages: DiscussionMessage[];
@@ -281,6 +294,8 @@ function CurrentTurnDisplay({
   isSummarizing: boolean;
   searchResults?: SearchResult[];
   onFollowUp?: (topic: string, previousAnswer: string) => void;
+  messageVotes?: MessageVote[];
+  onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -396,7 +411,12 @@ function CurrentTurnDisplay({
           {isExpanded && (
             <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-gray-700 max-h-48 md:max-h-64 overflow-y-auto">
               {messages.map((message) => (
-                <MessageBubble key={message.id} message={message} />
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  vote={messageVotes?.find(v => v.messageId === message.id)?.vote}
+                  onVote={onVote ? (vote) => onVote(message.id, vote) : undefined}
+                />
               ))}
               {isLoading && messages.length === 0 && (
                 <div className="flex items-center gap-2 py-3 md:py-4">
@@ -491,6 +511,8 @@ export function DiscussionPanel({
   isSummarizing,
   searchResults,
   onFollowUp,
+  messageVotes,
+  onVote,
 }: DiscussionPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -522,6 +544,8 @@ export function DiscussionPanel({
           defaultExpanded={false}
           onFollowUp={onFollowUp}
           disabled={isLoading}
+          messageVotes={messageVotes}
+          onVote={onVote}
         />
       ))}
 
@@ -535,6 +559,8 @@ export function DiscussionPanel({
           isSummarizing={isSummarizing}
           searchResults={searchResults}
           onFollowUp={onFollowUp}
+          messageVotes={messageVotes}
+          onVote={onVote}
         />
       )}
     </div>
