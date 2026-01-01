@@ -1,4 +1,4 @@
-import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS } from '@/types';
+import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS, DiscussionParticipant } from '@/types';
 
 // モデル情報
 export interface ModelInfo {
@@ -59,6 +59,32 @@ function getRolePrompt(role?: ParticipantRole, customRolePrompt?: string): strin
   return '';
 }
 
+// 参加者リストをフォーマット
+function formatParticipantsList(
+  participants: DiscussionParticipant[],
+  currentParticipant?: DiscussionParticipant
+): string {
+  if (!participants || participants.length === 0) {
+    return '';
+  }
+
+  const participantLines = participants.map((p) => {
+    const rolePreset = p.role ? ROLE_PRESETS.find((r) => r.id === p.role) : undefined;
+    const roleName = rolePreset?.name || '中立';
+    const roleDesc = rolePreset?.description || 'バランスの取れた客観的な視点';
+    const isCurrentUser = currentParticipant &&
+      p.provider === currentParticipant.provider &&
+      p.model === currentParticipant.model;
+
+    if (isCurrentUser) {
+      return `- **あなた**: ${p.displayName} [${roleName}] - ${roleDesc}`;
+    }
+    return `- ${p.displayName} [${roleName}] - ${roleDesc}`;
+  });
+
+  return `\n【今回の議論参加者（予定）】\n${participantLines.join('\n')}\n※一部の参加者がエラーで発言できない場合があります。「これまでの議論」に登場した参加者のみ参照してください。\n`;
+}
+
 // 議論用のシステムプロンプト
 export function createDiscussionPrompt(
   topic: string,
@@ -68,7 +94,9 @@ export function createDiscussionPrompt(
   previousTurns?: PreviousTurnSummary[],
   searchResults?: SearchResult[],
   currentRole?: ParticipantRole,
-  customRolePrompt?: string
+  customRolePrompt?: string,
+  allParticipants?: DiscussionParticipant[],
+  currentParticipant?: DiscussionParticipant
 ): string {
   // 過去のターンのコンテキストを構築
   let previousContext = '';
@@ -84,6 +112,9 @@ export function createDiscussionPrompt(
 
   // ロールのプロンプトを取得
   const rolePrompt = getRolePrompt(currentRole, customRolePrompt);
+
+  // 参加者リストを取得
+  const participantsContext = formatParticipantsList(allParticipants || [], currentParticipant);
 
   if (isFinalSummary) {
     const allResponses = previousMessages
@@ -114,7 +145,7 @@ ${allResponses}
 
   if (isFirstRound) {
     return `あなたは議論に参加するAIアシスタントです。以下のトピックについて、あなたの見解を述べてください。
-${rolePrompt}${previousContext}${searchContext}
+${rolePrompt}${participantsContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -134,7 +165,7 @@ ${topic}
     .join('\n\n');
 
   return `あなたは議論に参加するAIアシスタントです。以下のトピックについて議論が進行中です。
-${rolePrompt}${previousContext}${searchContext}
+${rolePrompt}${participantsContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -142,8 +173,10 @@ ${topic}
 ${previousResponses}
 
 【指示】
-- 他のAIの意見を参考にしつつ、あなた自身の見解を述べてください
+- 上記「これまでの議論」に登場した参加者の意見を参照する際は、名前を挙げてコメントしてください（例: 「〇〇さんの意見に同意しますが...」）
+- 発言していない参加者には言及しないでください
 - 同意する点、異なる視点、追加すべき観点などを明確にしてください
+- 特に議論を深めたい相手がいれば、その人に向けて質問や意見を述べてください
 - 建設的な議論を心がけてください
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
 - 検索結果がある場合は、最新の情報を参考にして回答してください
