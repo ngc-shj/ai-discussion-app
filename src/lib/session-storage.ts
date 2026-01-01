@@ -1,4 +1,4 @@
-import { DiscussionSession, DiscussionTurn, SearchResult } from '@/types';
+import { DiscussionSession, DiscussionTurn, SearchResult, InterruptedDiscussionState, DiscussionMessage } from '@/types';
 
 const DB_NAME = 'ai-discussion-db';
 const DB_VERSION = 1;
@@ -181,4 +181,64 @@ export function createNewTurn(
     searchResults,
     createdAt: new Date(),
   };
+}
+
+// 中断された議論状態を保存するためのストレージキー
+const INTERRUPTED_STORAGE_KEY = 'ai-discussion-interrupted';
+
+// 中断状態をシリアライズ（Date型を文字列に変換）
+function serializeInterruptedState(state: InterruptedDiscussionState): Record<string, unknown> {
+  return {
+    ...state,
+    interruptedAt: toISOString(state.interruptedAt),
+    messages: state.messages.map((msg) => ({
+      ...msg,
+      timestamp: toISOString(msg.timestamp),
+    })),
+  };
+}
+
+// 中断状態をデシリアライズ（文字列をDate型に変換）
+function deserializeInterruptedState(data: Record<string, unknown>): InterruptedDiscussionState {
+  return {
+    ...data,
+    interruptedAt: new Date(data.interruptedAt as string),
+    messages: (data.messages as Array<Record<string, unknown>>).map((msg) => ({
+      ...msg,
+      timestamp: new Date(msg.timestamp as string),
+    })) as DiscussionMessage[],
+  } as InterruptedDiscussionState;
+}
+
+// 中断された議論状態を保存
+export function saveInterruptedState(state: InterruptedDiscussionState): void {
+  try {
+    const serialized = serializeInterruptedState(state);
+    localStorage.setItem(INTERRUPTED_STORAGE_KEY, JSON.stringify(serialized));
+  } catch (err) {
+    console.error('Failed to save interrupted state:', err);
+  }
+}
+
+// 中断された議論状態を取得
+export function getInterruptedState(): InterruptedDiscussionState | null {
+  try {
+    const saved = localStorage.getItem(INTERRUPTED_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return deserializeInterruptedState(parsed);
+    }
+  } catch (err) {
+    console.error('Failed to load interrupted state:', err);
+  }
+  return null;
+}
+
+// 中断された議論状態を削除
+export function clearInterruptedState(): void {
+  try {
+    localStorage.removeItem(INTERRUPTED_STORAGE_KEY);
+  } catch (err) {
+    console.error('Failed to clear interrupted state:', err);
+  }
 }

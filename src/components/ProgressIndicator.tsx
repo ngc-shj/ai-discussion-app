@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { AIProviderType, DiscussionParticipant, DEFAULT_PROVIDERS, getOllamaModelColor, ROLE_PRESETS } from '@/types';
 
 // 各参加者の実行状態
@@ -23,6 +24,7 @@ interface ProgressIndicatorProps {
   isSearching?: boolean;
   participants?: DiscussionParticipant[];
   completedParticipants?: Set<string>;
+  onInterrupt?: () => void;
 }
 
 export function ProgressIndicator({
@@ -37,8 +39,23 @@ export function ProgressIndicator({
   isSearching = false,
   participants = [],
   completedParticipants = new Set(),
+  onInterrupt,
 }: ProgressIndicatorProps) {
+  const [isInterrupting, setIsInterrupting] = useState(false);
+
+  // isActiveがfalseになったら中断中状態をリセット
+  if (!isActive && isInterrupting) {
+    setIsInterrupting(false);
+  }
+
   if (!isActive && !isSearching) return null;
+
+  const handleInterrupt = () => {
+    if (onInterrupt && !isInterrupting) {
+      setIsInterrupting(true);
+      onInterrupt();
+    }
+  };
 
   const provider = DEFAULT_PROVIDERS.find((p) => p.id === currentProvider);
   const isOllama = currentProvider === 'ollama';
@@ -193,16 +210,49 @@ export function ProgressIndicator({
             </>
           )}
         </div>
-        <div className="text-gray-400 shrink-0 ml-2">
-          {isSearching ? (
-            <span className="hidden sm:inline">最新情報を取得中</span>
-          ) : isSummarizing ? (
-            <span className="hidden sm:inline">最終ステップ</span>
-          ) : (
-            <span>
-              <span className="hidden sm:inline">ラウンド </span>{currentRound}/{totalRounds}
-              <span className="hidden sm:inline"> ・ AI {currentProviderIndex + 1}/{totalProviders}</span>
-            </span>
+        <div className="flex items-center gap-2 shrink-0 ml-2">
+          <div className="text-gray-400">
+            {isSearching ? (
+              <span className="hidden sm:inline">最新情報を取得中</span>
+            ) : isSummarizing ? (
+              <span className="hidden sm:inline">最終ステップ</span>
+            ) : (
+              <span>
+                <span className="hidden sm:inline">ラウンド </span>{currentRound}/{totalRounds}
+                <span className="hidden sm:inline"> ・ AI {currentProviderIndex + 1}/{totalProviders}</span>
+              </span>
+            )}
+          </div>
+          {/* 中断ボタン */}
+          {onInterrupt && !isSummarizing && !isSearching && (
+            <button
+              type="button"
+              onClick={handleInterrupt}
+              disabled={isInterrupting}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 shadow-sm ${
+                isInterrupting
+                  ? 'bg-orange-600 text-white cursor-wait animate-pulse'
+                  : 'bg-red-600 hover:bg-red-500 active:bg-red-700 text-white hover:shadow-md active:scale-95'
+              }`}
+              title={isInterrupting ? '中断処理中...' : '議論を中断して後で再開できます'}
+            >
+              {isInterrupting ? (
+                <>
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>中断中...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                  </svg>
+                  <span>中断</span>
+                </>
+              )}
+            </button>
           )}
         </div>
       </div>

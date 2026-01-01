@@ -18,6 +18,13 @@ export interface DiscussionProgress {
   };
 }
 
+// 再開用のパラメータ
+export interface ResumeFromState {
+  messages: DiscussionMessage[];
+  currentRound: number;
+  currentParticipantIndex: number;
+}
+
 // 議論リクエストの型定義
 export interface DiscussionRequest {
   topic: string;
@@ -30,6 +37,7 @@ export interface DiscussionRequest {
   discussionDepth?: DiscussionDepth;
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
+  resumeFrom?: ResumeFromState; // 中断からの再開用
 }
 
 // 合意判定用のキーワード
@@ -72,11 +80,17 @@ function checkTerminationKeywords(content: string, keywords: string[]): boolean 
 export async function* runDiscussion(
   request: DiscussionRequest
 ): AsyncGenerator<DiscussionProgress> {
-  const { topic, participants, rounds, previousTurns, searchResults, userProfile, discussionMode, discussionDepth, directionGuide, terminationConfig } = request;
-  const messages: DiscussionMessage[] = [];
-  let messageId = 0;
+  const { topic, participants, rounds, previousTurns, searchResults, userProfile, discussionMode, discussionDepth, directionGuide, terminationConfig, resumeFrom } = request;
+
+  // 再開時は既存のメッセージから開始
+  const messages: DiscussionMessage[] = resumeFrom?.messages ? [...resumeFrom.messages] : [];
+  let messageId = messages.length;
   let terminated = false;
   let terminationReason = '';
+
+  // 再開位置
+  const startRound = resumeFrom?.currentRound || 1;
+  const startParticipantIndex = resumeFrom?.currentParticipantIndex || 0;
 
   // 過去のターンの要約を準備（最新5件まで）
   const turnContext: PreviousTurnSummary[] | undefined = previousTurns?.slice(-5);
@@ -93,8 +107,11 @@ export async function* runDiscussion(
     : Math.min(rounds, termConfig.maxRounds);
 
   // 各ラウンドで全参加者が発言
-  for (let round = 1; round <= effectiveMaxRounds && !terminated; round++) {
-    for (let pIndex = 0; pIndex < participants.length && !terminated; pIndex++) {
+  for (let round = startRound; round <= effectiveMaxRounds && !terminated; round++) {
+    // 再開時の最初のラウンドでは、中断位置から開始
+    const pStartIndex = (round === startRound) ? startParticipantIndex : 0;
+
+    for (let pIndex = pStartIndex; pIndex < participants.length && !terminated; pIndex++) {
       const participant = participants[pIndex];
 
       // 進捗情報を送信

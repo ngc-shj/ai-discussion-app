@@ -35,7 +35,11 @@ import {
   updateSessionTitle,
   createNewSession,
   createNewTurn,
+  saveInterruptedState,
+  getInterruptedState,
+  clearInterruptedState,
 } from '@/lib/session-storage';
+import { InterruptedDiscussionState } from '@/types';
 
 const STORAGE_KEY_PARTICIPANTS = 'ai-discussion-participants';
 const STORAGE_KEY_SEARCH = 'ai-discussion-search';
@@ -120,6 +124,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   // フォローアップ用のプリセットトピック
   const [presetTopic, setPresetTopic] = useState<string>('');
+  // 中断された議論の状態
+  const [interruptedState, setInterruptedState] = useState<InterruptedDiscussionState | null>(null);
+  // 中断リクエストフラグ
+  const interruptRequestedRef = useRef(false);
   const [progress, setProgress] = useState<ProgressState>({
     currentRound: 0,
     totalRounds: 0,
@@ -142,6 +150,12 @@ export default function Home() {
       }
     }
     loadSessions();
+
+    // 中断された議論があるかチェック
+    const savedInterrupted = getInterruptedState();
+    if (savedInterrupted) {
+      setInterruptedState(savedInterrupted);
+    }
   }, []);
 
   // プロバイダーの可用性をチェック
@@ -385,6 +399,225 @@ export default function Home() {
     setPresetTopic('');
   }, []);
 
+  // 議論を中断
+  const handleInterrupt = useCallback(() => {
+    interruptRequestedRef.current = true;
+  }, []);
+
+  // 中断状態を破棄
+  const handleDiscardInterrupted = useCallback(() => {
+    clearInterruptedState();
+    setInterruptedState(null);
+  }, []);
+
+  // 中断した議論を再開
+  const handleResumeDiscussion = useCallback(async () => {
+    if (!interruptedState) return;
+
+    // 中断状態をクリア
+    clearInterruptedState();
+    setInterruptedState(null);
+
+    // 参加者と設定を復元
+    setParticipants(interruptedState.participants);
+    if (interruptedState.discussionMode) {
+      setDiscussionMode(interruptedState.discussionMode);
+    }
+    if (interruptedState.discussionDepth) {
+      setDiscussionDepth(interruptedState.discussionDepth);
+    }
+    if (interruptedState.directionGuide) {
+      setDirectionGuide(interruptedState.directionGuide);
+    }
+    if (interruptedState.terminationConfig) {
+      setTerminationConfig(interruptedState.terminationConfig);
+    }
+    if (interruptedState.userProfile) {
+      setUserProfile(interruptedState.userProfile);
+    }
+
+    // セッションを復元
+    const session = await getAllSessions().then(sessions =>
+      sessions.find(s => s.id === interruptedState.sessionId)
+    );
+    if (session) {
+      setCurrentSession(session);
+    }
+
+    // 中断時のメッセージを復元して表示
+    setCurrentTopic(interruptedState.topic);
+    setCurrentMessages(interruptedState.messages);
+    setCurrentSearchResults(interruptedState.searchResults || []);
+
+    // 再開用のAPIを呼び出す
+    setIsLoading(true);
+    setError(null);
+    interruptRequestedRef.current = false;
+    setCompletedParticipants(new Set());
+    setProgress({
+      currentRound: interruptedState.currentRound,
+      totalRounds: interruptedState.totalRounds,
+      currentParticipantIndex: interruptedState.currentParticipantIndex,
+      totalParticipants: interruptedState.participants.length,
+      currentParticipant: interruptedState.participants[interruptedState.currentParticipantIndex],
+      isSummarizing: false,
+    });
+
+    // 過去のターンを取得
+    const sessionForTurns = session || currentSessionRef.current;
+    const previousTurns: PreviousTurnSummary[] = sessionForTurns?.turns.map((t) => ({
+      topic: t.topic,
+      finalAnswer: t.finalAnswer,
+    })) || [];
+
+    try {
+      const response = await fetch('/api/discuss', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          topic: interruptedState.topic,
+          participants: interruptedState.participants,
+          rounds: interruptedState.totalRounds,
+          previousTurns,
+          searchResults: interruptedState.searchResults,
+          userProfile: interruptedState.userProfile,
+          discussionMode: interruptedState.discussionMode,
+          discussionDepth: interruptedState.discussionDepth,
+          directionGuide: interruptedState.directionGuide,
+          terminationConfig: interruptedState.terminationConfig,
+          // 再開用のパラメータ
+          resumeFrom: {
+            messages: interruptedState.messages,
+            currentRound: interruptedState.currentRound,
+            currentParticipantIndex: interruptedState.currentParticipantIndex,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to resume discussion');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let collectedMessages: DiscussionMessage[] = [...interruptedState.messages];
+      let collectedFinalAnswer = '';
+
+      const processLine = (line: string) => {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          try {
+            const progressData = JSON.parse(data);
+
+            switch (progressData.type) {
+              case 'progress':
+                setProgress({
+                  currentRound: progressData.progress.currentRound,
+                  totalRounds: progressData.progress.totalRounds,
+                  currentParticipantIndex: progressData.progress.currentParticipantIndex,
+                  totalParticipants: progressData.progress.totalParticipants,
+                  currentParticipant: progressData.progress.currentParticipant,
+                  isSummarizing: progressData.progress.isSummarizing,
+                });
+                break;
+              case 'message':
+                collectedMessages = [...collectedMessages, progressData.message];
+                setCurrentMessages(collectedMessages);
+                const messageParticipant = progressData.message;
+                if (messageParticipant) {
+                  setCompletedParticipants(prev => {
+                    const newSet = new Set(prev);
+                    newSet.add(`${messageParticipant.provider}-${messageParticipant.model}`);
+                    return newSet;
+                  });
+                }
+                break;
+              case 'summary':
+                collectedFinalAnswer = progressData.finalAnswer;
+                setCurrentFinalAnswer(collectedFinalAnswer);
+                setProgress((prev) => ({ ...prev, isSummarizing: false }));
+                break;
+              case 'error':
+                console.error('Discussion error:', progressData.error);
+                if (progressData.error.includes('No messages were generated') ||
+                    progressData.error.includes('Failed to generate summary with all')) {
+                  setError(progressData.error);
+                }
+                break;
+              case 'complete':
+                setIsLoading(false);
+                setProgress((prev) => ({ ...prev, isSummarizing: false }));
+                break;
+            }
+          } catch {
+            // JSON parse error, ignore
+          }
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          if (buffer.trim()) {
+            const remainingLines = buffer.split('\n\n');
+            for (const line of remainingLines) {
+              processLine(line);
+            }
+          }
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          processLine(line);
+        }
+      }
+
+      // 議論完了後、セッションにターンを追加して保存
+      if (collectedFinalAnswer) {
+        const newTurn = createNewTurn(
+          interruptedState.topic,
+          collectedMessages,
+          collectedFinalAnswer,
+          interruptedState.searchResults
+        );
+        const latestSession = currentSessionRef.current;
+
+        if (latestSession) {
+          const updatedSession: DiscussionSession = {
+            ...latestSession,
+            turns: [...latestSession.turns, newTurn],
+            updatedAt: new Date(),
+          };
+          await saveSession(updatedSession);
+          setCurrentSession(updatedSession);
+          setSessions((prev) =>
+            prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+          );
+        }
+
+        setCurrentTopic('');
+        setCurrentMessages([]);
+        setCurrentFinalAnswer('');
+        setCurrentSearchResults([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [interruptedState]);
+
   // セッションの名前を変更
   const handleRenameSession = useCallback(async (id: string, newTitle: string) => {
     try {
@@ -415,6 +648,7 @@ export default function Home() {
       setIsLoading(true);
       setCurrentTopic(topic);
       setCompletedParticipants(new Set());
+      interruptRequestedRef.current = false; // 中断フラグをリセット
       setProgress({
         currentRound: 1,
         totalRounds: terminationConfig.maxRounds,
@@ -561,7 +795,17 @@ export default function Home() {
           }
         };
 
+        let wasInterrupted = false;
+        let interruptProgress = { currentRound: 1, currentParticipantIndex: 0 };
+
         while (true) {
+          // 中断リクエストをチェック
+          if (interruptRequestedRef.current) {
+            wasInterrupted = true;
+            reader.cancel();
+            break;
+          }
+
           const { done, value } = await reader.read();
           if (done) {
             // ストリーム終了時にバッファに残っているデータを処理
@@ -580,7 +824,45 @@ export default function Home() {
 
           for (const line of lines) {
             processLine(line);
+            // 進捗情報から現在位置を記録（中断時に使用）
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === 'progress' && data.progress) {
+                  interruptProgress = {
+                    currentRound: data.progress.currentRound,
+                    currentParticipantIndex: data.progress.currentParticipantIndex,
+                  };
+                }
+              } catch {
+                // ignore
+              }
+            }
           }
+        }
+
+        // 中断された場合、状態を保存
+        if (wasInterrupted) {
+          const interruptedState: InterruptedDiscussionState = {
+            sessionId: sessionAtStart?.id || '',
+            topic,
+            participants,
+            messages: collectedMessages,
+            currentRound: interruptProgress.currentRound,
+            currentParticipantIndex: interruptProgress.currentParticipantIndex,
+            totalRounds: terminationConfig.maxRounds,
+            searchResults: searchResults.length > 0 ? searchResults : undefined,
+            userProfile,
+            discussionMode,
+            discussionDepth,
+            directionGuide,
+            terminationConfig,
+            interruptedAt: new Date(),
+          };
+          saveInterruptedState(interruptedState);
+          setInterruptedState(interruptedState);
+          setIsLoading(false);
+          return;
         }
 
         // 議論完了後、セッションにターンを追加して保存
@@ -711,6 +993,53 @@ export default function Home() {
           </div>
         )}
 
+        {/* 中断された議論の復元バナー */}
+        {interruptedState && !isLoading && (
+          <div className="mx-3 md:mx-4 mt-3 md:mt-4 p-3 bg-yellow-900/50 border border-yellow-700 rounded-lg shrink-0">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-yellow-200 font-medium text-sm">中断された議論があります</p>
+                <p className="text-yellow-300/70 text-xs mt-1 truncate" title={interruptedState.topic}>
+                  「{interruptedState.topic}」
+                </p>
+                <p className="text-yellow-300/60 text-xs mt-0.5">
+                  ラウンド {interruptedState.currentRound}/{interruptedState.totalRounds}・
+                  {interruptedState.messages.length}件のメッセージ・
+                  {new Date(interruptedState.interruptedAt).toLocaleString('ja-JP', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}に中断
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDiscardInterrupted}
+                  className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-500 text-gray-200 rounded transition-colors"
+                >
+                  破棄
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResumeDiscussion}
+                  className="px-3 py-1.5 text-xs bg-yellow-600 hover:bg-yellow-500 text-white rounded transition-colors flex items-center gap-1"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  再開
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 議論パネル */}
         <DiscussionPanel
           turns={currentSession?.turns || []}
@@ -738,6 +1067,7 @@ export default function Home() {
           isSearching={isSearching}
           participants={participants}
           completedParticipants={completedParticipants}
+          onInterrupt={handleInterrupt}
         />
 
         {/* 入力フォーム */}

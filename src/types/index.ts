@@ -460,3 +460,21 @@ export interface MessageRating {
   disagrees: number;
   neutrals: number;
 }
+
+// 中断された議論の状態
+export interface InterruptedDiscussionState {
+  sessionId: string;
+  topic: string;
+  participants: DiscussionParticipant[];
+  messages: DiscussionMessage[];
+  currentRound: number;
+  currentParticipantIndex: number;
+  totalRounds: number;
+  searchResults?: SearchResult[];
+  userProfile?: UserProfile;
+  discussionMode?: DiscussionMode;
+  discussionDepth?: DiscussionDepth;
+  directionGuide?: DirectionGuide;
+  terminationConfig?: TerminationConfig;
+  interruptedAt: Date;
+}
