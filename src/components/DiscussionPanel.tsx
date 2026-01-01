@@ -13,6 +13,7 @@ interface DiscussionPanelProps {
   isLoading: boolean;
   isSummarizing: boolean;
   searchResults?: SearchResult[];
+  onFollowUp?: (topic: string, previousAnswer: string) => void;
 }
 
 // 検索結果を表示するコンポーネント
@@ -84,10 +85,14 @@ function TurnDisplay({
   turn,
   isLatest,
   defaultExpanded,
+  onFollowUp,
+  disabled,
 }: {
   turn: DiscussionTurn;
   isLatest: boolean;
   defaultExpanded: boolean;
+  onFollowUp?: (topic: string, previousAnswer: string) => void;
+  disabled?: boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [copied, setCopied] = useState(false);
@@ -235,6 +240,23 @@ function TurnDisplay({
                 <MarkdownRenderer content={turn.finalAnswer} />
               </div>
             </div>
+            {/* 深掘りボタン */}
+            {onFollowUp && (
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => onFollowUp(turn.topic, turn.finalAnswer)}
+                  disabled={disabled}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-purple-300 hover:text-white bg-purple-900/50 hover:bg-purple-800/50 border border-purple-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="この回答について深掘りする"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7m14-8l-7 7-7-7" />
+                  </svg>
+                  <span>深掘りする</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -250,6 +272,7 @@ function CurrentTurnDisplay({
   isLoading,
   isSummarizing,
   searchResults,
+  onFollowUp,
 }: {
   topic: string;
   messages: DiscussionMessage[];
@@ -257,6 +280,7 @@ function CurrentTurnDisplay({
   isLoading: boolean;
   isSummarizing: boolean;
   searchResults?: SearchResult[];
+  onFollowUp?: (topic: string, previousAnswer: string) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -435,6 +459,22 @@ function CurrentTurnDisplay({
                 </>
               )}
             </div>
+            {/* 深掘りボタン（統合完了後のみ表示） */}
+            {finalAnswer && !isSummarizing && !isLoading && onFollowUp && (
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => onFollowUp(topic, finalAnswer)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-purple-300 hover:text-white bg-purple-900/50 hover:bg-purple-800/50 border border-purple-700/50 rounded-lg transition-colors"
+                  title="この回答について深掘りする"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7m14-8l-7 7-7-7" />
+                  </svg>
+                  <span>深掘りする</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -450,6 +490,7 @@ export function DiscussionPanel({
   isLoading,
   isSummarizing,
   searchResults,
+  onFollowUp,
 }: DiscussionPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -479,6 +520,8 @@ export function DiscussionPanel({
           turn={turn}
           isLatest={index === turns.length - 1 && !currentTopic}
           defaultExpanded={false}
+          onFollowUp={onFollowUp}
+          disabled={isLoading}
         />
       ))}
 
@@ -491,6 +534,7 @@ export function DiscussionPanel({
           isLoading={isLoading}
           isSummarizing={isSummarizing}
           searchResults={searchResults}
+          onFollowUp={onFollowUp}
         />
       )}
     </div>

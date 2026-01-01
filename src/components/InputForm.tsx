@@ -1,14 +1,24 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 
 interface InputFormProps {
   onSubmit: (topic: string) => void;
   disabled?: boolean;
+  presetTopic?: string;
+  onPresetTopicClear?: () => void;
 }
 
-export function InputForm({ onSubmit, disabled }: InputFormProps) {
+export function InputForm({ onSubmit, disabled, presetTopic, onPresetTopicClear }: InputFormProps) {
   const [topic, setTopic] = useState('');
+
+  // プリセットトピックが設定されたら入力欄に反映
+  useEffect(() => {
+    if (presetTopic) {
+      setTopic(presetTopic);
+      onPresetTopicClear?.();
+    }
+  }, [presetTopic, onPresetTopicClear]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
