@@ -67,12 +67,18 @@ export const ROLE_PRESETS: RolePreset[] = [
 
 // 議論参加者（プロバイダー + モデルの組み合わせ）
 export interface DiscussionParticipant {
+  id: string; // 一意のID（同一モデルを複数追加可能にするため）
   provider: AIProviderType;
   model: string;
   displayName: string;
   color: string;
   role?: ParticipantRole;
   customRolePrompt?: string; // role === 'custom' の場合に使用
+}
+
+// 参加者IDを生成
+export function generateParticipantId(): string {
+  return `participant-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
 
 // AIプロバイダーの設定
