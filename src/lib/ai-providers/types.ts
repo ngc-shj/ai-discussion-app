@@ -1,4 +1,4 @@
-import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS, DiscussionParticipant, UserProfile, TECH_LEVEL_PRESETS, RESPONSE_STYLE_PRESETS } from '@/types';
+import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS, DiscussionParticipant, UserProfile, TECH_LEVEL_PRESETS, RESPONSE_STYLE_PRESETS, DiscussionMode, DISCUSSION_MODE_PRESETS } from '@/types';
 
 // モデル情報
 export interface ModelInfo {
@@ -125,6 +125,18 @@ function formatParticipantsList(
   return `\n【今回の議論参加者（予定）】\n${participantLines.join('\n')}\n※一部の参加者がエラーで発言できない場合があります。「これまでの議論」に登場した参加者のみ参照してください。\n`;
 }
 
+// 議論モードのプロンプトを取得
+function getDiscussionModePrompt(mode?: DiscussionMode, isSummary = false): string {
+  if (!mode || mode === 'free') {
+    return '';
+  }
+  const preset = DISCUSSION_MODE_PRESETS.find((m) => m.id === mode);
+  if (!preset) {
+    return '';
+  }
+  return isSummary ? (preset.summaryPrompt ? `\n${preset.summaryPrompt}\n` : '') : (preset.prompt ? `\n${preset.prompt}\n` : '');
+}
+
 // 議論用のシステムプロンプト
 export function createDiscussionPrompt(
   topic: string,
@@ -137,7 +149,8 @@ export function createDiscussionPrompt(
   customRolePrompt?: string,
   allParticipants?: DiscussionParticipant[],
   currentParticipant?: DiscussionParticipant,
-  userProfile?: UserProfile
+  userProfile?: UserProfile,
+  discussionMode?: DiscussionMode
 ): string {
   // 過去のターンのコンテキストを構築
   let previousContext = '';
@@ -160,6 +173,9 @@ export function createDiscussionPrompt(
   // ユーザープロファイルを取得
   const userProfileContext = formatUserProfile(userProfile);
 
+  // 議論モードのプロンプトを取得
+  const discussionModePrompt = getDiscussionModePrompt(discussionMode, isFinalSummary);
+
   if (isFinalSummary) {
     const allResponses = previousMessages
       .map((m) => {
@@ -170,7 +186,7 @@ export function createDiscussionPrompt(
 
     return `あなたは議論の統合者です。以下のトピックについて、複数のAIがそれぞれの役割に基づいて議論を行いました。
 それぞれの意見を踏まえて、最終的な統合回答を作成してください。
-${userProfileContext}${previousContext}${searchContext}
+${discussionModePrompt}${userProfileContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -189,7 +205,7 @@ ${allResponses}
 
   if (isFirstRound) {
     return `あなたは議論に参加するAIアシスタントです。以下のトピックについて、あなたの見解を述べてください。
-${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
+${discussionModePrompt}${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -209,7 +225,7 @@ ${topic}
     .join('\n\n');
 
   return `あなたは議論に参加するAIアシスタントです。以下のトピックについて議論が進行中です。
-${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
+${discussionModePrompt}${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
