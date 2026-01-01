@@ -12,6 +12,7 @@ import {
   getOllamaModelColor,
   SearchConfig,
   SearchResult,
+  UserProfile,
 } from '@/types';
 import {
   DiscussionPanel,
@@ -33,6 +34,7 @@ import {
 const STORAGE_KEY_PARTICIPANTS = 'ai-discussion-participants';
 const STORAGE_KEY_ROUNDS = 'ai-discussion-rounds';
 const STORAGE_KEY_SEARCH = 'ai-discussion-search';
+const STORAGE_KEY_PROFILE = 'ai-discussion-profile';
 
 const DEFAULT_SEARCH_CONFIG: SearchConfig = {
   enabled: false,
@@ -84,6 +86,7 @@ export default function Home() {
   });
   const [rounds, setRounds] = useState(2);
   const [searchConfig, setSearchConfig] = useState<SearchConfig>(DEFAULT_SEARCH_CONFIG);
+  const [userProfile, setUserProfile] = useState<UserProfile>({});
   const [isSearching, setIsSearching] = useState(false);
   const [currentSearchResults, setCurrentSearchResults] = useState<SearchResult[]>([]);
   const [availability, setAvailability] = useState<Record<AIProviderType, boolean>>({
@@ -210,6 +213,17 @@ export default function Home() {
         // パースエラー時は無視
       }
     }
+
+    // ローカルストレージからプロファイルを復元
+    const savedProfile = localStorage.getItem(STORAGE_KEY_PROFILE);
+    if (savedProfile) {
+      try {
+        const parsed = JSON.parse(savedProfile);
+        setUserProfile(parsed);
+      } catch {
+        // パースエラー時は無視
+      }
+    }
   }, []);
 
   // 参加者が変更されたらローカルストレージに保存
@@ -228,6 +242,11 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_SEARCH, JSON.stringify(searchConfig));
   }, [searchConfig]);
+
+  // プロファイルが変更されたらローカルストレージに保存
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(userProfile));
+  }, [userProfile]);
 
   // 新しいセッションを開始
   const handleNewSession = useCallback(() => {
@@ -381,6 +400,7 @@ export default function Home() {
             rounds,
             previousTurns,
             searchResults,
+            userProfile,
           }),
         });
 
@@ -504,7 +524,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [participants, rounds, searchConfig]
+    [participants, rounds, searchConfig, userProfile]
   );
 
   return (
@@ -652,6 +672,8 @@ export default function Home() {
             onRoundsChange={setRounds}
             searchConfig={searchConfig}
             onSearchConfigChange={setSearchConfig}
+            userProfile={userProfile}
+            onUserProfileChange={setUserProfile}
             disabled={isLoading || isSearching}
           />
         </div>
@@ -668,6 +690,8 @@ export default function Home() {
           onRoundsChange={setRounds}
           searchConfig={searchConfig}
           onSearchConfigChange={setSearchConfig}
+          userProfile={userProfile}
+          onUserProfileChange={setUserProfile}
           disabled={isLoading || isSearching}
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}

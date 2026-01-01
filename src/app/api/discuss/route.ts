@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
             rounds,
             previousTurns: body.previousTurns,
             searchResults: body.searchResults,
+            userProfile: body.userProfile,
           })) {
             const data = JSON.stringify(progress);
             controller.enqueue(encoder.encode(`data: ${data}\n\n`));

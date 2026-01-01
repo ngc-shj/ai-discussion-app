@@ -1,7 +1,8 @@
 'use client';
 
-import { AIProviderType, ModelInfo, DiscussionParticipant, SearchConfig } from '@/types';
+import { AIProviderType, ModelInfo, DiscussionParticipant, SearchConfig, UserProfile } from '@/types';
 import { AISelector } from './AISelector';
+import { UserProfileSettings } from './UserProfileSettings';
 
 interface SettingsPanelProps {
   participants: DiscussionParticipant[];
@@ -12,6 +13,8 @@ interface SettingsPanelProps {
   onRoundsChange: (rounds: number) => void;
   searchConfig: SearchConfig;
   onSearchConfigChange: (config: SearchConfig) => void;
+  userProfile: UserProfile;
+  onUserProfileChange: (profile: UserProfile) => void;
   disabled?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
@@ -26,6 +29,8 @@ export function SettingsPanel({
   onRoundsChange,
   searchConfig,
   onSearchConfigChange,
+  userProfile,
+  onUserProfileChange,
   disabled,
   isOpen = true,
   onClose,
@@ -68,7 +73,14 @@ export function SettingsPanel({
           )}
         </div>
 
-        <div className="flex-1 overflow-hidden flex flex-col space-y-4">
+        <div className="flex-1 overflow-y-auto flex flex-col space-y-4">
+          {/* プロファイル設定 */}
+          <UserProfileSettings
+            profile={userProfile}
+            onProfileChange={onUserProfileChange}
+            disabled={disabled}
+          />
+
           <AISelector
             participants={participants}
             onParticipantsChange={onParticipantsChange}
