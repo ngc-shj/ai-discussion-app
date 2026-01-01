@@ -126,10 +126,14 @@ To use the web search feature, set up a SearXNG instance with JSON format enable
 ```bash
 git clone https://github.com/ngc-shj/searxng-mcp-server.git
 cd searxng-mcp-server
-docker compose up -d
+docker run -d \
+  -p 8080:8080 \
+  -v $(pwd)/searxng-config/settings.yml:/etc/searxng/settings.yml:ro \
+  -e SEARXNG_BASE_URL=http://localhost:8080/ \
+  searxng/searxng
 ```
 
-This setup already has JSON format output enabled.
+This setup uses a custom settings file with JSON format output already enabled.
 
 **Manual Setup** (if you prefer):
 

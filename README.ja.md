@@ -129,10 +129,14 @@ Web検索機能を使用するには、JSON形式出力が有効なSearXNGイン
 ```bash
 git clone https://github.com/ngc-shj/searxng-mcp-server.git
 cd searxng-mcp-server
-docker compose up -d
+docker run -d \
+  -p 8080:8080 \
+  -v $(pwd)/searxng-config/settings.yml:/etc/searxng/settings.yml:ro \
+  -e SEARXNG_BASE_URL=http://localhost:8080/ \
+  searxng/searxng
 ```
 
-このセットアップではJSON形式出力が既に有効になっています。
+このセットアップではJSON形式出力が有効な設定ファイルを使用します。
 
 **手動セットアップ**（必要に応じて）:
 
