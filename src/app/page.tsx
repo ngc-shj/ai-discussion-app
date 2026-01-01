@@ -13,6 +13,7 @@ import {
   SearchConfig,
   SearchResult,
   UserProfile,
+  DiscussionMode,
 } from '@/types';
 import {
   DiscussionPanel,
@@ -35,6 +36,7 @@ const STORAGE_KEY_PARTICIPANTS = 'ai-discussion-participants';
 const STORAGE_KEY_ROUNDS = 'ai-discussion-rounds';
 const STORAGE_KEY_SEARCH = 'ai-discussion-search';
 const STORAGE_KEY_PROFILE = 'ai-discussion-profile';
+const STORAGE_KEY_MODE = 'ai-discussion-mode';
 
 const DEFAULT_SEARCH_CONFIG: SearchConfig = {
   enabled: false,
@@ -87,6 +89,7 @@ export default function Home() {
   const [rounds, setRounds] = useState(2);
   const [searchConfig, setSearchConfig] = useState<SearchConfig>(DEFAULT_SEARCH_CONFIG);
   const [userProfile, setUserProfile] = useState<UserProfile>({});
+  const [discussionMode, setDiscussionMode] = useState<DiscussionMode>('free');
   const [isSearching, setIsSearching] = useState(false);
   const [currentSearchResults, setCurrentSearchResults] = useState<SearchResult[]>([]);
   const [availability, setAvailability] = useState<Record<AIProviderType, boolean>>({
@@ -224,6 +227,12 @@ export default function Home() {
         // パースエラー時は無視
       }
     }
+
+    // ローカルストレージから議論モードを復元
+    const savedMode = localStorage.getItem(STORAGE_KEY_MODE);
+    if (savedMode && ['free', 'brainstorm', 'debate', 'consensus', 'critique'].includes(savedMode)) {
+      setDiscussionMode(savedMode as DiscussionMode);
+    }
   }, []);
 
   // 参加者が変更されたらローカルストレージに保存
@@ -247,6 +256,11 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(userProfile));
   }, [userProfile]);
+
+  // 議論モードが変更されたらローカルストレージに保存
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_MODE, discussionMode);
+  }, [discussionMode]);
 
   // 新しいセッションを開始
   const handleNewSession = useCallback(() => {
@@ -401,6 +415,7 @@ export default function Home() {
             previousTurns,
             searchResults,
             userProfile,
+            discussionMode,
           }),
         });
 
@@ -524,7 +539,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [participants, rounds, searchConfig, userProfile]
+    [participants, rounds, searchConfig, userProfile, discussionMode]
   );
 
   return (
@@ -656,6 +671,8 @@ export default function Home() {
             disabled={isLoading || isSearching}
             presetTopic={presetTopic}
             onPresetTopicClear={handlePresetTopicClear}
+            discussionMode={discussionMode}
+            onDiscussionModeChange={setDiscussionMode}
           />
         </div>
       </div>
