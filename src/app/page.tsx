@@ -93,6 +93,8 @@ export default function Home() {
     gemini: false,
   });
   const [error, setError] = useState<string | null>(null);
+  // フォローアップ用のプリセットトピック
+  const [presetTopic, setPresetTopic] = useState<string>('');
   const [progress, setProgress] = useState<ProgressState>({
     currentRound: 0,
     totalRounds: 0,
@@ -265,6 +267,19 @@ export default function Home() {
       console.error('Failed to delete session:', err);
     }
   }, [currentSession, handleNewSession]);
+
+  // フォローアップ質問を設定
+  const handleFollowUp = useCallback((topic: string, previousAnswer: string) => {
+    // 回答の最初の100文字を参考として含める
+    const answerPreview = previousAnswer.slice(0, 100) + (previousAnswer.length > 100 ? '...' : '');
+    const followUpPrompt = `「${topic}」についてもう少し詳しく教えてください。特に以下の点について深掘りしたいです：\n\n（前回の回答より: ${answerPreview}）`;
+    setPresetTopic(followUpPrompt);
+  }, []);
+
+  // プリセットトピックをクリア
+  const handlePresetTopicClear = useCallback(() => {
+    setPresetTopic('');
+  }, []);
 
   // セッションの名前を変更
   const handleRenameSession = useCallback(async (id: string, newTitle: string) => {
@@ -596,6 +611,7 @@ export default function Home() {
           isLoading={isLoading}
           isSummarizing={progress.isSummarizing}
           searchResults={currentSearchResults}
+          onFollowUp={handleFollowUp}
         />
 
         {/* 進捗インジケーター */}
@@ -615,7 +631,12 @@ export default function Home() {
 
         {/* 入力フォーム */}
         <div className="shrink-0">
-          <InputForm onSubmit={handleStartDiscussion} disabled={isLoading || isSearching} />
+          <InputForm
+            onSubmit={handleStartDiscussion}
+            disabled={isLoading || isSearching}
+            presetTopic={presetTopic}
+            onPresetTopicClear={handlePresetTopicClear}
+          />
         </div>
       </div>
 
