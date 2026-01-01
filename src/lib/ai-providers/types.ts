@@ -1,4 +1,4 @@
-import { AIProviderType, AIRequest, AIResponse, SearchResult } from '@/types';
+import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS } from '@/types';
 
 // モデル情報
 export interface ModelInfo {
@@ -44,14 +44,31 @@ function formatSearchResults(searchResults: SearchResult[]): string {
   return `\n【最新の検索結果】\n以下は関連する最新の情報です。これらの情報を参考にして議論してください。\n\n${formattedResults}\n`;
 }
 
+// ロールのプロンプトを取得
+function getRolePrompt(role?: ParticipantRole, customRolePrompt?: string): string {
+  if (!role || role === 'neutral') {
+    return '';
+  }
+  if (role === 'custom' && customRolePrompt) {
+    return `\n【あなたの役割】\n${customRolePrompt}\n`;
+  }
+  const preset = ROLE_PRESETS.find((r) => r.id === role);
+  if (preset) {
+    return `\n【あなたの役割】\n${preset.prompt}\n`;
+  }
+  return '';
+}
+
 // 議論用のシステムプロンプト
 export function createDiscussionPrompt(
   topic: string,
-  previousMessages: Array<{ provider: string; content: string }>,
+  previousMessages: Array<{ provider: string; content: string; role?: string }>,
   isFirstRound: boolean,
   isFinalSummary: boolean,
   previousTurns?: PreviousTurnSummary[],
-  searchResults?: SearchResult[]
+  searchResults?: SearchResult[],
+  currentRole?: ParticipantRole,
+  customRolePrompt?: string
 ): string {
   // 過去のターンのコンテキストを構築
   let previousContext = '';
@@ -65,12 +82,18 @@ export function createDiscussionPrompt(
   // 検索結果のコンテキストを構築
   const searchContext = formatSearchResults(searchResults || []);
 
+  // ロールのプロンプトを取得
+  const rolePrompt = getRolePrompt(currentRole, customRolePrompt);
+
   if (isFinalSummary) {
     const allResponses = previousMessages
-      .map((m) => `【${m.provider}の意見】\n${m.content}`)
+      .map((m) => {
+        const roleLabel = m.role ? `（${m.role}）` : '';
+        return `【${m.provider}${roleLabel}の意見】\n${m.content}`;
+      })
       .join('\n\n');
 
-    return `あなたは議論の統合者です。以下のトピックについて、複数のAIが議論を行いました。
+    return `あなたは議論の統合者です。以下のトピックについて、複数のAIがそれぞれの役割に基づいて議論を行いました。
 それぞれの意見を踏まえて、最終的な統合回答を作成してください。
 ${previousContext}${searchContext}
 【今回の議論のトピック】
@@ -81,6 +104,7 @@ ${allResponses}
 
 【指示】
 - 各AIの意見の良い点を取り入れてください
+- それぞれの役割に基づいた視点を考慮してください
 - 矛盾がある場合は、最も合理的な見解を採用してください
 - 最終的な結論を明確に述べてください
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
@@ -90,7 +114,7 @@ ${allResponses}
 
   if (isFirstRound) {
     return `あなたは議論に参加するAIアシスタントです。以下のトピックについて、あなたの見解を述べてください。
-${previousContext}${searchContext}
+${rolePrompt}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -103,11 +127,14 @@ ${topic}
   }
 
   const previousResponses = previousMessages
-    .map((m) => `【${m.provider}】: ${m.content}`)
+    .map((m) => {
+      const roleLabel = m.role ? `（${m.role}）` : '';
+      return `【${m.provider}${roleLabel}】: ${m.content}`;
+    })
     .join('\n\n');
 
   return `あなたは議論に参加するAIアシスタントです。以下のトピックについて議論が進行中です。
-${previousContext}${searchContext}
+${rolePrompt}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 

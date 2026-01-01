@@ -1,4 +1,4 @@
-import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult, ROLE_PRESETS } from '@/types';
 import { createProvider, createDiscussionPrompt } from './ai-providers';
 
 export interface DiscussionProgress {
@@ -68,10 +68,20 @@ export async function* runDiscussion(
       }
 
       // プロンプトを生成
-      const previousMessages = messages.map((m) => ({
-        provider: m.model ? `${getProviderDisplayName(m.provider)} (${m.model})` : getProviderDisplayName(m.provider),
-        content: m.content,
-      }));
+      const previousMessages = messages.map((m) => {
+        // メッセージに対応する参加者のロールを取得
+        const msgParticipant = participants.find(
+          (p) => p.provider === m.provider && p.model === m.model
+        );
+        const rolePreset = msgParticipant?.role
+          ? ROLE_PRESETS.find((r) => r.id === msgParticipant.role)
+          : undefined;
+        return {
+          provider: m.model ? `${getProviderDisplayName(m.provider)} (${m.model})` : getProviderDisplayName(m.provider),
+          content: m.content,
+          role: rolePreset?.name,
+        };
+      });
 
       const prompt = createDiscussionPrompt(
         topic,
@@ -79,7 +89,9 @@ export async function* runDiscussion(
         messages.length === 0,
         false,
         turnContext,
-        searchResults
+        searchResults,
+        participant.role,
+        participant.customRolePrompt
       );
 
       // AIに問い合わせ
@@ -145,10 +157,19 @@ export async function* runDiscussion(
   for (const participant of successfulParticipants) {
     const summaryProvider = createProvider(participant.provider, participant.model);
 
-    const allMessages = messages.map((m) => ({
-      provider: m.model ? `${getProviderDisplayName(m.provider)} (${m.model})` : getProviderDisplayName(m.provider),
-      content: m.content,
-    }));
+    const allMessages = messages.map((m) => {
+      const msgParticipant = participants.find(
+        (p) => p.provider === m.provider && p.model === m.model
+      );
+      const rolePreset = msgParticipant?.role
+        ? ROLE_PRESETS.find((r) => r.id === msgParticipant.role)
+        : undefined;
+      return {
+        provider: m.model ? `${getProviderDisplayName(m.provider)} (${m.model})` : getProviderDisplayName(m.provider),
+        content: m.content,
+        role: rolePreset?.name,
+      };
+    });
 
     const summaryPrompt = createDiscussionPrompt(topic, allMessages, false, true, turnContext, searchResults);
     const summaryResponse = await summaryProvider.generate({ prompt: summaryPrompt });

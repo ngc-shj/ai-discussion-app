@@ -1,6 +1,6 @@
 'use client';
 
-import { AIProviderType, DiscussionParticipant, DEFAULT_PROVIDERS, getOllamaModelColor } from '@/types';
+import { AIProviderType, DiscussionParticipant, DEFAULT_PROVIDERS, getOllamaModelColor, ROLE_PRESETS } from '@/types';
 
 // 各参加者の実行状態
 export type ParticipantStatus = 'pending' | 'active' | 'completed' | 'error';
@@ -74,6 +74,11 @@ export function ProgressIndicator({
                 ? p.model.slice(0, 12) + '...'
                 : p.model;
 
+            // ロール名を取得（中立以外の場合のみ表示）
+            const rolePreset = p.role && p.role !== 'neutral'
+              ? ROLE_PRESETS.find((r) => r.id === p.role)
+              : undefined;
+
             return (
               <div
                 key={`${key}-${index}`}
@@ -94,7 +99,7 @@ export function ProgressIndicator({
                   // @ts-expect-error CSS custom property for ring color
                   '--tw-ring-color': isCurrentActive ? p.color : undefined,
                 }}
-                title={`${p.displayName}${isCurrentActive ? ' (実行中)' : isCompleted ? ' (完了)' : ' (待機中)'}`}
+                title={`${p.displayName}${rolePreset ? ` [${rolePreset.name}]` : ''}${isCurrentActive ? ' (実行中)' : isCompleted ? ' (完了)' : ' (待機中)'}`}
               >
                 {/* ステータスインジケーター */}
                 <div className="relative">
@@ -119,6 +124,12 @@ export function ProgressIndicator({
                 >
                   {shortName}
                 </span>
+                {/* ロール表示（中立以外） */}
+                {rolePreset && (
+                  <span className="text-gray-400 text-[10px]">
+                    [{rolePreset.name}]
+                  </span>
+                )}
               </div>
             );
           })}
