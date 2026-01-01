@@ -335,3 +335,61 @@ export const DISCUSSION_MODE_PRESETS: DiscussionModePreset[] = [
 - 提案された改善策や対策をまとめてください`,
   },
 ];
+
+// 議論の深さレベル（1-5）
+export type DiscussionDepth = 1 | 2 | 3 | 4 | 5;
+
+// 議論の深さプリセット
+export interface DiscussionDepthPreset {
+  level: DiscussionDepth;
+  name: string;
+  description: string;
+  prompt: string;
+  wordCount: string;
+}
+
+// 議論の深さプリセット一覧
+export const DISCUSSION_DEPTH_PRESETS: DiscussionDepthPreset[] = [
+  {
+    level: 1,
+    name: '概要',
+    description: '要点のみ簡潔に',
+    prompt: '【回答の深さ: 概要レベル】\n要点のみを簡潔にまとめてください。詳細な説明は不要です。',
+    wordCount: '100-150文字',
+  },
+  {
+    level: 2,
+    name: '簡潔',
+    description: '主要ポイントを短く',
+    prompt: '【回答の深さ: 簡潔】\n主要なポイントを短くまとめてください。',
+    wordCount: '150-250文字',
+  },
+  {
+    level: 3,
+    name: '標準',
+    description: 'バランスの取れた説明',
+    prompt: '', // デフォルトなのでプロンプト不要
+    wordCount: '200-400文字',
+  },
+  {
+    level: 4,
+    name: '詳細',
+    description: '背景や理由も含めて',
+    prompt: '【回答の深さ: 詳細】\n背景情報や理由、具体例を含めて詳しく説明してください。',
+    wordCount: '400-600文字',
+  },
+  {
+    level: 5,
+    name: '徹底',
+    description: '多角的に深く分析',
+    prompt: '【回答の深さ: 徹底分析】\n多角的な視点から深く分析し、根拠やデータ、具体例を豊富に含めて説明してください。反論への対応も検討してください。',
+    wordCount: '600文字以上',
+  },
+];
+
+// 議論の方向性ガイド
+export interface DirectionGuide {
+  keywords: string[];      // 注目してほしいキーワード
+  focusAreas?: string[];   // 特に議論を深めたい領域
+  avoidTopics?: string[];  // 避けたいトピック
+}

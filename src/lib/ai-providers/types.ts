@@ -1,4 +1,4 @@
-import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS, DiscussionParticipant, UserProfile, TECH_LEVEL_PRESETS, RESPONSE_STYLE_PRESETS, DiscussionMode, DISCUSSION_MODE_PRESETS } from '@/types';
+import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS, DiscussionParticipant, UserProfile, TECH_LEVEL_PRESETS, RESPONSE_STYLE_PRESETS, DiscussionMode, DISCUSSION_MODE_PRESETS, DiscussionDepth, DISCUSSION_DEPTH_PRESETS, DirectionGuide } from '@/types';
 
 // モデル情報
 export interface ModelInfo {
@@ -137,6 +137,43 @@ function getDiscussionModePrompt(mode?: DiscussionMode, isSummary = false): stri
   return isSummary ? (preset.summaryPrompt ? `\n${preset.summaryPrompt}\n` : '') : (preset.prompt ? `\n${preset.prompt}\n` : '');
 }
 
+// 議論の深さプロンプトを取得
+function getDepthPrompt(depth?: DiscussionDepth): string {
+  if (!depth || depth === 3) {
+    return ''; // デフォルト（標準）の場合はプロンプト不要
+  }
+  const preset = DISCUSSION_DEPTH_PRESETS.find((d) => d.level === depth);
+  if (!preset || !preset.prompt) {
+    return '';
+  }
+  return `\n${preset.prompt}\n回答は${preset.wordCount}程度でまとめてください。\n`;
+}
+
+// 方向性ガイドをフォーマット
+function formatDirectionGuide(guide?: DirectionGuide): string {
+  if (!guide) {
+    return '';
+  }
+
+  const lines: string[] = [];
+
+  if (guide.keywords && guide.keywords.length > 0) {
+    lines.push(`- 注目キーワード: ${guide.keywords.join('、')}`);
+  }
+  if (guide.focusAreas && guide.focusAreas.length > 0) {
+    lines.push(`- 特に深掘りしたい領域: ${guide.focusAreas.join('、')}`);
+  }
+  if (guide.avoidTopics && guide.avoidTopics.length > 0) {
+    lines.push(`- 避けるべきトピック: ${guide.avoidTopics.join('、')}`);
+  }
+
+  if (lines.length === 0) {
+    return '';
+  }
+
+  return `\n【議論の方向性ガイド】\n${lines.join('\n')}\nこれらの指示を考慮して議論してください。\n`;
+}
+
 // 議論用のシステムプロンプト
 export function createDiscussionPrompt(
   topic: string,
@@ -150,7 +187,9 @@ export function createDiscussionPrompt(
   allParticipants?: DiscussionParticipant[],
   currentParticipant?: DiscussionParticipant,
   userProfile?: UserProfile,
-  discussionMode?: DiscussionMode
+  discussionMode?: DiscussionMode,
+  discussionDepth?: DiscussionDepth,
+  directionGuide?: DirectionGuide
 ): string {
   // 過去のターンのコンテキストを構築
   let previousContext = '';
@@ -176,6 +215,12 @@ export function createDiscussionPrompt(
   // 議論モードのプロンプトを取得
   const discussionModePrompt = getDiscussionModePrompt(discussionMode, isFinalSummary);
 
+  // 議論の深さプロンプトを取得
+  const depthPrompt = getDepthPrompt(discussionDepth);
+
+  // 方向性ガイドを取得
+  const directionGuidePrompt = formatDirectionGuide(directionGuide);
+
   if (isFinalSummary) {
     const allResponses = previousMessages
       .map((m) => {
@@ -186,7 +231,7 @@ export function createDiscussionPrompt(
 
     return `あなたは議論の統合者です。以下のトピックについて、複数のAIがそれぞれの役割に基づいて議論を行いました。
 それぞれの意見を踏まえて、最終的な統合回答を作成してください。
-${discussionModePrompt}${userProfileContext}${previousContext}${searchContext}
+${discussionModePrompt}${depthPrompt}${directionGuidePrompt}${userProfileContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -203,9 +248,13 @@ ${allResponses}
 - 統合回答は日本語で記述してください`;
   }
 
+  // 深さに応じた文字数指示を取得
+  const depthPreset = discussionDepth ? DISCUSSION_DEPTH_PRESETS.find((d) => d.level === discussionDepth) : undefined;
+  const wordCountInstruction = depthPreset ? depthPreset.wordCount : '200-400文字程度';
+
   if (isFirstRound) {
     return `あなたは議論に参加するAIアシスタントです。以下のトピックについて、あなたの見解を述べてください。
-${discussionModePrompt}${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
+${discussionModePrompt}${depthPrompt}${directionGuidePrompt}${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -214,7 +263,7 @@ ${topic}
 - 具体例があれば挙げてください
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
 - 検索結果がある場合は、最新の情報を参考にして回答してください
-- 回答は日本語で、簡潔にまとめてください（200-400文字程度）`;
+- 回答は日本語で、簡潔にまとめてください（${wordCountInstruction}）`;
   }
 
   const previousResponses = previousMessages
@@ -225,7 +274,7 @@ ${topic}
     .join('\n\n');
 
   return `あなたは議論に参加するAIアシスタントです。以下のトピックについて議論が進行中です。
-${discussionModePrompt}${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
+${discussionModePrompt}${depthPrompt}${directionGuidePrompt}${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -240,5 +289,5 @@ ${previousResponses}
 - 建設的な議論を心がけてください
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
 - 検索結果がある場合は、最新の情報を参考にして回答してください
-- 回答は日本語で、簡潔にまとめてください（200-400文字程度）`;
+- 回答は日本語で、簡潔にまとめてください（${wordCountInstruction}）`;
 }

@@ -14,6 +14,8 @@ import {
   SearchResult,
   UserProfile,
   DiscussionMode,
+  DiscussionDepth,
+  DirectionGuide,
 } from '@/types';
 import {
   DiscussionPanel,
@@ -37,6 +39,12 @@ const STORAGE_KEY_ROUNDS = 'ai-discussion-rounds';
 const STORAGE_KEY_SEARCH = 'ai-discussion-search';
 const STORAGE_KEY_PROFILE = 'ai-discussion-profile';
 const STORAGE_KEY_MODE = 'ai-discussion-mode';
+const STORAGE_KEY_DEPTH = 'ai-discussion-depth';
+const STORAGE_KEY_DIRECTION = 'ai-discussion-direction';
+
+const DEFAULT_DIRECTION_GUIDE: DirectionGuide = {
+  keywords: [],
+};
 
 const DEFAULT_SEARCH_CONFIG: SearchConfig = {
   enabled: false,
@@ -90,6 +98,8 @@ export default function Home() {
   const [searchConfig, setSearchConfig] = useState<SearchConfig>(DEFAULT_SEARCH_CONFIG);
   const [userProfile, setUserProfile] = useState<UserProfile>({});
   const [discussionMode, setDiscussionMode] = useState<DiscussionMode>('free');
+  const [discussionDepth, setDiscussionDepth] = useState<DiscussionDepth>(3);
+  const [directionGuide, setDirectionGuide] = useState<DirectionGuide>(DEFAULT_DIRECTION_GUIDE);
   const [isSearching, setIsSearching] = useState(false);
   const [currentSearchResults, setCurrentSearchResults] = useState<SearchResult[]>([]);
   const [availability, setAvailability] = useState<Record<AIProviderType, boolean>>({
@@ -233,6 +243,26 @@ export default function Home() {
     if (savedMode && ['free', 'brainstorm', 'debate', 'consensus', 'critique'].includes(savedMode)) {
       setDiscussionMode(savedMode as DiscussionMode);
     }
+
+    // ローカルストレージから議論の深さを復元
+    const savedDepth = localStorage.getItem(STORAGE_KEY_DEPTH);
+    if (savedDepth) {
+      const parsed = parseInt(savedDepth, 10);
+      if (!isNaN(parsed) && parsed >= 1 && parsed <= 5) {
+        setDiscussionDepth(parsed as DiscussionDepth);
+      }
+    }
+
+    // ローカルストレージから方向性ガイドを復元
+    const savedDirection = localStorage.getItem(STORAGE_KEY_DIRECTION);
+    if (savedDirection) {
+      try {
+        const parsed = JSON.parse(savedDirection);
+        setDirectionGuide({ ...DEFAULT_DIRECTION_GUIDE, ...parsed });
+      } catch {
+        // パースエラー時は無視
+      }
+    }
   }, []);
 
   // 参加者が変更されたらローカルストレージに保存
@@ -261,6 +291,16 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_MODE, discussionMode);
   }, [discussionMode]);
+
+  // 議論の深さが変更されたらローカルストレージに保存
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_DEPTH, discussionDepth.toString());
+  }, [discussionDepth]);
+
+  // 方向性ガイドが変更されたらローカルストレージに保存
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_DIRECTION, JSON.stringify(directionGuide));
+  }, [directionGuide]);
 
   // 新しいセッションを開始
   const handleNewSession = useCallback(() => {
@@ -416,6 +456,8 @@ export default function Home() {
             searchResults,
             userProfile,
             discussionMode,
+            discussionDepth,
+            directionGuide,
           }),
         });
 
@@ -539,7 +581,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [participants, rounds, searchConfig, userProfile, discussionMode]
+    [participants, rounds, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide]
   );
 
   return (
@@ -673,6 +715,10 @@ export default function Home() {
             onPresetTopicClear={handlePresetTopicClear}
             discussionMode={discussionMode}
             onDiscussionModeChange={setDiscussionMode}
+            discussionDepth={discussionDepth}
+            onDiscussionDepthChange={setDiscussionDepth}
+            directionGuide={directionGuide}
+            onDirectionGuideChange={setDirectionGuide}
           />
         </div>
       </div>

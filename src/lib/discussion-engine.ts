@@ -1,4 +1,4 @@
-import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult, ROLE_PRESETS, UserProfile, DiscussionMode } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult, ROLE_PRESETS, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide } from '@/types';
 import { createProvider, createDiscussionPrompt } from './ai-providers';
 
 export interface DiscussionProgress {
@@ -26,13 +26,15 @@ export interface DiscussionRequest {
   searchResults?: SearchResult[];
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
+  discussionDepth?: DiscussionDepth;
+  directionGuide?: DirectionGuide;
 }
 
 // 議論を実行するジェネレーター関数
 export async function* runDiscussion(
   request: DiscussionRequest
 ): AsyncGenerator<DiscussionProgress> {
-  const { topic, participants, rounds, previousTurns, searchResults, userProfile, discussionMode } = request;
+  const { topic, participants, rounds, previousTurns, searchResults, userProfile, discussionMode, discussionDepth, directionGuide } = request;
   const messages: DiscussionMessage[] = [];
   let messageId = 0;
 
@@ -97,7 +99,9 @@ export async function* runDiscussion(
         participants,
         participant,
         userProfile,
-        discussionMode
+        discussionMode,
+        discussionDepth,
+        directionGuide
       );
 
       // AIに問い合わせ
@@ -177,7 +181,7 @@ export async function* runDiscussion(
       };
     });
 
-    const summaryPrompt = createDiscussionPrompt(topic, allMessages, false, true, turnContext, searchResults, undefined, undefined, participants, undefined, userProfile, discussionMode);
+    const summaryPrompt = createDiscussionPrompt(topic, allMessages, false, true, turnContext, searchResults, undefined, undefined, participants, undefined, userProfile, discussionMode, discussionDepth, directionGuide);
     const summaryResponse = await summaryProvider.generate({ prompt: summaryPrompt });
 
     if (!summaryResponse.error && summaryResponse.content) {
