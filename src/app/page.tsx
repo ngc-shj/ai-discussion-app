@@ -16,6 +16,8 @@ import {
   DiscussionMode,
   DiscussionDepth,
   DirectionGuide,
+  TerminationConfig,
+  MessageVote,
 } from '@/types';
 import {
   DiscussionPanel,
@@ -35,15 +37,20 @@ import {
 } from '@/lib/session-storage';
 
 const STORAGE_KEY_PARTICIPANTS = 'ai-discussion-participants';
-const STORAGE_KEY_ROUNDS = 'ai-discussion-rounds';
 const STORAGE_KEY_SEARCH = 'ai-discussion-search';
 const STORAGE_KEY_PROFILE = 'ai-discussion-profile';
 const STORAGE_KEY_MODE = 'ai-discussion-mode';
 const STORAGE_KEY_DEPTH = 'ai-discussion-depth';
 const STORAGE_KEY_DIRECTION = 'ai-discussion-direction';
+const STORAGE_KEY_TERMINATION = 'ai-discussion-termination';
 
 const DEFAULT_DIRECTION_GUIDE: DirectionGuide = {
   keywords: [],
+};
+
+const DEFAULT_TERMINATION_CONFIG: TerminationConfig = {
+  condition: 'rounds',
+  maxRounds: 5,
 };
 
 const DEFAULT_SEARCH_CONFIG: SearchConfig = {
@@ -94,12 +101,13 @@ export default function Home() {
     openai: [],
     gemini: [],
   });
-  const [rounds, setRounds] = useState(2);
   const [searchConfig, setSearchConfig] = useState<SearchConfig>(DEFAULT_SEARCH_CONFIG);
   const [userProfile, setUserProfile] = useState<UserProfile>({});
   const [discussionMode, setDiscussionMode] = useState<DiscussionMode>('free');
   const [discussionDepth, setDiscussionDepth] = useState<DiscussionDepth>(3);
   const [directionGuide, setDirectionGuide] = useState<DirectionGuide>(DEFAULT_DIRECTION_GUIDE);
+  const [terminationConfig, setTerminationConfig] = useState<TerminationConfig>(DEFAULT_TERMINATION_CONFIG);
+  const [messageVotes, setMessageVotes] = useState<MessageVote[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [currentSearchResults, setCurrentSearchResults] = useState<SearchResult[]>([]);
   const [availability, setAvailability] = useState<Record<AIProviderType, boolean>>({
@@ -207,15 +215,6 @@ export default function Home() {
     }
     fetchModels();
 
-    // ローカルストレージからラウンド数を復元
-    const savedRounds = localStorage.getItem(STORAGE_KEY_ROUNDS);
-    if (savedRounds) {
-      const parsed = parseInt(savedRounds, 10);
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= 5) {
-        setRounds(parsed);
-      }
-    }
-
     // ローカルストレージから検索設定を復元
     const savedSearch = localStorage.getItem(STORAGE_KEY_SEARCH);
     if (savedSearch) {
@@ -263,6 +262,17 @@ export default function Home() {
         // パースエラー時は無視
       }
     }
+
+    // ローカルストレージから終了条件を復元
+    const savedTermination = localStorage.getItem(STORAGE_KEY_TERMINATION);
+    if (savedTermination) {
+      try {
+        const parsed = JSON.parse(savedTermination);
+        setTerminationConfig({ ...DEFAULT_TERMINATION_CONFIG, ...parsed });
+      } catch {
+        // パースエラー時は無視
+      }
+    }
   }, []);
 
   // 参加者が変更されたらローカルストレージに保存
@@ -271,11 +281,6 @@ export default function Home() {
       localStorage.setItem(STORAGE_KEY_PARTICIPANTS, JSON.stringify(participants));
     }
   }, [participants]);
-
-  // ラウンド数が変更されたらローカルストレージに保存
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_ROUNDS, rounds.toString());
-  }, [rounds]);
 
   // 検索設定が変更されたらローカルストレージに保存
   useEffect(() => {
@@ -302,6 +307,24 @@ export default function Home() {
     localStorage.setItem(STORAGE_KEY_DIRECTION, JSON.stringify(directionGuide));
   }, [directionGuide]);
 
+  // 終了条件が変更されたらローカルストレージに保存
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_TERMINATION, JSON.stringify(terminationConfig));
+  }, [terminationConfig]);
+
+  // 投票を追加/更新するハンドラー
+  const handleVote = useCallback((messageId: string, vote: 'agree' | 'disagree' | 'neutral') => {
+    setMessageVotes(prev => {
+      const existing = prev.findIndex(v => v.messageId === messageId);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = { messageId, vote, timestamp: new Date() };
+        return updated;
+      }
+      return [...prev, { messageId, vote, timestamp: new Date() }];
+    });
+  }, []);
+
   // 新しいセッションを開始
   const handleNewSession = useCallback(() => {
     setCurrentSession(null);
@@ -324,7 +347,7 @@ export default function Home() {
       setParticipants(session.participants);
     }
     if (session.rounds) {
-      setRounds(session.rounds);
+      setTerminationConfig(prev => ({ ...prev, maxRounds: session.rounds! }));
     }
   }, []);
 
@@ -386,7 +409,7 @@ export default function Home() {
       setCompletedParticipants(new Set());
       setProgress({
         currentRound: 1,
-        totalRounds: rounds,
+        totalRounds: terminationConfig.maxRounds,
         currentParticipantIndex: 0,
         totalParticipants: participants.length,
         currentParticipant: participants[0],
@@ -434,7 +457,7 @@ export default function Home() {
         const newSession = createNewSession(
           topic.slice(0, 50) + (topic.length > 50 ? '...' : ''),
           participants,
-          rounds
+          terminationConfig.maxRounds
         );
         await saveSession(newSession);
         setCurrentSession(newSession);
@@ -451,13 +474,14 @@ export default function Home() {
           body: JSON.stringify({
             topic,
             participants,
-            rounds,
+            rounds: terminationConfig.maxRounds,
             previousTurns,
             searchResults,
             userProfile,
             discussionMode,
             discussionDepth,
             directionGuide,
+            terminationConfig,
           }),
         });
 
@@ -581,7 +605,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [participants, rounds, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide]
+    [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide]
   );
 
   return (
@@ -689,6 +713,8 @@ export default function Home() {
           isSummarizing={progress.isSummarizing}
           searchResults={currentSearchResults}
           onFollowUp={handleFollowUp}
+          messageVotes={messageVotes}
+          onVote={handleVote}
         />
 
         {/* 進捗インジケーター */}
@@ -713,17 +739,21 @@ export default function Home() {
             disabled={isLoading || isSearching}
             presetTopic={presetTopic}
             onPresetTopicClear={handlePresetTopicClear}
+            searchConfig={searchConfig}
+            onSearchConfigChange={setSearchConfig}
             discussionMode={discussionMode}
             onDiscussionModeChange={setDiscussionMode}
             discussionDepth={discussionDepth}
             onDiscussionDepthChange={setDiscussionDepth}
             directionGuide={directionGuide}
             onDirectionGuideChange={setDirectionGuide}
+            terminationConfig={terminationConfig}
+            onTerminationConfigChange={setTerminationConfig}
           />
         </div>
       </div>
 
-      {/* 設定パネル - デスクトップ */}
+      {/* 参加者パネル - デスクトップ */}
       {!isSettingsCollapsed && (
         <div className="hidden md:block">
           <SettingsPanel
@@ -731,10 +761,6 @@ export default function Home() {
             onParticipantsChange={setParticipants}
             availableModels={availableModels}
             availability={availability}
-            rounds={rounds}
-            onRoundsChange={setRounds}
-            searchConfig={searchConfig}
-            onSearchConfigChange={setSearchConfig}
             userProfile={userProfile}
             onUserProfileChange={setUserProfile}
             disabled={isLoading || isSearching}
@@ -742,17 +768,13 @@ export default function Home() {
         </div>
       )}
 
-      {/* モバイル用設定パネル（オーバーレイ）- md以下でのみ表示 */}
+      {/* モバイル用参加者パネル（オーバーレイ）- md以下でのみ表示 */}
       <div className="md:hidden">
         <SettingsPanel
           participants={participants}
           onParticipantsChange={setParticipants}
           availableModels={availableModels}
           availability={availability}
-          rounds={rounds}
-          onRoundsChange={setRounds}
-          searchConfig={searchConfig}
-          onSearchConfigChange={setSearchConfig}
           userProfile={userProfile}
           onUserProfileChange={setUserProfile}
           disabled={isLoading || isSearching}

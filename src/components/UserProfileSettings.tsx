@@ -42,7 +42,6 @@ export function UserProfileSettings({ profile, onProfileChange, disabled }: User
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex items-center justify-between w-full text-left"
-        disabled={disabled}
       >
         <div className="flex items-center gap-2">
           <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
