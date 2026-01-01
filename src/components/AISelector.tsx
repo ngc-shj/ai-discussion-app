@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS, getOllamaModelColor } from '@/types';
+import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS, getOllamaModelColor, ROLE_PRESETS, ParticipantRole } from '@/types';
 
 // 最新モデルの数（各プロバイダーごと）
 const LATEST_MODEL_COUNT = 5;
@@ -44,8 +44,20 @@ export function AISelector({
     if (existingIndex >= 0) {
       onParticipantsChange(participants.filter((_, i) => i !== existingIndex));
     } else {
-      onParticipantsChange([...participants, { provider, model, displayName, color }]);
+      onParticipantsChange([...participants, { provider, model, displayName, color, role: 'neutral' }]);
     }
+  };
+
+  const updateParticipantRole = (provider: AIProviderType, model: string, role: ParticipantRole) => {
+    onParticipantsChange(
+      participants.map((p) =>
+        p.provider === provider && p.model === model ? { ...p, role } : p
+      )
+    );
+  };
+
+  const getParticipant = (provider: AIProviderType, model: string) => {
+    return participants.find((p) => p.provider === provider && p.model === model);
   };
 
   const isParticipantSelected = (provider: AIProviderType, model: string) => {
@@ -162,28 +174,52 @@ export function AISelector({
                         const displayName = isOllama ? `Ollama (${model.name})` : `${provider.name} (${model.name})`;
                         const isSelected = isParticipantSelected(provider.id, model.id);
 
+                        const participant = getParticipant(provider.id, model.id);
+
                         return (
-                          <label
-                            key={model.id}
-                            className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                              disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-700'
-                            } ${isSelected ? 'bg-gray-700' : ''}`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleParticipant(provider.id, model.id, displayName, modelColor)}
-                              disabled={disabled}
-                              className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
-                            />
-                            <div
-                              className="w-3 h-3 rounded-full shrink-0"
-                              style={{ backgroundColor: modelColor }}
-                            />
-                            <span className="text-sm text-gray-300 truncate" title={model.name}>
-                              {model.name}
-                            </span>
-                          </label>
+                          <div key={model.id} className="space-y-1">
+                            <label
+                              className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                                disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-700'
+                              } ${isSelected ? 'bg-gray-700' : ''}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleParticipant(provider.id, model.id, displayName, modelColor)}
+                                disabled={disabled}
+                                className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
+                              />
+                              <div
+                                className="w-3 h-3 rounded-full shrink-0"
+                                style={{ backgroundColor: modelColor }}
+                              />
+                              <span className="text-sm text-gray-300 truncate" title={model.name}>
+                                {model.name}
+                              </span>
+                            </label>
+                            {/* ロール選択（選択時のみ表示） */}
+                            {isSelected && participant && (
+                              <div className="ml-7 flex items-center gap-1 flex-wrap">
+                                {ROLE_PRESETS.map((role) => (
+                                  <button
+                                    key={role.id}
+                                    type="button"
+                                    onClick={() => updateParticipantRole(provider.id, model.id, role.id)}
+                                    disabled={disabled}
+                                    title={role.description}
+                                    className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                                      participant.role === role.id
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                                    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  >
+                                    {role.name}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                       {!showAllModels && allModels.length > LATEST_MODEL_COUNT && (
