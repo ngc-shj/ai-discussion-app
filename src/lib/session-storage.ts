@@ -43,11 +43,22 @@ function serializeSession(session: DiscussionSession): Record<string, unknown> {
         timestamp: toISOString(msg.timestamp),
       })),
     })),
+    // 中断状態がある場合はシリアライズ
+    interruptedTurn: session.interruptedTurn ? {
+      ...session.interruptedTurn,
+      interruptedAt: toISOString(session.interruptedTurn.interruptedAt),
+      messages: session.interruptedTurn.messages.map((msg) => ({
+        ...msg,
+        timestamp: toISOString(msg.timestamp),
+      })),
+    } : undefined,
   };
 }
 
 // セッションを復元（文字列をDate型に変換）
 function deserializeSession(data: Record<string, unknown>): DiscussionSession {
+  const interruptedTurnData = data.interruptedTurn as Record<string, unknown> | undefined;
+
   return {
     ...data,
     createdAt: new Date(data.createdAt as string),
@@ -60,6 +71,15 @@ function deserializeSession(data: Record<string, unknown>): DiscussionSession {
         timestamp: new Date(msg.timestamp as string),
       })),
     })),
+    // 中断状態がある場合はデシリアライズ
+    interruptedTurn: interruptedTurnData ? {
+      ...interruptedTurnData,
+      interruptedAt: new Date(interruptedTurnData.interruptedAt as string),
+      messages: (interruptedTurnData.messages as Array<Record<string, unknown>>).map((msg) => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp as string),
+      })),
+    } : undefined,
   } as DiscussionSession;
 }
 

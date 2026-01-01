@@ -39,7 +39,7 @@ import {
   getInterruptedState,
   clearInterruptedState,
 } from '@/lib/session-storage';
-import { InterruptedDiscussionState } from '@/types';
+import { InterruptedDiscussionState, InterruptedTurnState } from '@/types';
 
 const STORAGE_KEY_PARTICIPANTS = 'ai-discussion-participants';
 const STORAGE_KEY_SEARCH = 'ai-discussion-search';
@@ -364,12 +364,56 @@ export default function Home() {
     setCurrentTopic('');
     setError(null);
 
-    // セッションの参加者設定を適用
-    if (session.participants.length > 0) {
-      setParticipants(session.participants);
-    }
-    if (session.rounds) {
-      setTerminationConfig(prev => ({ ...prev, maxRounds: session.rounds! }));
+    // セッションに中断状態がある場合、interruptedStateにセットし、設定も復元
+    if (session.interruptedTurn) {
+      const turn = session.interruptedTurn;
+
+      // 中断時の参加者を復元（保存されていればそれを、なければセッションの参加者を使用）
+      setParticipants(turn.participants || session.participants);
+
+      // 中断時の設定を復元
+      if (turn.discussionMode) {
+        setDiscussionMode(turn.discussionMode);
+      }
+      if (turn.discussionDepth) {
+        setDiscussionDepth(turn.discussionDepth);
+      }
+      if (turn.directionGuide) {
+        setDirectionGuide(turn.directionGuide);
+      }
+      if (turn.terminationConfig) {
+        setTerminationConfig(turn.terminationConfig);
+      }
+      if (turn.userProfile) {
+        setUserProfile(turn.userProfile);
+      }
+
+      const interrupted: InterruptedDiscussionState = {
+        sessionId: session.id,
+        topic: turn.topic,
+        participants: turn.participants || session.participants,
+        messages: turn.messages,
+        currentRound: turn.currentRound,
+        currentParticipantIndex: turn.currentParticipantIndex,
+        totalRounds: turn.totalRounds,
+        searchResults: turn.searchResults,
+        userProfile: turn.userProfile,
+        discussionMode: turn.discussionMode,
+        discussionDepth: turn.discussionDepth,
+        directionGuide: turn.directionGuide,
+        terminationConfig: turn.terminationConfig,
+        interruptedAt: turn.interruptedAt,
+      };
+      setInterruptedState(interrupted);
+    } else {
+      // 中断状態がない場合はセッションの設定を適用
+      if (session.participants.length > 0) {
+        setParticipants(session.participants);
+      }
+      if (session.rounds) {
+        setTerminationConfig(prev => ({ ...prev, maxRounds: session.rounds! }));
+      }
+      setInterruptedState(null);
     }
   }, []);
 
@@ -414,7 +458,7 @@ export default function Home() {
   const handleResumeDiscussion = useCallback(async () => {
     if (!interruptedState) return;
 
-    // 中断状態をクリア
+    // 中断状態をクリア（localStorage）
     clearInterruptedState();
     setInterruptedState(null);
 
@@ -436,12 +480,21 @@ export default function Home() {
       setUserProfile(interruptedState.userProfile);
     }
 
-    // セッションを復元
+    // セッションを復元し、中断状態をクリア
     const session = await getAllSessions().then(sessions =>
       sessions.find(s => s.id === interruptedState.sessionId)
     );
     if (session) {
-      setCurrentSession(session);
+      // セッションから中断状態を削除（再開したので）
+      const updatedSession: DiscussionSession = {
+        ...session,
+        interruptedTurn: undefined,
+      };
+      await saveSession(updatedSession);
+      setCurrentSession(updatedSession);
+      setSessions((prev) =>
+        prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+      );
     }
 
     // 中断時のメッセージを復元して表示
@@ -509,6 +562,13 @@ export default function Home() {
       let buffer = '';
       let collectedMessages: DiscussionMessage[] = [...interruptedState.messages];
       let collectedFinalAnswer = '';
+      // 進捗情報を追跡（中断時・自動保存時に使用）
+      let currentProgress = {
+        currentRound: interruptedState.currentRound,
+        currentParticipantIndex: interruptedState.currentParticipantIndex,
+      };
+      // 再開時のセッションを保持
+      const resumeSession = currentSessionRef.current;
 
       const processLine = (line: string) => {
         if (line.startsWith('data: ')) {
@@ -518,6 +578,10 @@ export default function Home() {
 
             switch (progressData.type) {
               case 'progress':
+                currentProgress = {
+                  currentRound: progressData.progress.currentRound,
+                  currentParticipantIndex: progressData.progress.currentParticipantIndex,
+                };
                 setProgress({
                   currentRound: progressData.progress.currentRound,
                   totalRounds: progressData.progress.totalRounds,
@@ -537,6 +601,36 @@ export default function Home() {
                     newSet.add(`${messageParticipant.provider}-${messageParticipant.model}`);
                     return newSet;
                   });
+                }
+                // メッセージ受信のたびにセッションの中断状態を更新（自動保存）
+                {
+                  const latestSession = currentSessionRef.current;
+                  if (latestSession) {
+                    const interruptedTurn: InterruptedTurnState = {
+                      topic: interruptedState.topic,
+                      participants: interruptedState.participants, // 再開時の参加者を保存
+                      messages: collectedMessages,
+                      currentRound: currentProgress.currentRound,
+                      currentParticipantIndex: currentProgress.currentParticipantIndex,
+                      totalRounds: interruptedState.totalRounds,
+                      searchResults: interruptedState.searchResults,
+                      userProfile: interruptedState.userProfile,
+                      discussionMode: interruptedState.discussionMode,
+                      discussionDepth: interruptedState.discussionDepth,
+                      directionGuide: interruptedState.directionGuide,
+                      terminationConfig: interruptedState.terminationConfig,
+                      interruptedAt: new Date(),
+                    };
+                    const updatedSession: DiscussionSession = {
+                      ...latestSession,
+                      interruptedTurn,
+                      updatedAt: new Date(),
+                    };
+                    saveSession(updatedSession).catch(err => console.error('Failed to save interrupted state:', err));
+                    setSessions((prev) =>
+                      prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+                    );
+                  }
                 }
                 break;
               case 'summary':
@@ -562,7 +656,16 @@ export default function Home() {
         }
       };
 
+      let wasInterrupted = false;
+
       while (true) {
+        // 中断リクエストをチェック
+        if (interruptRequestedRef.current) {
+          wasInterrupted = true;
+          reader.cancel();
+          break;
+        }
+
         const { done, value } = await reader.read();
         if (done) {
           if (buffer.trim()) {
@@ -583,7 +686,31 @@ export default function Home() {
         }
       }
 
-      // 議論完了後、セッションにターンを追加して保存
+      // 中断された場合、状態を保存
+      if (wasInterrupted) {
+        const newInterruptedState: InterruptedDiscussionState = {
+          sessionId: resumeSession?.id || '',
+          topic: interruptedState.topic,
+          participants: interruptedState.participants,
+          messages: collectedMessages,
+          currentRound: currentProgress.currentRound,
+          currentParticipantIndex: currentProgress.currentParticipantIndex,
+          totalRounds: interruptedState.totalRounds,
+          searchResults: interruptedState.searchResults,
+          userProfile: interruptedState.userProfile,
+          discussionMode: interruptedState.discussionMode,
+          discussionDepth: interruptedState.discussionDepth,
+          directionGuide: interruptedState.directionGuide,
+          terminationConfig: interruptedState.terminationConfig,
+          interruptedAt: new Date(),
+        };
+        saveInterruptedState(newInterruptedState);
+        setInterruptedState(newInterruptedState);
+        setIsLoading(false);
+        return;
+      }
+
+      // 議論完了後、セッションにターンを追加して保存（中断状態もクリア）
       if (collectedFinalAnswer) {
         const newTurn = createNewTurn(
           interruptedState.topic,
@@ -597,6 +724,7 @@ export default function Home() {
           const updatedSession: DiscussionSession = {
             ...latestSession,
             turns: [...latestSession.turns, newTurn],
+            interruptedTurn: undefined, // 完了したので中断状態をクリア
             updatedAt: new Date(),
           };
           await saveSession(updatedSession);
@@ -740,6 +868,8 @@ export default function Home() {
         let buffer = '';
         let collectedMessages: DiscussionMessage[] = [];
         let collectedFinalAnswer = '';
+        // 進捗情報を追跡（中断時・自動保存時に使用）
+        let currentProgress = { currentRound: 1, currentParticipantIndex: 0 };
 
         const processLine = (line: string) => {
           if (line.startsWith('data: ')) {
@@ -749,6 +879,10 @@ export default function Home() {
 
               switch (progressData.type) {
                 case 'progress':
+                  currentProgress = {
+                    currentRound: progressData.progress.currentRound,
+                    currentParticipantIndex: progressData.progress.currentParticipantIndex,
+                  };
                   setProgress({
                     currentRound: progressData.progress.currentRound,
                     totalRounds: progressData.progress.totalRounds,
@@ -769,6 +903,37 @@ export default function Home() {
                       newSet.add(`${messageParticipant.provider}-${messageParticipant.model}`);
                       return newSet;
                     });
+                  }
+                  // メッセージ受信のたびにセッションの中断状態を更新（自動保存）
+                  {
+                    const latestSession = currentSessionRef.current;
+                    if (latestSession) {
+                      const interruptedTurn: InterruptedTurnState = {
+                        topic,
+                        participants, // 現在の参加者を保存
+                        messages: collectedMessages,
+                        currentRound: currentProgress.currentRound,
+                        currentParticipantIndex: currentProgress.currentParticipantIndex,
+                        totalRounds: terminationConfig.maxRounds,
+                        searchResults: searchResults.length > 0 ? searchResults : undefined,
+                        userProfile,
+                        discussionMode,
+                        discussionDepth,
+                        directionGuide,
+                        terminationConfig,
+                        interruptedAt: new Date(),
+                      };
+                      const updatedSession: DiscussionSession = {
+                        ...latestSession,
+                        interruptedTurn,
+                        updatedAt: new Date(),
+                      };
+                      saveSession(updatedSession).catch(err => console.error('Failed to save interrupted state:', err));
+                      // sessionsリストも更新
+                      setSessions((prev) =>
+                        prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+                      );
+                    }
                   }
                   break;
                 case 'summary':
@@ -796,7 +961,6 @@ export default function Home() {
         };
 
         let wasInterrupted = false;
-        let interruptProgress = { currentRound: 1, currentParticipantIndex: 0 };
 
         while (true) {
           // 中断リクエストをチェック
@@ -824,20 +988,6 @@ export default function Home() {
 
           for (const line of lines) {
             processLine(line);
-            // 進捗情報から現在位置を記録（中断時に使用）
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.type === 'progress' && data.progress) {
-                  interruptProgress = {
-                    currentRound: data.progress.currentRound,
-                    currentParticipantIndex: data.progress.currentParticipantIndex,
-                  };
-                }
-              } catch {
-                // ignore
-              }
-            }
           }
         }
 
@@ -848,8 +998,8 @@ export default function Home() {
             topic,
             participants,
             messages: collectedMessages,
-            currentRound: interruptProgress.currentRound,
-            currentParticipantIndex: interruptProgress.currentParticipantIndex,
+            currentRound: currentProgress.currentRound,
+            currentParticipantIndex: currentProgress.currentParticipantIndex,
             totalRounds: terminationConfig.maxRounds,
             searchResults: searchResults.length > 0 ? searchResults : undefined,
             userProfile,
@@ -865,7 +1015,7 @@ export default function Home() {
           return;
         }
 
-        // 議論完了後、セッションにターンを追加して保存
+        // 議論完了後、セッションにターンを追加して保存（中断状態もクリア）
         if (collectedFinalAnswer) {
           const newTurn = createNewTurn(topic, collectedMessages, collectedFinalAnswer, searchResults.length > 0 ? searchResults : undefined);
           const latestSession = currentSessionRef.current;
@@ -874,6 +1024,7 @@ export default function Home() {
             const updatedSession: DiscussionSession = {
               ...latestSession,
               turns: [...latestSession.turns, newTurn],
+              interruptedTurn: undefined, // 完了したので中断状態をクリア
               updatedAt: new Date(),
             };
             await saveSession(updatedSession);
@@ -882,6 +1033,9 @@ export default function Home() {
               prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
             );
           }
+          // localStorageの中断状態もクリア
+          clearInterruptedState();
+          setInterruptedState(null);
 
           // 現在のターンをクリア（セッションに保存済み）
           setCurrentTopic('');

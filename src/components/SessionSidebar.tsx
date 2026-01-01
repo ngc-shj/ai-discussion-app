@@ -193,8 +193,19 @@ export function SessionSidebar({
                         className={`flex-1 min-w-0 pr-2 cursor-pointer ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
                         onClick={() => handleSelectSession(session)}
                       >
-                        <div className="text-sm text-white truncate" title={session.title}>
-                          {session.title}
+                        <div className="flex items-center gap-1.5">
+                          <div className="text-sm text-white truncate flex-1" title={session.title}>
+                            {session.title}
+                          </div>
+                          {/* 中断中マーク（現在アクティブなセッションで議論中の場合は非表示） */}
+                          {session.interruptedTurn && !(currentSessionId === session.id && disabled) && (
+                            <span
+                              className="shrink-0 px-1.5 py-0.5 text-[10px] bg-orange-600/80 text-orange-100 rounded font-medium"
+                              title={`中断中: ${session.interruptedTurn.topic}`}
+                            >
+                              中断中
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-gray-500">

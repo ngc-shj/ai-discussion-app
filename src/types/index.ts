@@ -191,6 +191,23 @@ export interface DiscussionTurn {
   createdAt: Date;
 }
 
+// 中断された議論の進行状態（セッション内保存用）
+export interface InterruptedTurnState {
+  topic: string;
+  participants: DiscussionParticipant[]; // 中断時の参加者（セッションの参加者と同期するために保存）
+  messages: DiscussionMessage[];
+  currentRound: number;
+  currentParticipantIndex: number;
+  totalRounds: number;
+  searchResults?: SearchResult[];
+  userProfile?: UserProfile;
+  discussionMode?: DiscussionMode;
+  discussionDepth?: DiscussionDepth;
+  directionGuide?: DirectionGuide;
+  terminationConfig?: TerminationConfig;
+  interruptedAt: Date;
+}
+
 // 議論セッション（複数のターンを含む）
 export interface DiscussionSession {
   id: string;
@@ -200,6 +217,7 @@ export interface DiscussionSession {
   rounds: number;
   createdAt: Date;
   updatedAt: Date;
+  interruptedTurn?: InterruptedTurnState; // 中断された議論がある場合
 }
 
 // SearXNG検索結果
