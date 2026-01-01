@@ -91,7 +91,9 @@ export async function* runDiscussion(
         turnContext,
         searchResults,
         participant.role,
-        participant.customRolePrompt
+        participant.customRolePrompt,
+        participants,
+        participant
       );
 
       // AIに問い合わせ
@@ -171,7 +173,7 @@ export async function* runDiscussion(
       };
     });
 
-    const summaryPrompt = createDiscussionPrompt(topic, allMessages, false, true, turnContext, searchResults);
+    const summaryPrompt = createDiscussionPrompt(topic, allMessages, false, true, turnContext, searchResults, undefined, undefined, participants);
     const summaryResponse = await summaryProvider.generate({ prompt: summaryPrompt });
 
     if (!summaryResponse.error && summaryResponse.content) {
