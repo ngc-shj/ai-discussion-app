@@ -18,6 +18,7 @@ import {
   DirectionGuide,
   TerminationConfig,
   MessageVote,
+  generateParticipantId,
 } from '@/types';
 import {
   DiscussionPanel,
@@ -174,10 +175,16 @@ export default function Home() {
             try {
               const parsed: DiscussionParticipant[] = JSON.parse(savedParticipants);
               // 保存された参加者が現在利用可能なモデルに存在するか確認
-              const validParticipants = parsed.filter((p) => {
-                const providerModels = data[p.provider] || [];
-                return providerModels.some((m: ModelInfo) => m.id === p.model);
-              });
+              // また、IDがない古いデータにはIDを付与
+              const validParticipants = parsed
+                .filter((p) => {
+                  const providerModels = data[p.provider] || [];
+                  return providerModels.some((m: ModelInfo) => m.id === p.model);
+                })
+                .map((p) => ({
+                  ...p,
+                  id: p.id || generateParticipantId(),
+                }));
               if (validParticipants.length > 0) {
                 setParticipants(validParticipants);
                 return;
@@ -197,6 +204,7 @@ export default function Home() {
                 const model = models[0];
                 const isOllama = providerId === 'ollama';
                 initialParticipants.push({
+                  id: generateParticipantId(),
                   provider: providerId,
                   model: model.id,
                   displayName: isOllama ? `Ollama (${model.name})` : `${provider.name} (${model.name})`,

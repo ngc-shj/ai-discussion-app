@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS, getOllamaModelColor, ROLE_PRESETS, ParticipantRole } from '@/types';
+import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS, getOllamaModelColor, ROLE_PRESETS, ParticipantRole, generateParticipantId } from '@/types';
 
 // 最新モデルの数（各プロバイダーごと）
 const LATEST_MODEL_COUNT = 5;
@@ -36,32 +36,36 @@ export function AISelector({
     }));
   };
 
-  const toggleParticipant = (provider: AIProviderType, model: string, displayName: string, color: string) => {
-    const existingIndex = participants.findIndex(
-      (p) => p.provider === provider && p.model === model
-    );
-
-    if (existingIndex >= 0) {
-      onParticipantsChange(participants.filter((_, i) => i !== existingIndex));
-    } else {
-      onParticipantsChange([...participants, { provider, model, displayName, color, role: 'neutral' }]);
-    }
+  // 参加者を追加（同一モデルでも複数追加可能）
+  const addParticipant = (provider: AIProviderType, model: string, displayName: string, color: string, role: ParticipantRole = 'neutral') => {
+    const newParticipant: DiscussionParticipant = {
+      id: generateParticipantId(),
+      provider,
+      model,
+      displayName,
+      color,
+      role,
+    };
+    onParticipantsChange([...participants, newParticipant]);
   };
 
-  const updateParticipantRole = (provider: AIProviderType, model: string, role: ParticipantRole) => {
+  // 参加者を削除（IDで識別）
+  const removeParticipant = (id: string) => {
+    onParticipantsChange(participants.filter((p) => p.id !== id));
+  };
+
+  // 参加者の役割を更新（IDで識別）
+  const updateParticipantRole = (id: string, role: ParticipantRole) => {
     onParticipantsChange(
       participants.map((p) =>
-        p.provider === provider && p.model === model ? { ...p, role } : p
+        p.id === id ? { ...p, role } : p
       )
     );
   };
 
-  const getParticipant = (provider: AIProviderType, model: string) => {
-    return participants.find((p) => p.provider === provider && p.model === model);
-  };
-
-  const isParticipantSelected = (provider: AIProviderType, model: string) => {
-    return participants.some((p) => p.provider === provider && p.model === model);
+  // 特定モデルの参加者数を取得
+  const getParticipantCountForModel = (provider: AIProviderType, model: string) => {
+    return participants.filter((p) => p.provider === provider && p.model === model).length;
   };
 
   const getFilteredModels = (models: ModelInfo[]) => {
@@ -77,8 +81,59 @@ export function AISelector({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-gray-300">参加AI</label>
-        <span className="text-xs text-gray-500">{participants.length}個選択中</span>
+        <span className="text-xs text-gray-500">{participants.length}人参加</span>
       </div>
+
+      {/* 選択された参加者一覧 */}
+      {participants.length > 0 && (
+        <div className="space-y-1 p-2 bg-gray-700/30 rounded-lg">
+          <div className="text-xs text-gray-400 mb-1">参加者一覧</div>
+          {participants.map((participant, index) => {
+            const rolePreset = ROLE_PRESETS.find((r) => r.id === participant.role);
+            return (
+              <div
+                key={participant.id}
+                className="flex items-center gap-2 p-1.5 bg-gray-800 rounded text-sm"
+              >
+                <span className="text-gray-500 text-xs w-4">{index + 1}.</span>
+                <div
+                  className="w-3 h-3 rounded-full shrink-0"
+                  style={{ backgroundColor: participant.color }}
+                />
+                <span className="text-gray-300 truncate flex-1" title={participant.displayName}>
+                  {participant.displayName}
+                </span>
+                {/* 役割選択 */}
+                <select
+                  value={participant.role || 'neutral'}
+                  onChange={(e) => updateParticipantRole(participant.id, e.target.value as ParticipantRole)}
+                  disabled={disabled}
+                  title={rolePreset?.description || '役割を選択'}
+                  className="px-1.5 py-0.5 text-xs bg-gray-600 text-gray-200 rounded border-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                >
+                  {ROLE_PRESETS.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </select>
+                {/* 削除ボタン */}
+                <button
+                  type="button"
+                  onClick={() => removeParticipant(participant.id)}
+                  disabled={disabled}
+                  className="p-0.5 text-gray-500 hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="削除"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* モデル表示切替 */}
       <div className="flex items-center gap-3 p-2 bg-gray-700/50 rounded-lg">
@@ -105,7 +160,7 @@ export function AISelector({
         </label>
       </div>
 
-      <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+      <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
         {DEFAULT_PROVIDERS.map((provider) => {
           const isAvailable = availability[provider.id];
           const allModels = availableModels[provider.id] || [];
@@ -159,9 +214,6 @@ export function AISelector({
                 {!isAvailable && (
                   <span className="text-xs text-red-400">利用不可</span>
                 )}
-                {isOllama && isAvailable && (
-                  <span className="text-xs text-gray-500">複数選択可</span>
-                )}
               </button>
 
               {/* モデル一覧（折りたたみ可能） */}
@@ -172,53 +224,35 @@ export function AISelector({
                       {models.map((model) => {
                         const modelColor = isOllama ? getOllamaModelColor(model.id) : provider.color;
                         const displayName = isOllama ? `Ollama (${model.name})` : `${provider.name} (${model.name})`;
-                        const isSelected = isParticipantSelected(provider.id, model.id);
-
-                        const participant = getParticipant(provider.id, model.id);
+                        const count = getParticipantCountForModel(provider.id, model.id);
 
                         return (
-                          <div key={model.id} className="space-y-1">
-                            <label
-                              className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                                disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-700'
-                              } ${isSelected ? 'bg-gray-700' : ''}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleParticipant(provider.id, model.id, displayName, modelColor)}
-                                disabled={disabled}
-                                className="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-gray-800"
-                              />
-                              <div
-                                className="w-3 h-3 rounded-full shrink-0"
-                                style={{ backgroundColor: modelColor }}
-                              />
-                              <span className="text-sm text-gray-300 truncate" title={model.name}>
-                                {model.name}
-                              </span>
-                            </label>
-                            {/* ロール選択（選択時のみ表示） */}
-                            {isSelected && participant && (
-                              <div className="ml-7 flex items-center gap-1 flex-wrap">
-                                {ROLE_PRESETS.map((role) => (
-                                  <button
-                                    key={role.id}
-                                    type="button"
-                                    onClick={() => updateParticipantRole(provider.id, model.id, role.id)}
-                                    disabled={disabled}
-                                    title={role.description}
-                                    className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                                      participant.role === role.id
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-                                    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                  >
-                                    {role.name}
-                                  </button>
-                                ))}
-                              </div>
+                          <div
+                            key={model.id}
+                            className="flex items-center gap-2 p-2 rounded hover:bg-gray-700/50 transition-colors"
+                          >
+                            <div
+                              className="w-3 h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: modelColor }}
+                            />
+                            <span className="text-sm text-gray-300 truncate flex-1" title={model.name}>
+                              {model.name}
+                            </span>
+                            {count > 0 && (
+                              <span className="text-xs text-blue-400">×{count}</span>
                             )}
+                            {/* 追加ボタン */}
+                            <button
+                              type="button"
+                              onClick={() => addParticipant(provider.id, model.id, displayName, modelColor)}
+                              disabled={disabled}
+                              className="p-1 text-gray-400 hover:text-green-400 hover:bg-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="参加者として追加"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                            </button>
                           </div>
                         );
                       })}
@@ -240,6 +274,10 @@ export function AISelector({
           );
         })}
       </div>
+
+      <p className="text-xs text-gray-500">
+        同じモデルを異なる役割で複数追加できます
+      </p>
     </div>
   );
 }
