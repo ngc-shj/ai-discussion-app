@@ -220,3 +220,34 @@ export interface SearchBasedDiscussionRequest extends DiscussionRequest {
   searchConfig?: SearchConfig;
   searchResults?: SearchResult[];
 }
+
+// ユーザーの技術レベル
+export type TechLevel = 'beginner' | 'intermediate' | 'advanced';
+
+// 回答スタイルの好み
+export type ResponseStyle = 'concise' | 'detailed' | 'technical' | 'simple';
+
+// ユーザープロファイル
+export interface UserProfile {
+  name?: string;                    // 名前（任意）
+  occupation?: string;              // 職業・専門分野
+  techLevel?: TechLevel;            // 技術レベル
+  interests?: string[];             // 関心のある領域
+  responseStyle?: ResponseStyle;    // 回答スタイルの好み
+  customContext?: string;           // その他のコンテキスト（自由記述）
+}
+
+// 技術レベルのプリセット
+export const TECH_LEVEL_PRESETS: { id: TechLevel; name: string; description: string }[] = [
+  { id: 'beginner', name: '初心者', description: '基礎から丁寧に説明してほしい' },
+  { id: 'intermediate', name: '中級者', description: '基本は理解しているので応用的な内容を' },
+  { id: 'advanced', name: '上級者', description: '専門用語や高度な概念も使ってOK' },
+];
+
+// 回答スタイルのプリセット
+export const RESPONSE_STYLE_PRESETS: { id: ResponseStyle; name: string; description: string }[] = [
+  { id: 'concise', name: '簡潔', description: 'ポイントを絞った短い回答' },
+  { id: 'detailed', name: '詳細', description: '背景や理由も含めた詳しい回答' },
+  { id: 'technical', name: '技術的', description: '専門用語や技術的な詳細を含む' },
+  { id: 'simple', name: '平易', description: '専門用語を避けたわかりやすい説明' },
+];

@@ -1,4 +1,4 @@
-import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS, DiscussionParticipant } from '@/types';
+import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS, DiscussionParticipant, UserProfile, TECH_LEVEL_PRESETS, RESPONSE_STYLE_PRESETS } from '@/types';
 
 // モデル情報
 export interface ModelInfo {
@@ -59,6 +59,46 @@ function getRolePrompt(role?: ParticipantRole, customRolePrompt?: string): strin
   return '';
 }
 
+// ユーザープロファイルをフォーマット
+function formatUserProfile(profile?: UserProfile): string {
+  if (!profile) {
+    return '';
+  }
+
+  const lines: string[] = [];
+
+  if (profile.name) {
+    lines.push(`- 名前: ${profile.name}`);
+  }
+  if (profile.occupation) {
+    lines.push(`- 職業・専門分野: ${profile.occupation}`);
+  }
+  if (profile.techLevel) {
+    const level = TECH_LEVEL_PRESETS.find((l) => l.id === profile.techLevel);
+    if (level) {
+      lines.push(`- 技術レベル: ${level.name}（${level.description}）`);
+    }
+  }
+  if (profile.responseStyle) {
+    const style = RESPONSE_STYLE_PRESETS.find((s) => s.id === profile.responseStyle);
+    if (style) {
+      lines.push(`- 回答スタイル: ${style.name}（${style.description}）`);
+    }
+  }
+  if (profile.interests && profile.interests.length > 0) {
+    lines.push(`- 関心のある領域: ${profile.interests.join('、')}`);
+  }
+  if (profile.customContext) {
+    lines.push(`- その他: ${profile.customContext}`);
+  }
+
+  if (lines.length === 0) {
+    return '';
+  }
+
+  return `\n【ユーザーについて】\n${lines.join('\n')}\nこのユーザーに合わせた回答を心がけてください。\n`;
+}
+
 // 参加者リストをフォーマット
 function formatParticipantsList(
   participants: DiscussionParticipant[],
@@ -96,7 +136,8 @@ export function createDiscussionPrompt(
   currentRole?: ParticipantRole,
   customRolePrompt?: string,
   allParticipants?: DiscussionParticipant[],
-  currentParticipant?: DiscussionParticipant
+  currentParticipant?: DiscussionParticipant,
+  userProfile?: UserProfile
 ): string {
   // 過去のターンのコンテキストを構築
   let previousContext = '';
@@ -116,6 +157,9 @@ export function createDiscussionPrompt(
   // 参加者リストを取得
   const participantsContext = formatParticipantsList(allParticipants || [], currentParticipant);
 
+  // ユーザープロファイルを取得
+  const userProfileContext = formatUserProfile(userProfile);
+
   if (isFinalSummary) {
     const allResponses = previousMessages
       .map((m) => {
@@ -126,7 +170,7 @@ export function createDiscussionPrompt(
 
     return `あなたは議論の統合者です。以下のトピックについて、複数のAIがそれぞれの役割に基づいて議論を行いました。
 それぞれの意見を踏まえて、最終的な統合回答を作成してください。
-${previousContext}${searchContext}
+${userProfileContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -145,7 +189,7 @@ ${allResponses}
 
   if (isFirstRound) {
     return `あなたは議論に参加するAIアシスタントです。以下のトピックについて、あなたの見解を述べてください。
-${rolePrompt}${participantsContext}${previousContext}${searchContext}
+${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
@@ -165,7 +209,7 @@ ${topic}
     .join('\n\n');
 
   return `あなたは議論に参加するAIアシスタントです。以下のトピックについて議論が進行中です。
-${rolePrompt}${participantsContext}${previousContext}${searchContext}
+${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
