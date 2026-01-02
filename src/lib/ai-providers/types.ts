@@ -1,4 +1,4 @@
-import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS, DiscussionParticipant, UserProfile, TECH_LEVEL_PRESETS, RESPONSE_STYLE_PRESETS, DiscussionMode, DISCUSSION_MODE_PRESETS, DiscussionDepth, DISCUSSION_DEPTH_PRESETS, DirectionGuide } from '@/types';
+import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS, DiscussionParticipant, UserProfile, TECH_LEVEL_PRESETS, RESPONSE_STYLE_PRESETS, DiscussionMode, DISCUSSION_MODE_PRESETS, DiscussionDepth, DISCUSSION_DEPTH_PRESETS, DirectionGuide, FollowUpQuestion, FollowUpCategory } from '@/types';
 
 // モデル情報
 export interface ModelInfo {
@@ -112,9 +112,8 @@ function formatParticipantsList(
     const rolePreset = p.role ? ROLE_PRESETS.find((r) => r.id === p.role) : undefined;
     const roleName = rolePreset?.name || '中立';
     const roleDesc = rolePreset?.description || 'バランスの取れた客観的な視点';
-    const isCurrentUser = currentParticipant &&
-      p.provider === currentParticipant.provider &&
-      p.model === currentParticipant.model;
+    // IDで一致を確認（同じモデルでも異なる参加者を区別）
+    const isCurrentUser = currentParticipant && p.id === currentParticipant.id;
 
     if (isCurrentUser) {
       return `- **あなた**: ${p.displayName} [${roleName}] - ${roleDesc}`;
@@ -290,4 +289,82 @@ ${previousResponses}
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
 - 検索結果がある場合は、最新の情報を参考にして回答してください
 - 回答は日本語で、簡潔にまとめてください（${wordCountInstruction}）`;
+}
+
+// フォローアップ質問生成用のプロンプト
+export function createFollowUpPrompt(
+  topic: string,
+  finalAnswer: string,
+  userProfile?: UserProfile
+): string {
+  const techLevelHint = userProfile?.techLevel
+    ? TECH_LEVEL_PRESETS.find((l) => l.id === userProfile.techLevel)?.description || ''
+    : '';
+
+  return `あなたは議論の補助者です。以下のトピックと回答について、ユーザーが次に知りたいであろうフォローアップ質問を4つ提案してください。
+
+【トピック】
+${topic}
+
+【統合回答】
+${finalAnswer.slice(0, 1500)}${finalAnswer.length > 1500 ? '...' : ''}
+
+${techLevelHint ? `【ユーザーの技術レベル】\n${techLevelHint}\n` : ''}
+
+【出力形式】
+以下のJSON配列形式で出力してください。JSONのみを出力し、他の説明は不要です。
+
+[
+  {"category": "clarification", "question": "〜について詳しく説明してもらえますか？"},
+  {"category": "expansion", "question": "〜の観点からも考えてみたいのですが..."},
+  {"category": "example", "question": "具体的な例を挙げてもらえますか？"},
+  {"category": "alternative", "question": "別のアプローチはありますか？"}
+]
+
+【カテゴリの説明】
+- clarification: 回答の詳細や不明点を明確にする質問
+- expansion: 議論を別の視点や領域に広げる質問
+- example: 具体例やケーススタディを求める質問
+- alternative: 代替案や別のアプローチを探る質問
+
+【注意】
+- 各カテゴリから1つずつ質問を生成してください
+- 質問は簡潔で具体的にしてください
+- 統合回答の内容を踏まえた関連性の高い質問にしてください`;
+}
+
+// フォローアップ質問のレスポンスをパース
+export function parseFollowUpResponse(response: string): FollowUpQuestion[] {
+  try {
+    // JSONを抽出（前後のテキストを除去）
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      return [];
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as Array<{ category: string; question: string }>;
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const validCategories: FollowUpCategory[] = ['clarification', 'expansion', 'example', 'alternative'];
+
+    return parsed
+      .filter((item) => {
+        return (
+          item &&
+          typeof item.category === 'string' &&
+          typeof item.question === 'string' &&
+          validCategories.includes(item.category as FollowUpCategory)
+        );
+      })
+      .map((item, index) => ({
+        id: `followup-${Date.now()}-${index}`,
+        category: item.category as FollowUpCategory,
+        question: item.question,
+      }));
+  } catch {
+    return [];
+  }
 }

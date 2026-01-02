@@ -98,6 +98,7 @@ export interface DiscussionMessage {
   round: number;
   timestamp: Date;
   isLoading?: boolean;
+  prompt?: string; // AIに渡されたプロンプト（確認用）
 }
 
 // 議論の状態
@@ -181,6 +182,24 @@ export function getOllamaModelColor(modelId: string): string {
   return colors[Math.abs(hash) % colors.length];
 }
 
+// フォローアップ質問のカテゴリ
+export type FollowUpCategory = 'clarification' | 'expansion' | 'example' | 'alternative';
+
+// フォローアップ質問
+export interface FollowUpQuestion {
+  id: string;
+  question: string;
+  category: FollowUpCategory;
+}
+
+// フォローアップカテゴリのラベル
+export const FOLLOW_UP_CATEGORY_LABELS: Record<FollowUpCategory, string> = {
+  clarification: '詳細',
+  expansion: '拡張',
+  example: '具体例',
+  alternative: '別視点',
+};
+
 // 議論ターン（ユーザーの質問とAIの議論・回答のセット）
 export interface DiscussionTurn {
   id: string;
@@ -188,7 +207,11 @@ export interface DiscussionTurn {
   messages: DiscussionMessage[];
   finalAnswer: string;
   searchResults?: SearchResult[];
+  suggestedFollowUps?: FollowUpQuestion[]; // AI生成のフォローアップ質問候補
   createdAt: Date;
+  // 分岐・フォーク用
+  parentTurnId?: string;  // 分岐元のターンID
+  branchLabel?: string;   // 分岐のラベル
 }
 
 // 中断された議論の進行状態（セッション内保存用）
@@ -218,6 +241,7 @@ export interface DiscussionSession {
   createdAt: Date;
   updatedAt: Date;
   interruptedTurn?: InterruptedTurnState; // 中断された議論がある場合
+  branches?: TurnBranch[]; // 分岐一覧
 }
 
 // SearXNG検索結果
@@ -282,7 +306,8 @@ export type DiscussionMode =
   | 'brainstorm'     // ブレインストーミング
   | 'debate'         // ディベート
   | 'consensus'      // コンセンサス形成
-  | 'critique';      // 批判的レビュー
+  | 'critique'       // 批判的レビュー
+  | 'counterargument'; // 反論モード
 
 // 議論モードのプリセット
 export interface DiscussionModePreset {
@@ -357,6 +382,20 @@ export const DISCUSSION_MODE_PRESETS: DiscussionModePreset[] = [
 - 指摘された主要な問題点・リスクを整理してください
 - 優先度や深刻度で分類してください
 - 提案された改善策や対策をまとめてください`,
+  },
+  {
+    id: 'counterargument',
+    name: '反論モード',
+    description: '統合回答に対する反論を生成',
+    prompt: `【議論モード: 反論生成】
+- あなたは批判的思考者として、提示された内容の問題点や盲点を指摘してください
+- 単なる否定ではなく、論理的な根拠を持った反論を述べてください
+- 反論が妥当である条件や状況も述べてください
+- 建設的な批判を心がけ、改善案も提示してください`,
+    summaryPrompt: `【反論の統合】
+- 提示された反論のうち、特に重要なものを整理してください
+- 各反論の妥当性を評価してください
+- 反論を踏まえた上での、より堅牢な結論を提示してください`,
   },
 ];
 
@@ -496,3 +535,77 @@ export interface InterruptedDiscussionState {
   terminationConfig?: TerminationConfig;
   interruptedAt: Date;
 }
+
+// 深掘りモードの種類
+export type DeepDiveType =
+  | 'technical'     // 技術的詳細
+  | 'practical'     // 実践的な応用
+  | 'theoretical'   // 理論的背景
+  | 'comparison'    // 比較分析
+  | 'implications'  // 影響と結果
+  | 'custom';       // カスタム
+
+// 深掘りプリセット
+export interface DeepDivePreset {
+  id: DeepDiveType;
+  name: string;
+  description: string;
+  prompt: string;
+}
+
+// 深掘りプリセット一覧
+export const DEEP_DIVE_PRESETS: DeepDivePreset[] = [
+  {
+    id: 'technical',
+    name: '技術的詳細',
+    description: '技術的な側面を深掘り',
+    prompt: '技術的な詳細、実装方法、アーキテクチャについて深く掘り下げてください。',
+  },
+  {
+    id: 'practical',
+    name: '実践的応用',
+    description: '実際の適用方法を検討',
+    prompt: '実際にどのように適用できるか、具体的なステップや注意点について議論してください。',
+  },
+  {
+    id: 'theoretical',
+    name: '理論的背景',
+    description: '背景にある理論を探求',
+    prompt: '背景にある理論、原理原則、学術的な根拠について深く議論してください。',
+  },
+  {
+    id: 'comparison',
+    name: '比較分析',
+    description: '他のアプローチと比較',
+    prompt: '他のアプローチや代替案と比較し、それぞれの長所短所を分析してください。',
+  },
+  {
+    id: 'implications',
+    name: '影響と結果',
+    description: '影響や将来への示唆を考察',
+    prompt: 'この内容が持つ影響、結果、将来への示唆について深く考察してください。',
+  },
+];
+
+// 分岐情報
+export interface TurnBranch {
+  turnId: string;
+  label: string;
+  createdAt: Date;
+}
+
+// 分岐プリセット
+export interface ForkPreset {
+  id: string;
+  name: string;
+  description: string;
+  prompt: string;
+}
+
+// 分岐プリセット一覧
+export const FORK_PRESETS: ForkPreset[] = [
+  { id: 'technical', name: '技術的視点', description: '技術的な実現可能性や実装の観点から', prompt: '技術的な実現可能性、パフォーマンス、スケーラビリティ、実装の複雑さなどの観点から議論してください。' },
+  { id: 'business', name: 'ビジネス視点', description: 'ビジネス価値やROIの観点から', prompt: 'ビジネス価値、投資対効果、市場競争力、収益性などの観点から議論してください。' },
+  { id: 'ethical', name: '倫理的視点', description: '倫理的・社会的な影響の観点から', prompt: '倫理的な問題、社会的影響、公平性、プライバシーなどの観点から議論してください。' },
+  { id: 'risk', name: 'リスク視点', description: 'リスクや課題の観点から', prompt: 'リスク、課題、障害となりうる要因、失敗シナリオなどの観点から議論してください。' },
+];

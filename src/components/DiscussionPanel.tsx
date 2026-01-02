@@ -1,9 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { DiscussionMessage, DiscussionTurn, SearchResult, MessageVote } from '@/types';
+import { DiscussionMessage, DiscussionTurn, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType } from '@/types';
 import { MessageBubble } from './MessageBubble';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { FollowUpSuggestions } from './FollowUpSuggestions';
+import { DeepDiveModal } from './DeepDiveModal';
+import { CounterargumentButton } from './CounterargumentButton';
+import { ForkButton } from './ForkButton';
+import { ForkModal } from './ForkModal';
 
 interface DiscussionPanelProps {
   turns: DiscussionTurn[];
@@ -14,8 +19,13 @@ interface DiscussionPanelProps {
   isSummarizing: boolean;
   searchResults?: SearchResult[];
   onFollowUp?: (topic: string, previousAnswer: string) => void;
+  onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
+  onCounterargument?: (topic: string, previousAnswer: string) => void;
+  onFork?: (turnId: string, topic: string, previousAnswer: string, label: string, perspective: string) => void;
   messageVotes?: MessageVote[];
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
+  suggestedFollowUps?: FollowUpQuestion[];
+  isGeneratingFollowUps?: boolean;
 }
 
 // 検索結果を表示するコンポーネント
@@ -88,6 +98,9 @@ function TurnDisplay({
   isLatest,
   defaultExpanded,
   onFollowUp,
+  onDeepDive,
+  onCounterargument,
+  onFork,
   disabled,
   messageVotes,
   onVote,
@@ -96,6 +109,9 @@ function TurnDisplay({
   isLatest: boolean;
   defaultExpanded: boolean;
   onFollowUp?: (topic: string, previousAnswer: string) => void;
+  onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
+  onCounterargument?: (topic: string, previousAnswer: string) => void;
+  onFork?: (turnId: string, topic: string, previousAnswer: string, label: string, perspective: string) => void;
   disabled?: boolean;
   messageVotes?: MessageVote[];
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
@@ -103,6 +119,8 @@ function TurnDisplay({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [copied, setCopied] = useState(false);
   const [discussionCopied, setDiscussionCopied] = useState(false);
+  const [isDeepDiveModalOpen, setIsDeepDiveModalOpen] = useState(false);
+  const [isForkModalOpen, setIsForkModalOpen] = useState(false);
 
   const maxRound = turn.messages.length > 0 ? Math.max(...turn.messages.map(m => m.round)) : 0;
   const participantCount = new Set(turn.messages.map(m => `${m.provider}-${m.model}`)).size;
@@ -251,22 +269,62 @@ function TurnDisplay({
                 <MarkdownRenderer content={turn.finalAnswer} />
               </div>
             </div>
-            {/* 深掘りボタン */}
-            {onFollowUp && (
-              <div className="mt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => onFollowUp(turn.topic, turn.finalAnswer)}
-                  disabled={disabled}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-purple-300 hover:text-white bg-purple-900/50 hover:bg-purple-800/50 border border-purple-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="この回答について深掘りする"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7m14-8l-7 7-7-7" />
-                  </svg>
-                  <span>深掘りする</span>
-                </button>
+            {/* アクションボタン */}
+            {(onDeepDive || onCounterargument || onFork) && (
+              <div className="mt-2 flex justify-end gap-2 flex-wrap">
+                {onDeepDive && (
+                  <button
+                    type="button"
+                    onClick={() => setIsDeepDiveModalOpen(true)}
+                    disabled={disabled}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-purple-300 hover:text-white bg-purple-900/50 hover:bg-purple-800/50 border border-purple-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="この回答について深掘りする"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7m14-8l-7 7-7-7" />
+                    </svg>
+                    <span>深掘りする</span>
+                  </button>
+                )}
+                {onCounterargument && (
+                  <CounterargumentButton
+                    onClick={() => onCounterargument(turn.topic, turn.finalAnswer)}
+                    disabled={disabled}
+                  />
+                )}
+                {onFork && (
+                  <ForkButton
+                    onClick={() => setIsForkModalOpen(true)}
+                    disabled={disabled}
+                  />
+                )}
               </div>
+            )}
+            {/* DeepDiveModal */}
+            {onDeepDive && (
+              <DeepDiveModal
+                isOpen={isDeepDiveModalOpen}
+                onClose={() => setIsDeepDiveModalOpen(false)}
+                onStartDeepDive={(type, customPrompt) => onDeepDive(turn.topic, turn.finalAnswer, type, customPrompt)}
+                topic={turn.topic}
+              />
+            )}
+            {/* ForkModal */}
+            {onFork && (
+              <ForkModal
+                isOpen={isForkModalOpen}
+                onClose={() => setIsForkModalOpen(false)}
+                onCreateFork={(label, perspective) => onFork(turn.id, turn.topic, turn.finalAnswer, label, perspective)}
+                topic={turn.topic}
+              />
+            )}
+            {/* フォローアップ質問候補 */}
+            {turn.suggestedFollowUps && turn.suggestedFollowUps.length > 0 && onFollowUp && (
+              <FollowUpSuggestions
+                questions={turn.suggestedFollowUps}
+                onSelect={(question) => onFollowUp(question, turn.finalAnswer)}
+                disabled={disabled}
+              />
             )}
           </div>
         </div>
@@ -284,8 +342,12 @@ function CurrentTurnDisplay({
   isSummarizing,
   searchResults,
   onFollowUp,
+  onDeepDive,
+  onCounterargument,
   messageVotes,
   onVote,
+  suggestedFollowUps,
+  isGeneratingFollowUps,
 }: {
   topic: string;
   messages: DiscussionMessage[];
@@ -294,13 +356,18 @@ function CurrentTurnDisplay({
   isSummarizing: boolean;
   searchResults?: SearchResult[];
   onFollowUp?: (topic: string, previousAnswer: string) => void;
+  onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
+  onCounterargument?: (topic: string, previousAnswer: string) => void;
   messageVotes?: MessageVote[];
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
+  suggestedFollowUps?: FollowUpQuestion[];
+  isGeneratingFollowUps?: boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [discussionCopied, setDiscussionCopied] = useState(false);
+  const [isDeepDiveModalOpen, setIsDeepDiveModalOpen] = useState(false);
 
   useEffect(() => {
     if (isExpanded) {
@@ -479,21 +546,46 @@ function CurrentTurnDisplay({
                 </>
               )}
             </div>
-            {/* 深掘りボタン（統合完了後のみ表示） */}
-            {finalAnswer && !isSummarizing && !isLoading && onFollowUp && (
-              <div className="mt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => onFollowUp(topic, finalAnswer)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-purple-300 hover:text-white bg-purple-900/50 hover:bg-purple-800/50 border border-purple-700/50 rounded-lg transition-colors"
-                  title="この回答について深掘りする"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7m14-8l-7 7-7-7" />
-                  </svg>
-                  <span>深掘りする</span>
-                </button>
+            {/* アクションボタン（統合完了後のみ表示） */}
+            {finalAnswer && !isSummarizing && !isLoading && (onDeepDive || onCounterargument) && (
+              <div className="mt-2 flex justify-end gap-2 flex-wrap">
+                {onDeepDive && (
+                  <button
+                    type="button"
+                    onClick={() => setIsDeepDiveModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-purple-300 hover:text-white bg-purple-900/50 hover:bg-purple-800/50 border border-purple-700/50 rounded-lg transition-colors"
+                    title="この回答について深掘りする"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7m14-8l-7 7-7-7" />
+                    </svg>
+                    <span>深掘りする</span>
+                  </button>
+                )}
+                {onCounterargument && (
+                  <CounterargumentButton
+                    onClick={() => onCounterargument(topic, finalAnswer)}
+                  />
+                )}
               </div>
+            )}
+            {/* DeepDiveModal */}
+            {finalAnswer && onDeepDive && (
+              <DeepDiveModal
+                isOpen={isDeepDiveModalOpen}
+                onClose={() => setIsDeepDiveModalOpen(false)}
+                onStartDeepDive={(type, customPrompt) => onDeepDive(topic, finalAnswer, type, customPrompt)}
+                topic={topic}
+              />
+            )}
+            {/* フォローアップ質問候補 */}
+            {finalAnswer && !isSummarizing && onFollowUp && (
+              <FollowUpSuggestions
+                questions={suggestedFollowUps || []}
+                onSelect={(question) => onFollowUp(question, finalAnswer)}
+                disabled={isLoading}
+                isLoading={isGeneratingFollowUps}
+              />
             )}
           </div>
         </div>
@@ -511,8 +603,13 @@ export function DiscussionPanel({
   isSummarizing,
   searchResults,
   onFollowUp,
+  onDeepDive,
+  onCounterargument,
+  onFork,
   messageVotes,
   onVote,
+  suggestedFollowUps,
+  isGeneratingFollowUps,
 }: DiscussionPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -543,6 +640,9 @@ export function DiscussionPanel({
           isLatest={index === turns.length - 1 && !currentTopic}
           defaultExpanded={false}
           onFollowUp={onFollowUp}
+          onDeepDive={onDeepDive}
+          onCounterargument={onCounterargument}
+          onFork={onFork}
           disabled={isLoading}
           messageVotes={messageVotes}
           onVote={onVote}
@@ -559,8 +659,12 @@ export function DiscussionPanel({
           isSummarizing={isSummarizing}
           searchResults={searchResults}
           onFollowUp={onFollowUp}
+          onDeepDive={onDeepDive}
+          onCounterargument={onCounterargument}
           messageVotes={messageVotes}
           onVote={onVote}
+          suggestedFollowUps={suggestedFollowUps}
+          isGeneratingFollowUps={isGeneratingFollowUps}
         />
       )}
     </div>

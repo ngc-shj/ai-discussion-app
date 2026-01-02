@@ -1,13 +1,14 @@
-import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult, ROLE_PRESETS, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig } from '@/types';
-import { createProvider, createDiscussionPrompt } from './ai-providers';
+import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult, ROLE_PRESETS, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig, FollowUpQuestion } from '@/types';
+import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from './ai-providers';
 
 export interface DiscussionProgress {
-  type: 'message' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'terminated';
+  type: 'message' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'terminated' | 'followups';
   message?: DiscussionMessage;
   finalAnswer?: string;
   error?: string;
   searchResults?: SearchResult[];
   terminationReason?: string;
+  suggestedFollowUps?: FollowUpQuestion[];
   progress?: {
     currentRound: number;
     totalRounds: number;
@@ -190,6 +191,7 @@ export async function* runDiscussion(
         content: response.content,
         round,
         timestamp: new Date(),
+        prompt, // AIに渡されたプロンプトを保存
       };
 
       messages.push(message);
@@ -296,6 +298,29 @@ export async function* runDiscussion(
       type: 'summary',
       finalAnswer: summaryContent,
     };
+
+    // フォローアップ質問を生成
+    try {
+      const followUpProvider = successfulParticipants[0];
+      if (followUpProvider) {
+        const provider = createProvider(followUpProvider.provider, followUpProvider.model);
+        const followUpPromptText = createFollowUpPrompt(topic, summaryContent, userProfile);
+        const followUpResponse = await provider.generate({ prompt: followUpPromptText });
+
+        if (!followUpResponse.error && followUpResponse.content) {
+          const followUpQuestions = parseFollowUpResponse(followUpResponse.content);
+          if (followUpQuestions.length > 0) {
+            yield {
+              type: 'followups',
+              suggestedFollowUps: followUpQuestions,
+            };
+          }
+        }
+      }
+    } catch (error) {
+      // フォローアップ質問の生成に失敗しても議論は完了とする
+      console.error('Failed to generate follow-up questions:', error);
+    }
   } else {
     yield {
       type: 'error',
