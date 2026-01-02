@@ -31,6 +31,8 @@ export async function POST(request: NextRequest) {
             directionGuide: body.directionGuide,
             terminationConfig: body.terminationConfig,
             resumeFrom: body.resumeFrom,
+            messageVotes: body.messageVotes,
+            skipSummary: body.skipSummary,
           })) {
             const data = JSON.stringify(progress);
             controller.enqueue(encoder.encode(`data: ${data}\n\n`));

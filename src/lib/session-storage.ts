@@ -191,13 +191,15 @@ export function createNewTurn(
   topic: string,
   messages: DiscussionTurn['messages'],
   finalAnswer: string,
-  searchResults?: SearchResult[]
+  searchResults?: SearchResult[],
+  summaryPrompt?: string
 ): DiscussionTurn {
   return {
     id: `turn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     topic,
     messages,
     finalAnswer,
+    summaryPrompt,
     searchResults,
     createdAt: new Date(),
   };

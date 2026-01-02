@@ -1,4 +1,4 @@
-import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS, DiscussionParticipant, UserProfile, TECH_LEVEL_PRESETS, RESPONSE_STYLE_PRESETS, DiscussionMode, DISCUSSION_MODE_PRESETS, DiscussionDepth, DISCUSSION_DEPTH_PRESETS, DirectionGuide, FollowUpQuestion, FollowUpCategory } from '@/types';
+import { AIProviderType, AIRequest, AIResponse, SearchResult, ParticipantRole, ROLE_PRESETS, DiscussionParticipant, UserProfile, TECH_LEVEL_PRESETS, RESPONSE_STYLE_PRESETS, DiscussionMode, DISCUSSION_MODE_PRESETS, DiscussionDepth, DISCUSSION_DEPTH_PRESETS, DirectionGuide, FollowUpQuestion, FollowUpCategory, MessageVote } from '@/types';
 
 // モデル情報
 export interface ModelInfo {
@@ -173,10 +173,78 @@ function formatDirectionGuide(guide?: DirectionGuide): string {
   return `\n【議論の方向性ガイド】\n${lines.join('\n')}\nこれらの指示を考慮して議論してください。\n`;
 }
 
+// ユーザー投票情報をフォーマット（統合回答用）
+function formatMessageVotes(
+  votes?: MessageVote[],
+  messages?: Array<{ provider: string; content: string; role?: string; messageId?: string }>
+): string {
+  if (!votes || votes.length === 0 || !messages) {
+    return '';
+  }
+
+  const voteLabels: Record<string, string> = {
+    agree: '同意',
+    disagree: '反対',
+    neutral: '中立',
+  };
+
+  // 投票のあるメッセージを集計
+  const voteSummary: { provider: string; vote: string; contentPreview: string }[] = [];
+
+  for (const vote of votes) {
+    const message = messages.find((m) => m.messageId === vote.messageId);
+    if (message) {
+      voteSummary.push({
+        provider: message.provider,
+        vote: voteLabels[vote.vote] || vote.vote,
+        contentPreview: message.content.slice(0, 50) + (message.content.length > 50 ? '...' : ''),
+      });
+    }
+  }
+
+  if (voteSummary.length === 0) {
+    return '';
+  }
+
+  // 投票を種類別に集計
+  const agreeVotes = voteSummary.filter((v) => v.vote === '同意');
+  const disagreeVotes = voteSummary.filter((v) => v.vote === '反対');
+  const neutralVotes = voteSummary.filter((v) => v.vote === '中立');
+
+  const lines: string[] = [];
+
+  if (agreeVotes.length > 0) {
+    lines.push(`【ユーザーが同意した意見】（${agreeVotes.length}件）`);
+    agreeVotes.forEach((v) => {
+      lines.push(`- ${v.provider}: "${v.contentPreview}"`);
+    });
+  }
+
+  if (disagreeVotes.length > 0) {
+    lines.push(`【ユーザーが反対した意見】（${disagreeVotes.length}件）`);
+    disagreeVotes.forEach((v) => {
+      lines.push(`- ${v.provider}: "${v.contentPreview}"`);
+    });
+  }
+
+  if (neutralVotes.length > 0) {
+    lines.push(`【ユーザーが中立とした意見】（${neutralVotes.length}件）`);
+    neutralVotes.forEach((v) => {
+      lines.push(`- ${v.provider}: "${v.contentPreview}"`);
+    });
+  }
+
+  if (lines.length === 0) {
+    return '';
+  }
+
+  return `\n${lines.join('\n')}\n\n※ユーザーの投票を考慮して、同意された意見を重視し、反対された意見については批判的に検討してください。中立の意見は参考程度に扱ってください。\n`;
+}
+
 // 議論用のシステムプロンプト
 export function createDiscussionPrompt(
   topic: string,
-  previousMessages: Array<{ provider: string; content: string; role?: string }>,
+  previousMessages: Array<{ provider: string; content: string; role?: string; messageId?: string }>,
   isFirstRound: boolean,
   isFinalSummary: boolean,
   previousTurns?: PreviousTurnSummary[],
@@ -188,7 +256,8 @@ export function createDiscussionPrompt(
   userProfile?: UserProfile,
   discussionMode?: DiscussionMode,
   discussionDepth?: DiscussionDepth,
-  directionGuide?: DirectionGuide
+  directionGuide?: DirectionGuide,
+  messageVotes?: MessageVote[]
 ): string {
   // 過去のターンのコンテキストを構築
   let previousContext = '';
@@ -228,6 +297,9 @@ export function createDiscussionPrompt(
       })
       .join('\n\n');
 
+    // ユーザー投票情報を取得
+    const votesContext = formatMessageVotes(messageVotes, previousMessages);
+
     return `あなたは議論の統合者です。以下のトピックについて、複数のAIがそれぞれの役割に基づいて議論を行いました。
 それぞれの意見を踏まえて、最終的な統合回答を作成してください。
 ${discussionModePrompt}${depthPrompt}${directionGuidePrompt}${userProfileContext}${previousContext}${searchContext}
@@ -236,7 +308,7 @@ ${topic}
 
 【各AIの意見】
 ${allResponses}
-
+${votesContext}
 【指示】
 - 各AIの意見の良い点を取り入れてください
 - それぞれの役割に基づいた視点を考慮してください
@@ -244,6 +316,7 @@ ${allResponses}
 - 最終的な結論を明確に述べてください
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
 - 検索結果がある場合は、最新の情報を考慮して回答してください
+- ユーザーの投票がある場合は、同意された意見を重視してください
 - 統合回答は日本語で記述してください`;
   }
 
