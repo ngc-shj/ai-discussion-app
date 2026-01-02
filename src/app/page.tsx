@@ -150,12 +150,12 @@ export default function Home() {
     });
   }, []);
 
-  // 新しいセッションを開始
-  const handleNewSession = useCallback(() => {
-    setCurrentSession(null);
+  // 現在のターン状態をクリア（共通ヘルパー）
+  const clearCurrentTurnState = useCallback(() => {
     setCurrentMessages([]);
     setCurrentFinalAnswer('');
     setCurrentTopic('');
+    setCurrentSearchResults([]);
     setError(null);
     setSuggestedFollowUps([]);
     setIsGeneratingFollowUps(false);
@@ -163,17 +163,42 @@ export default function Home() {
     setIsGeneratingSummary(false);
   }, []);
 
+  // セッションを更新して保存（共通ヘルパー）
+  const updateAndSaveSession = useCallback(async (
+    updates: Partial<DiscussionSession>,
+    options?: { async?: boolean }
+  ) => {
+    const latestSession = currentSessionRef.current;
+    if (!latestSession) return;
+
+    const updatedSession: DiscussionSession = {
+      ...latestSession,
+      ...updates,
+      updatedAt: new Date(),
+    };
+
+    if (options?.async) {
+      saveSession(updatedSession).catch(err => console.error('Failed to save session:', err));
+    } else {
+      await saveSession(updatedSession);
+    }
+
+    setCurrentSession(updatedSession);
+    setSessions((prev) =>
+      prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+    );
+  }, []);
+
+  // 新しいセッションを開始
+  const handleNewSession = useCallback(() => {
+    setCurrentSession(null);
+    clearCurrentTurnState();
+  }, [clearCurrentTurnState]);
+
   // セッションを選択
   const handleSelectSession = useCallback((session: DiscussionSession) => {
     setCurrentSession(session);
-    setCurrentMessages([]);
-    setCurrentFinalAnswer('');
-    setCurrentTopic('');
-    setError(null);
-    setSuggestedFollowUps([]);
-    setIsGeneratingFollowUps(false);
-    setAwaitingSummary(false);
-    setIsGeneratingSummary(false);
+    clearCurrentTurnState();
 
     // セッションに中断状態がある場合、interruptedStateにセットし、設定も復元
     if (session.interruptedTurn) {
@@ -189,7 +214,7 @@ export default function Home() {
         userProfile: turn.userProfile,
       });
 
-      const interrupted: InterruptedDiscussionState = {
+      setInterruptedState({
         sessionId: session.id,
         topic: turn.topic,
         participants: turn.participants || session.participants,
@@ -204,8 +229,7 @@ export default function Home() {
         directionGuide: turn.directionGuide,
         terminationConfig: turn.terminationConfig,
         interruptedAt: turn.interruptedAt,
-      };
-      setInterruptedState(interrupted);
+      });
     } else {
       // 中断状態がない場合はセッションの設定を適用
       restoreFromSession({
@@ -214,7 +238,7 @@ export default function Home() {
       });
       setInterruptedState(null);
     }
-  }, [restoreFromSession]);
+  }, [restoreFromSession, clearCurrentTurnState]);
 
   // セッションを削除
   const handleDeleteSession = useCallback(async (id: string) => {
@@ -366,17 +390,10 @@ export default function Home() {
         const latestSession = currentSessionRef.current;
 
         if (latestSession) {
-          const updatedSession: DiscussionSession = {
-            ...latestSession,
+          await updateAndSaveSession({
             turns: [...latestSession.turns, newTurn],
             interruptedTurn: undefined,
-            updatedAt: new Date(),
-          };
-          await saveSession(updatedSession);
-          setCurrentSession(updatedSession);
-          setSessions((prev) =>
-            prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-          );
+          });
         }
 
         // localStorageの中断状態もクリア
@@ -384,11 +401,7 @@ export default function Home() {
         setInterruptedState(null);
 
         // 現在のターンをクリア
-        setCurrentTopic('');
-        setCurrentMessages([]);
-        setCurrentFinalAnswer('');
-        setCurrentSearchResults([]);
-        setSuggestedFollowUps([]);
+        clearCurrentTurnState();
         setMessageVotes([]);
       }
     } catch (err) {
@@ -616,30 +629,20 @@ export default function Home() {
         const latestSession = currentSessionRef.current;
 
         if (latestSession) {
-          const updatedSession: DiscussionSession = {
-            ...latestSession,
+          await updateAndSaveSession({
             turns: [...latestSession.turns, newTurn],
             interruptedTurn: undefined,
-            updatedAt: new Date(),
-          };
-          await saveSession(updatedSession);
-          setCurrentSession(updatedSession);
-          setSessions((prev) =>
-            prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-          );
+          });
         }
 
-        setCurrentTopic('');
-        setCurrentMessages([]);
-        setCurrentFinalAnswer('');
-        setCurrentSearchResults([]);
+        clearCurrentTurnState();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);
     }
-  }, [interruptedState, restoreFromSession]);
+  }, [interruptedState, restoreFromSession, updateAndSaveSession, clearCurrentTurnState]);
 
   // セッションの名前を変更
   const handleRenameSession = useCallback(async (id: string, newTitle: string) => {
@@ -909,25 +912,15 @@ export default function Home() {
           const latestSession = currentSessionRef.current;
 
           if (latestSession) {
-            const updatedSession: DiscussionSession = {
-              ...latestSession,
+            await updateAndSaveSession({
               turns: [...latestSession.turns, newTurn],
               interruptedTurn: undefined,
-              updatedAt: new Date(),
-            };
-            await saveSession(updatedSession);
-            setCurrentSession(updatedSession);
-            setSessions((prev) =>
-              prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-            );
+            });
           }
           clearInterruptedState();
           setInterruptedState(null);
 
-          setCurrentTopic('');
-          setCurrentMessages([]);
-          setCurrentFinalAnswer('');
-          setCurrentSearchResults([]);
+          clearCurrentTurnState();
           setSuggestedFollowUps([]);
         }
       } catch (err) {
@@ -936,7 +929,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes]
+    [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes, updateAndSaveSession, clearCurrentTurnState]
   );
 
   return (
