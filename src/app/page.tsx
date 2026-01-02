@@ -2,23 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  AIProviderType,
-  ModelInfo,
   DiscussionMessage,
   DiscussionParticipant,
   DiscussionSession,
   PreviousTurnSummary,
-  DEFAULT_PROVIDERS,
-  getOllamaModelColor,
-  SearchConfig,
   SearchResult,
-  UserProfile,
-  DiscussionMode,
-  DiscussionDepth,
-  DirectionGuide,
-  TerminationConfig,
   MessageVote,
-  generateParticipantId,
   FollowUpQuestion,
   DeepDiveType,
   DEEP_DIVE_PRESETS,
@@ -43,30 +32,7 @@ import {
   clearInterruptedState,
 } from '@/lib/session-storage';
 import { InterruptedDiscussionState, InterruptedTurnState } from '@/types';
-
-const STORAGE_KEY_PARTICIPANTS = 'ai-discussion-participants';
-const STORAGE_KEY_SEARCH = 'ai-discussion-search';
-const STORAGE_KEY_PROFILE = 'ai-discussion-profile';
-const STORAGE_KEY_MODE = 'ai-discussion-mode';
-const STORAGE_KEY_DEPTH = 'ai-discussion-depth';
-const STORAGE_KEY_DIRECTION = 'ai-discussion-direction';
-const STORAGE_KEY_TERMINATION = 'ai-discussion-termination';
-
-const DEFAULT_DIRECTION_GUIDE: DirectionGuide = {
-  keywords: [],
-};
-
-const DEFAULT_TERMINATION_CONFIG: TerminationConfig = {
-  condition: 'rounds',
-  maxRounds: 5,
-};
-
-const DEFAULT_SEARCH_CONFIG: SearchConfig = {
-  enabled: false,
-  maxResults: 5,
-  searchType: 'web',
-  language: 'ja',
-};
+import { useDiscussionSettings } from '@/hooks';
 
 interface ProgressState {
   currentRound: number;
@@ -78,6 +44,27 @@ interface ProgressState {
 }
 
 export default function Home() {
+  // 設定関連（カスタムフックを使用）
+  const {
+    participants,
+    setParticipants,
+    availableModels,
+    availability,
+    searchConfig,
+    setSearchConfig,
+    userProfile,
+    setUserProfile,
+    discussionMode,
+    setDiscussionMode,
+    discussionDepth,
+    setDiscussionDepth,
+    directionGuide,
+    setDirectionGuide,
+    terminationConfig,
+    setTerminationConfig,
+    restoreFromSession,
+  } = useDiscussionSettings();
+
   // セッション管理
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
   const [currentSession, setCurrentSession] = useState<DiscussionSession | null>(null);
@@ -102,29 +89,10 @@ export default function Home() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsCollapsed, setIsSettingsCollapsed] = useState(false);
 
-  // 設定
-  const [participants, setParticipants] = useState<DiscussionParticipant[]>([]);
-  const [availableModels, setAvailableModels] = useState<Record<AIProviderType, ModelInfo[]>>({
-    claude: [],
-    ollama: [],
-    openai: [],
-    gemini: [],
-  });
-  const [searchConfig, setSearchConfig] = useState<SearchConfig>(DEFAULT_SEARCH_CONFIG);
-  const [userProfile, setUserProfile] = useState<UserProfile>({});
-  const [discussionMode, setDiscussionMode] = useState<DiscussionMode>('free');
-  const [discussionDepth, setDiscussionDepth] = useState<DiscussionDepth>(3);
-  const [directionGuide, setDirectionGuide] = useState<DirectionGuide>(DEFAULT_DIRECTION_GUIDE);
-  const [terminationConfig, setTerminationConfig] = useState<TerminationConfig>(DEFAULT_TERMINATION_CONFIG);
+  // その他の状態
   const [messageVotes, setMessageVotes] = useState<MessageVote[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [currentSearchResults, setCurrentSearchResults] = useState<SearchResult[]>([]);
-  const [availability, setAvailability] = useState<Record<AIProviderType, boolean>>({
-    claude: false,
-    ollama: false,
-    openai: false,
-    gemini: false,
-  });
   const [error, setError] = useState<string | null>(null);
   // フォローアップ用のプリセットトピック
   const [presetTopic, setPresetTopic] = useState<string>('');
@@ -168,185 +136,9 @@ export default function Home() {
     }
   }, []);
 
-  // プロバイダーの可用性をチェック
-  useEffect(() => {
-    async function checkAvailability() {
-      try {
-        const response = await fetch('/api/providers');
-        if (response.ok) {
-          const data = await response.json();
-          setAvailability(data);
-        }
-      } catch (err) {
-        console.error('Failed to check provider availability:', err);
-      }
-    }
-    checkAvailability();
-  }, []);
-
-  // モデル一覧を取得
-  useEffect(() => {
-    async function fetchModels() {
-      try {
-        const response = await fetch('/api/models');
-        if (response.ok) {
-          const data = await response.json();
-          setAvailableModels(data);
-
-          // ローカルストレージから保存された参加者を復元
-          const savedParticipants = localStorage.getItem(STORAGE_KEY_PARTICIPANTS);
-          if (savedParticipants) {
-            try {
-              const parsed: DiscussionParticipant[] = JSON.parse(savedParticipants);
-              // 保存された参加者が現在利用可能なモデルに存在するか確認
-              // また、IDがない古いデータにはIDを付与
-              const validParticipants = parsed
-                .filter((p) => {
-                  const providerModels = data[p.provider] || [];
-                  return providerModels.some((m: ModelInfo) => m.id === p.model);
-                })
-                .map((p) => ({
-                  ...p,
-                  id: p.id || generateParticipantId(),
-                }));
-              if (validParticipants.length > 0) {
-                setParticipants(validParticipants);
-                return;
-              }
-            } catch {
-              // パースエラー時は無視してデフォルトを使用
-            }
-          }
-
-          // 保存データがない場合はデフォルトの参加者を設定
-          const initialParticipants: DiscussionParticipant[] = [];
-          for (const providerId of ['ollama', 'gemini'] as AIProviderType[]) {
-            const models = data[providerId] || [];
-            if (models.length > 0) {
-              const provider = DEFAULT_PROVIDERS.find((p) => p.id === providerId);
-              if (provider) {
-                const model = models[0];
-                const isOllama = providerId === 'ollama';
-                initialParticipants.push({
-                  id: generateParticipantId(),
-                  provider: providerId,
-                  model: model.id,
-                  displayName: isOllama ? `Ollama (${model.name})` : `${provider.name} (${model.name})`,
-                  color: isOllama ? getOllamaModelColor(model.id) : provider.color,
-                });
-              }
-            }
-          }
-          if (initialParticipants.length > 0) {
-            setParticipants(initialParticipants);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch models:', err);
-      }
-    }
-    fetchModels();
-
-    // ローカルストレージから検索設定を復元
-    const savedSearch = localStorage.getItem(STORAGE_KEY_SEARCH);
-    if (savedSearch) {
-      try {
-        const parsed = JSON.parse(savedSearch);
-        setSearchConfig({ ...DEFAULT_SEARCH_CONFIG, ...parsed });
-      } catch {
-        // パースエラー時は無視
-      }
-    }
-
-    // ローカルストレージからプロファイルを復元
-    const savedProfile = localStorage.getItem(STORAGE_KEY_PROFILE);
-    if (savedProfile) {
-      try {
-        const parsed = JSON.parse(savedProfile);
-        setUserProfile(parsed);
-      } catch {
-        // パースエラー時は無視
-      }
-    }
-
-    // ローカルストレージから議論モードを復元
-    const savedMode = localStorage.getItem(STORAGE_KEY_MODE);
-    if (savedMode && ['free', 'brainstorm', 'debate', 'consensus', 'critique'].includes(savedMode)) {
-      setDiscussionMode(savedMode as DiscussionMode);
-    }
-
-    // ローカルストレージから議論の深さを復元
-    const savedDepth = localStorage.getItem(STORAGE_KEY_DEPTH);
-    if (savedDepth) {
-      const parsed = parseInt(savedDepth, 10);
-      if (!isNaN(parsed) && parsed >= 1 && parsed <= 5) {
-        setDiscussionDepth(parsed as DiscussionDepth);
-      }
-    }
-
-    // ローカルストレージから方向性ガイドを復元
-    const savedDirection = localStorage.getItem(STORAGE_KEY_DIRECTION);
-    if (savedDirection) {
-      try {
-        const parsed = JSON.parse(savedDirection);
-        setDirectionGuide({ ...DEFAULT_DIRECTION_GUIDE, ...parsed });
-      } catch {
-        // パースエラー時は無視
-      }
-    }
-
-    // ローカルストレージから終了条件を復元
-    const savedTermination = localStorage.getItem(STORAGE_KEY_TERMINATION);
-    if (savedTermination) {
-      try {
-        const parsed = JSON.parse(savedTermination);
-        setTerminationConfig({ ...DEFAULT_TERMINATION_CONFIG, ...parsed });
-      } catch {
-        // パースエラー時は無視
-      }
-    }
-  }, []);
-
-  // 参加者が変更されたらローカルストレージに保存
-  useEffect(() => {
-    if (participants.length > 0) {
-      localStorage.setItem(STORAGE_KEY_PARTICIPANTS, JSON.stringify(participants));
-    }
-  }, [participants]);
-
-  // 検索設定が変更されたらローカルストレージに保存
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_SEARCH, JSON.stringify(searchConfig));
-  }, [searchConfig]);
-
-  // プロファイルが変更されたらローカルストレージに保存
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(userProfile));
-  }, [userProfile]);
-
-  // 議論モードが変更されたらローカルストレージに保存
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_MODE, discussionMode);
-  }, [discussionMode]);
-
-  // 議論の深さが変更されたらローカルストレージに保存
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_DEPTH, discussionDepth.toString());
-  }, [discussionDepth]);
-
-  // 方向性ガイドが変更されたらローカルストレージに保存
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_DIRECTION, JSON.stringify(directionGuide));
-  }, [directionGuide]);
-
-  // 終了条件が変更されたらローカルストレージに保存
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_TERMINATION, JSON.stringify(terminationConfig));
-  }, [terminationConfig]);
-
   // 投票を追加/更新するハンドラー
   const handleVote = useCallback((messageId: string, vote: 'agree' | 'disagree' | 'neutral') => {
-    setMessageVotes(prev => {
+    setMessageVotes((prev: MessageVote[]) => {
       const existing = prev.findIndex(v => v.messageId === messageId);
       if (existing >= 0) {
         const updated = [...prev];
@@ -386,25 +178,15 @@ export default function Home() {
     if (session.interruptedTurn) {
       const turn = session.interruptedTurn;
 
-      // 中断時の参加者を復元（保存されていればそれを、なければセッションの参加者を使用）
-      setParticipants(turn.participants || session.participants);
-
       // 中断時の設定を復元
-      if (turn.discussionMode) {
-        setDiscussionMode(turn.discussionMode);
-      }
-      if (turn.discussionDepth) {
-        setDiscussionDepth(turn.discussionDepth);
-      }
-      if (turn.directionGuide) {
-        setDirectionGuide(turn.directionGuide);
-      }
-      if (turn.terminationConfig) {
-        setTerminationConfig(turn.terminationConfig);
-      }
-      if (turn.userProfile) {
-        setUserProfile(turn.userProfile);
-      }
+      restoreFromSession({
+        participants: turn.participants || session.participants,
+        discussionMode: turn.discussionMode,
+        discussionDepth: turn.discussionDepth,
+        directionGuide: turn.directionGuide,
+        terminationConfig: turn.terminationConfig,
+        userProfile: turn.userProfile,
+      });
 
       const interrupted: InterruptedDiscussionState = {
         sessionId: session.id,
@@ -425,15 +207,13 @@ export default function Home() {
       setInterruptedState(interrupted);
     } else {
       // 中断状態がない場合はセッションの設定を適用
-      if (session.participants.length > 0) {
-        setParticipants(session.participants);
-      }
-      if (session.rounds) {
-        setTerminationConfig(prev => ({ ...prev, maxRounds: session.rounds! }));
-      }
+      restoreFromSession({
+        participants: session.participants,
+        rounds: session.rounds,
+      });
       setInterruptedState(null);
     }
-  }, []);
+  }, [restoreFromSession]);
 
   // セッションを削除
   const handleDeleteSession = useCallback(async (id: string) => {
@@ -665,22 +445,14 @@ export default function Home() {
     setInterruptedState(null);
 
     // 参加者と設定を復元
-    setParticipants(interruptedState.participants);
-    if (interruptedState.discussionMode) {
-      setDiscussionMode(interruptedState.discussionMode);
-    }
-    if (interruptedState.discussionDepth) {
-      setDiscussionDepth(interruptedState.discussionDepth);
-    }
-    if (interruptedState.directionGuide) {
-      setDirectionGuide(interruptedState.directionGuide);
-    }
-    if (interruptedState.terminationConfig) {
-      setTerminationConfig(interruptedState.terminationConfig);
-    }
-    if (interruptedState.userProfile) {
-      setUserProfile(interruptedState.userProfile);
-    }
+    restoreFromSession({
+      participants: interruptedState.participants,
+      discussionMode: interruptedState.discussionMode,
+      discussionDepth: interruptedState.discussionDepth,
+      directionGuide: interruptedState.directionGuide,
+      terminationConfig: interruptedState.terminationConfig,
+      userProfile: interruptedState.userProfile,
+    });
 
     // セッションを復元し、中断状態をクリア
     const session = await getAllSessions().then(sessions =>
@@ -958,7 +730,7 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
-  }, [interruptedState]);
+  }, [interruptedState, restoreFromSession]);
 
   // セッションの名前を変更
   const handleRenameSession = useCallback(async (id: string, newTitle: string) => {
