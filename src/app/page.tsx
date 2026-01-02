@@ -89,6 +89,7 @@ export default function Home() {
   // 現在進行中のターン
   const [currentMessages, setCurrentMessages] = useState<DiscussionMessage[]>([]);
   const [currentFinalAnswer, setCurrentFinalAnswer] = useState<string>('');
+  const [currentSummaryPrompt, setCurrentSummaryPrompt] = useState<string>('');
   const [currentTopic, setCurrentTopic] = useState<string>('');
 
   // ローディング状態
@@ -144,6 +145,9 @@ export default function Home() {
   // フォローアップ質問
   const [suggestedFollowUps, setSuggestedFollowUps] = useState<FollowUpQuestion[]>([]);
   const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
+  // 統合回答待機状態（議論完了後、ユーザーが投票してから生成）
+  const [awaitingSummary, setAwaitingSummary] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   // セッション一覧を読み込み
   useEffect(() => {
@@ -362,6 +366,8 @@ export default function Home() {
     setError(null);
     setSuggestedFollowUps([]);
     setIsGeneratingFollowUps(false);
+    setAwaitingSummary(false);
+    setIsGeneratingSummary(false);
   }, []);
 
   // セッションを選択
@@ -373,6 +379,8 @@ export default function Home() {
     setError(null);
     setSuggestedFollowUps([]);
     setIsGeneratingFollowUps(false);
+    setAwaitingSummary(false);
+    setIsGeneratingSummary(false);
 
     // セッションに中断状態がある場合、interruptedStateにセットし、設定も復元
     if (session.interruptedTurn) {
@@ -492,6 +500,162 @@ export default function Home() {
     setInterruptedState(null);
   }, []);
 
+  // 統合回答を生成（投票後に手動で実行）
+  const handleGenerateSummary = useCallback(async () => {
+    if (currentMessages.length === 0) return;
+
+    setIsGeneratingSummary(true);
+    setAwaitingSummary(false);
+    setError(null);
+
+    // 過去のターンを取得
+    const sessionForTurns = currentSessionRef.current;
+    const previousTurns: PreviousTurnSummary[] = sessionForTurns?.turns.map((t) => ({
+      topic: t.topic,
+      finalAnswer: t.finalAnswer,
+    })) || [];
+
+    try {
+      const response = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          topic: currentTopic,
+          participants,
+          messages: currentMessages,
+          previousTurns,
+          searchResults: currentSearchResults,
+          userProfile,
+          discussionMode,
+          discussionDepth,
+          directionGuide,
+          messageVotes,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate summary');
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let collectedFinalAnswer = '';
+      let collectedSummaryPrompt = '';
+
+      const processLine = (line: string) => {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          try {
+            const progressData = JSON.parse(data);
+
+            switch (progressData.type) {
+              case 'progress':
+                if (progressData.progress?.isSummarizing) {
+                  setProgress((prev) => ({ ...prev, isSummarizing: true }));
+                }
+                break;
+              case 'summary':
+                collectedFinalAnswer = progressData.finalAnswer;
+                collectedSummaryPrompt = progressData.summaryPrompt || '';
+                setCurrentFinalAnswer(collectedFinalAnswer);
+                setCurrentSummaryPrompt(collectedSummaryPrompt);
+                setProgress((prev) => ({ ...prev, isSummarizing: false }));
+                setIsGeneratingFollowUps(true);
+                break;
+              case 'followups':
+                if (progressData.suggestedFollowUps) {
+                  setSuggestedFollowUps(progressData.suggestedFollowUps);
+                }
+                setIsGeneratingFollowUps(false);
+                break;
+              case 'error':
+                console.error('Summary error:', progressData.error);
+                setError(progressData.error);
+                break;
+              case 'complete':
+                setIsGeneratingSummary(false);
+                setProgress((prev) => ({ ...prev, isSummarizing: false }));
+                setIsGeneratingFollowUps(false);
+                break;
+            }
+          } catch {
+            // JSON parse error, ignore
+          }
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          if (buffer.trim()) {
+            const remainingLines = buffer.split('\n\n');
+            for (const line of remainingLines) {
+              processLine(line);
+            }
+          }
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          processLine(line);
+        }
+      }
+
+      // 統合回答生成完了後、セッションにターンを追加して保存
+      if (collectedFinalAnswer) {
+        const newTurn = createNewTurn(
+          currentTopic,
+          currentMessages,
+          collectedFinalAnswer,
+          currentSearchResults.length > 0 ? currentSearchResults : undefined,
+          collectedSummaryPrompt || undefined
+        );
+        const latestSession = currentSessionRef.current;
+
+        if (latestSession) {
+          const updatedSession: DiscussionSession = {
+            ...latestSession,
+            turns: [...latestSession.turns, newTurn],
+            interruptedTurn: undefined,
+            updatedAt: new Date(),
+          };
+          await saveSession(updatedSession);
+          setCurrentSession(updatedSession);
+          setSessions((prev) =>
+            prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+          );
+        }
+
+        // localStorageの中断状態もクリア
+        clearInterruptedState();
+        setInterruptedState(null);
+
+        // 現在のターンをクリア
+        setCurrentTopic('');
+        setCurrentMessages([]);
+        setCurrentFinalAnswer('');
+        setCurrentSearchResults([]);
+        setSuggestedFollowUps([]);
+        setMessageVotes([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  }, [currentMessages, currentTopic, participants, currentSearchResults, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes]);
+
   // 中断した議論を再開
   const handleResumeDiscussion = useCallback(async () => {
     if (!interruptedState) return;
@@ -578,6 +742,7 @@ export default function Home() {
           discussionDepth: interruptedState.discussionDepth,
           directionGuide: interruptedState.directionGuide,
           terminationConfig: interruptedState.terminationConfig,
+          messageVotes,
           // 再開用のパラメータ
           resumeFrom: {
             messages: interruptedState.messages,
@@ -600,6 +765,7 @@ export default function Home() {
       let buffer = '';
       let collectedMessages: DiscussionMessage[] = [...interruptedState.messages];
       let collectedFinalAnswer = '';
+      let collectedSummaryPrompt = '';
       // 進捗情報を追跡（中断時・自動保存時に使用）
       let currentProgress = {
         currentRound: interruptedState.currentRound,
@@ -673,7 +839,9 @@ export default function Home() {
                 break;
               case 'summary':
                 collectedFinalAnswer = progressData.finalAnswer;
+                collectedSummaryPrompt = progressData.summaryPrompt || '';
                 setCurrentFinalAnswer(collectedFinalAnswer);
+                setCurrentSummaryPrompt(collectedSummaryPrompt);
                 setProgress((prev) => ({ ...prev, isSummarizing: false }));
                 setIsGeneratingFollowUps(true);
                 break;
@@ -761,7 +929,8 @@ export default function Home() {
           interruptedState.topic,
           collectedMessages,
           collectedFinalAnswer,
-          interruptedState.searchResults
+          interruptedState.searchResults,
+          collectedSummaryPrompt || undefined
         );
         const latestSession = currentSessionRef.current;
 
@@ -912,6 +1081,8 @@ export default function Home() {
             discussionDepth,
             directionGuide,
             terminationConfig,
+            messageVotes,
+            skipSummary: true, // 統合回答はユーザーが投票後に手動で生成
           }),
         });
 
@@ -928,6 +1099,7 @@ export default function Home() {
         let buffer = '';
         let collectedMessages: DiscussionMessage[] = [];
         let collectedFinalAnswer = '';
+        let collectedSummaryPrompt = '';
         // 進捗情報を追跡（中断時・自動保存時に使用）
         let currentProgress = { currentRound: 1, currentParticipantIndex: 0 };
 
@@ -998,7 +1170,9 @@ export default function Home() {
                   break;
                 case 'summary':
                   collectedFinalAnswer = progressData.finalAnswer;
+                  collectedSummaryPrompt = progressData.summaryPrompt || '';
                   setCurrentFinalAnswer(collectedFinalAnswer);
+                  setCurrentSummaryPrompt(collectedSummaryPrompt);
                   setProgress((prev) => ({ ...prev, isSummarizing: false }));
                   setIsGeneratingFollowUps(true);
                   break;
@@ -1014,6 +1188,29 @@ export default function Home() {
                   if (progressData.error.includes('No messages were generated') ||
                       progressData.error.includes('Failed to generate summary with all')) {
                     setError(progressData.error);
+                  }
+                  break;
+                case 'ready_for_summary':
+                  // 議論完了、統合回答待ち状態
+                  setAwaitingSummary(true);
+                  setIsLoading(false);
+                  // セッションの中断状態をクリア（議論は正常に完了した）
+                  // 注意: メッセージ受信時にinterruptedTurnが設定されるが、setCurrentSessionが呼ばれないため
+                  // currentSessionRef.currentには反映されていない。そのため無条件でクリアする。
+                  {
+                    const latestSession = currentSessionRef.current;
+                    if (latestSession) {
+                      const updatedSession: DiscussionSession = {
+                        ...latestSession,
+                        interruptedTurn: undefined,
+                        updatedAt: new Date(),
+                      };
+                      saveSession(updatedSession).catch(err => console.error('Failed to clear interrupted state:', err));
+                      setCurrentSession(updatedSession);
+                      setSessions((prev) =>
+                        prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+                      );
+                    }
                   }
                   break;
                 case 'complete':
@@ -1084,8 +1281,9 @@ export default function Home() {
         }
 
         // 議論完了後、セッションにターンを追加して保存（中断状態もクリア）
+        // awaitingSummaryの場合は、統合回答が生成されるまでターンをクリアしない
         if (collectedFinalAnswer) {
-          const newTurn = createNewTurn(topic, collectedMessages, collectedFinalAnswer, searchResults.length > 0 ? searchResults : undefined);
+          const newTurn = createNewTurn(topic, collectedMessages, collectedFinalAnswer, searchResults.length > 0 ? searchResults : undefined, collectedSummaryPrompt || undefined);
           const latestSession = currentSessionRef.current;
 
           if (latestSession) {
@@ -1112,13 +1310,14 @@ export default function Home() {
           setCurrentSearchResults([]);
           setSuggestedFollowUps([]);
         }
+        // awaitingSummaryの場合は、現在の状態を維持（ユーザーが投票・統合回答生成できるように）
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setIsLoading(false);
       }
     },
-    [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide]
+    [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes]
   );
 
   return (
@@ -1269,6 +1468,7 @@ export default function Home() {
           currentMessages={currentMessages}
           currentTopic={currentTopic}
           currentFinalAnswer={currentFinalAnswer}
+          currentSummaryPrompt={currentSummaryPrompt}
           isLoading={isLoading}
           isSummarizing={progress.isSummarizing}
           searchResults={currentSearchResults}
@@ -1280,6 +1480,9 @@ export default function Home() {
           onVote={handleVote}
           suggestedFollowUps={suggestedFollowUps}
           isGeneratingFollowUps={isGeneratingFollowUps}
+          awaitingSummary={awaitingSummary}
+          isGeneratingSummary={isGeneratingSummary}
+          onGenerateSummary={handleGenerateSummary}
         />
 
         {/* 進捗インジケーター */}

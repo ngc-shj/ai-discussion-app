@@ -206,6 +206,7 @@ export interface DiscussionTurn {
   topic: string;
   messages: DiscussionMessage[];
   finalAnswer: string;
+  summaryPrompt?: string; // 統合回答生成に使用したプロンプト
   searchResults?: SearchResult[];
   suggestedFollowUps?: FollowUpQuestion[]; // AI生成のフォローアップ質問候補
   createdAt: Date;

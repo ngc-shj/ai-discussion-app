@@ -1,14 +1,16 @@
-import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult, ROLE_PRESETS, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig, FollowUpQuestion } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult, ROLE_PRESETS, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig, FollowUpQuestion, MessageVote } from '@/types';
 import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from './ai-providers';
 
 export interface DiscussionProgress {
-  type: 'message' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'terminated' | 'followups';
+  type: 'message' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'terminated' | 'followups' | 'ready_for_summary';
   message?: DiscussionMessage;
   finalAnswer?: string;
+  summaryPrompt?: string;
   error?: string;
   searchResults?: SearchResult[];
   terminationReason?: string;
   suggestedFollowUps?: FollowUpQuestion[];
+  messages?: DiscussionMessage[]; // ready_for_summary時に議論メッセージを含める
   progress?: {
     currentRound: number;
     totalRounds: number;
@@ -39,6 +41,8 @@ export interface DiscussionRequest {
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
   resumeFrom?: ResumeFromState; // 中断からの再開用
+  messageVotes?: MessageVote[]; // ユーザーの投票（統合回答に反映）
+  skipSummary?: boolean; // 統合回答生成をスキップ（ユーザーが投票後に手動で生成）
 }
 
 // 合意判定用のキーワード
@@ -81,7 +85,7 @@ function checkTerminationKeywords(content: string, keywords: string[]): boolean 
 export async function* runDiscussion(
   request: DiscussionRequest
 ): AsyncGenerator<DiscussionProgress> {
-  const { topic, participants, rounds, previousTurns, searchResults, userProfile, discussionMode, discussionDepth, directionGuide, terminationConfig, resumeFrom } = request;
+  const { topic, participants, rounds, previousTurns, searchResults, userProfile, discussionMode, discussionDepth, directionGuide, terminationConfig, resumeFrom, messageVotes, skipSummary } = request;
 
   // 再開時は既存のメッセージから開始
   const messages: DiscussionMessage[] = resumeFrom?.messages ? [...resumeFrom.messages] : [];
@@ -242,6 +246,18 @@ export async function* runDiscussion(
     return;
   }
 
+  // skipSummaryがtrueの場合、統合回答生成をスキップしてready_for_summaryイベントを送信
+  if (skipSummary) {
+    yield {
+      type: 'ready_for_summary',
+      messages: messages,
+    };
+    yield {
+      type: 'complete',
+    };
+    return;
+  }
+
   // 統合中の進捗を送信
   yield {
     type: 'progress',
@@ -261,6 +277,7 @@ export async function* runDiscussion(
   );
 
   let summaryContent: string | null = null;
+  let usedSummaryPrompt: string | null = null;
 
   for (const participant of successfulParticipants) {
     const summaryProvider = createProvider(participant.provider, participant.model);
@@ -276,14 +293,16 @@ export async function* runDiscussion(
         provider: m.model ? `${getProviderDisplayName(m.provider)} (${m.model})` : getProviderDisplayName(m.provider),
         content: m.content,
         role: rolePreset?.name,
+        messageId: m.id,
       };
     });
 
-    const summaryPrompt = createDiscussionPrompt(topic, allMessages, false, true, turnContext, searchResults, undefined, undefined, participants, undefined, userProfile, discussionMode, discussionDepth, directionGuide);
+    const summaryPrompt = createDiscussionPrompt(topic, allMessages, false, true, turnContext, searchResults, undefined, undefined, participants, undefined, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes);
     const summaryResponse = await summaryProvider.generate({ prompt: summaryPrompt });
 
     if (!summaryResponse.error && summaryResponse.content) {
       summaryContent = summaryResponse.content;
+      usedSummaryPrompt = summaryPrompt;
       break;
     } else {
       yield {
@@ -297,6 +316,7 @@ export async function* runDiscussion(
     yield {
       type: 'summary',
       finalAnswer: summaryContent,
+      summaryPrompt: usedSummaryPrompt || undefined,
     };
 
     // フォローアップ質問を生成

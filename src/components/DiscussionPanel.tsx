@@ -15,6 +15,7 @@ interface DiscussionPanelProps {
   currentMessages: DiscussionMessage[];
   currentTopic?: string;
   currentFinalAnswer?: string;
+  currentSummaryPrompt?: string;
   isLoading: boolean;
   isSummarizing: boolean;
   searchResults?: SearchResult[];
@@ -26,6 +27,9 @@ interface DiscussionPanelProps {
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   suggestedFollowUps?: FollowUpQuestion[];
   isGeneratingFollowUps?: boolean;
+  awaitingSummary?: boolean;
+  isGeneratingSummary?: boolean;
+  onGenerateSummary?: () => void;
 }
 
 // 検索結果を表示するコンポーネント
@@ -121,6 +125,7 @@ function TurnDisplay({
   const [discussionCopied, setDiscussionCopied] = useState(false);
   const [isDeepDiveModalOpen, setIsDeepDiveModalOpen] = useState(false);
   const [isForkModalOpen, setIsForkModalOpen] = useState(false);
+  const [showSummaryPrompt, setShowSummaryPrompt] = useState(false);
 
   const maxRound = turn.messages.length > 0 ? Math.max(...turn.messages.map(m => m.round)) : 0;
   const participantCount = new Set(turn.messages.map(m => `${m.provider}-${m.model}`)).size;
@@ -237,8 +242,33 @@ function TurnDisplay({
           </div>
           <div className="flex-1 min-w-0 relative">
             <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
+                {turn.summaryPrompt && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSummaryPrompt(!showSummaryPrompt)}
+                    className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded transition-colors ${
+                      showSummaryPrompt
+                        ? 'bg-purple-600 text-white'
+                        : 'text-gray-400 hover:text-purple-400 hover:bg-gray-700'
+                    }`}
+                    title="プロンプトを表示"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                    <span className="hidden sm:inline">Prompt</span>
+                  </button>
+                )}
+              </div>
             </div>
+            {/* プロンプト表示エリア */}
+            {showSummaryPrompt && turn.summaryPrompt && (
+              <div className="mb-2 bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
+                {turn.summaryPrompt}
+              </div>
+            )}
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg text-gray-200 text-sm md:text-base relative">
               {/* 固定コピーボタン */}
               <div className="sticky top-0 z-10 flex justify-end p-1.5 md:p-2 pb-0">
@@ -338,6 +368,7 @@ function CurrentTurnDisplay({
   topic,
   messages,
   finalAnswer,
+  summaryPrompt,
   isLoading,
   isSummarizing,
   searchResults,
@@ -348,10 +379,14 @@ function CurrentTurnDisplay({
   onVote,
   suggestedFollowUps,
   isGeneratingFollowUps,
+  awaitingSummary,
+  isGeneratingSummary,
+  onGenerateSummary,
 }: {
   topic: string;
   messages: DiscussionMessage[];
   finalAnswer?: string;
+  summaryPrompt?: string;
   isLoading: boolean;
   isSummarizing: boolean;
   searchResults?: SearchResult[];
@@ -362,12 +397,16 @@ function CurrentTurnDisplay({
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   suggestedFollowUps?: FollowUpQuestion[];
   isGeneratingFollowUps?: boolean;
+  awaitingSummary?: boolean;
+  isGeneratingSummary?: boolean;
+  onGenerateSummary?: () => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [discussionCopied, setDiscussionCopied] = useState(false);
   const [isDeepDiveModalOpen, setIsDeepDiveModalOpen] = useState(false);
+  const [showSummaryPrompt, setShowSummaryPrompt] = useState(false);
 
   useEffect(() => {
     if (isExpanded) {
@@ -497,18 +536,92 @@ function CurrentTurnDisplay({
         </div>
       )}
 
+      {/* 統合回答待ち状態（投票を促すUI） */}
+      {awaitingSummary && !finalAnswer && !isSummarizing && (
+        <div className="flex gap-2 md:gap-3">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shrink-0">
+            <span className="text-white text-base md:text-lg">✨</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg p-3 md:p-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="text-sm text-gray-300">
+                    <p className="font-medium text-purple-300 mb-1">議論が完了しました</p>
+                    <p className="text-gray-400">
+                      各AIの意見に対して投票（同意・反対・中立）を行うと、統合回答に反映されます。
+                      投票が完了したら「統合回答を生成」ボタンをクリックしてください。
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={onGenerateSummary}
+                    disabled={isGeneratingSummary}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                  >
+                    {isGeneratingSummary ? (
+                      <>
+                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                        <span>生成中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>統合回答を生成</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 統合回答または統合中表示 */}
-      {(finalAnswer || isSummarizing) && (
+      {(finalAnswer || isSummarizing || isGeneratingSummary) && (
         <div className="flex gap-2 md:gap-3">
           <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shrink-0">
             <span className="text-white text-base md:text-lg">✨</span>
           </div>
           <div className="flex-1 min-w-0 relative">
             <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
+                {summaryPrompt && !isSummarizing && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSummaryPrompt(!showSummaryPrompt)}
+                    className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded transition-colors ${
+                      showSummaryPrompt
+                        ? 'bg-purple-600 text-white'
+                        : 'text-gray-400 hover:text-purple-400 hover:bg-gray-700'
+                    }`}
+                    title="プロンプトを表示"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                    <span className="hidden sm:inline">Prompt</span>
+                  </button>
+                )}
+              </div>
             </div>
+            {/* プロンプト表示エリア */}
+            {showSummaryPrompt && summaryPrompt && (
+              <div className="mb-2 bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
+                {summaryPrompt}
+              </div>
+            )}
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg text-gray-200 text-sm md:text-base relative">
-              {isSummarizing && !finalAnswer ? (
+              {(isSummarizing || isGeneratingSummary) && !finalAnswer ? (
                 <div className="flex items-center gap-2 p-2 md:p-3">
                   <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-purple-400 rounded-full" />
                   <span className="text-gray-400 text-sm md:text-base">議論を統合中...</span>
@@ -599,6 +712,7 @@ export function DiscussionPanel({
   currentMessages,
   currentTopic,
   currentFinalAnswer,
+  currentSummaryPrompt,
   isLoading,
   isSummarizing,
   searchResults,
@@ -610,6 +724,9 @@ export function DiscussionPanel({
   onVote,
   suggestedFollowUps,
   isGeneratingFollowUps,
+  awaitingSummary,
+  isGeneratingSummary,
+  onGenerateSummary,
 }: DiscussionPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -655,6 +772,7 @@ export function DiscussionPanel({
           topic={currentTopic}
           messages={currentMessages}
           finalAnswer={currentFinalAnswer}
+          summaryPrompt={currentSummaryPrompt}
           isLoading={isLoading}
           isSummarizing={isSummarizing}
           searchResults={searchResults}
@@ -665,6 +783,9 @@ export function DiscussionPanel({
           onVote={onVote}
           suggestedFollowUps={suggestedFollowUps}
           isGeneratingFollowUps={isGeneratingFollowUps}
+          awaitingSummary={awaitingSummary}
+          isGeneratingSummary={isGeneratingSummary}
+          onGenerateSummary={onGenerateSummary}
         />
       )}
     </div>
