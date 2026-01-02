@@ -12,6 +12,7 @@ import {
   DISCUSSION_DEPTH_PRESETS,
   DirectionGuide,
   MessageVote,
+  isCustomRoleId,
 } from '@/types';
 
 /**
@@ -40,14 +41,18 @@ export function formatSearchResults(searchResults: SearchResult[]): string {
 
 /**
  * ロールのプロンプトを取得
+ * @param role ロールID（プリセット or カスタムロールID）
+ * @param customRolePrompt カスタムロールのプロンプト（カスタムロールIDの場合に使用）
  */
 export function getRolePrompt(role?: ParticipantRole, customRolePrompt?: string): string {
   if (!role || role === 'neutral') {
     return '';
   }
-  if (role === 'custom' && customRolePrompt) {
+  // カスタムロールIDの場合はcustomRolePromptを使用
+  if (isCustomRoleId(role) && customRolePrompt) {
     return `\n【あなたの役割】\n${customRolePrompt}\n`;
   }
+  // プリセットロールの場合
   const preset = ROLE_PRESETS.find((r) => r.id === role);
   if (preset) {
     return `\n【あなたの役割】\n${preset.prompt}\n`;

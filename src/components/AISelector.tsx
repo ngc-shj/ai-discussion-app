@@ -1,8 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS } from '@/types';
 import { useAISelector, LATEST_MODEL_COUNT } from '@/hooks/useAISelector';
+import { useCustomRoles } from '@/hooks/useCustomRoles';
 import { ParticipantList, ProviderSection } from './ai-selector';
+import { RoleEditor } from './RoleEditor';
 
 interface AISelectorProps {
   participants: DiscussionParticipant[];
@@ -19,6 +22,8 @@ export function AISelector({
   availability,
   disabled,
 }: AISelectorProps) {
+  const [showRoleEditor, setShowRoleEditor] = useState(false);
+
   const {
     expandedProviders,
     showAllModels,
@@ -32,16 +37,35 @@ export function AISelector({
     getSelectedCountForProvider,
   } = useAISelector({ participants, onParticipantsChange });
 
+  const {
+    customRoles,
+    addCustomRole,
+    updateCustomRole,
+    deleteCustomRole,
+    duplicateCustomRole,
+  } = useCustomRoles();
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-gray-300">参加AI</label>
-        <span className="text-xs text-gray-500">{participants.length}人参加</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowRoleEditor(true)}
+            className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            title="カスタムロールを管理"
+          >
+            ロール管理
+          </button>
+          <span className="text-xs text-gray-500">{participants.length}人参加</span>
+        </div>
       </div>
 
       {/* 選択された参加者一覧 */}
       <ParticipantList
         participants={participants}
+        customRoles={customRoles}
         disabled={disabled}
         onUpdateRole={updateParticipantRole}
         onRemove={removeParticipant}
@@ -102,6 +126,18 @@ export function AISelector({
       <p className="text-xs text-gray-500">
         同じモデルを異なる役割で複数追加できます
       </p>
+
+      {/* ロール編集モーダル */}
+      {showRoleEditor && (
+        <RoleEditor
+          customRoles={customRoles}
+          onAdd={addCustomRole}
+          onUpdate={updateCustomRole}
+          onDelete={deleteCustomRole}
+          onDuplicate={duplicateCustomRole}
+          onClose={() => setShowRoleEditor(false)}
+        />
+      )}
     </div>
   );
 }

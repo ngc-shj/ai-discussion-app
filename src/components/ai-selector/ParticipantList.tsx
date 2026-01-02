@@ -1,9 +1,10 @@
 'use client';
 
-import { DiscussionParticipant, ROLE_PRESETS, ParticipantRole } from '@/types';
+import { DiscussionParticipant, ROLE_PRESETS, ParticipantRole, CustomRole, isCustomRoleId } from '@/types';
 
 interface ParticipantListProps {
   participants: DiscussionParticipant[];
+  customRoles: CustomRole[];
   disabled?: boolean;
   onUpdateRole: (id: string, role: ParticipantRole) => void;
   onRemove: (id: string) => void;
@@ -11,6 +12,7 @@ interface ParticipantListProps {
 
 export function ParticipantList({
   participants,
+  customRoles,
   disabled,
   onUpdateRole,
   onRemove,
@@ -19,11 +21,21 @@ export function ParticipantList({
     return null;
   }
 
+  // ロールの情報を取得
+  const getRoleInfo = (roleId: string | undefined) => {
+    if (!roleId) return ROLE_PRESETS.find((r) => r.id === 'neutral');
+    if (isCustomRoleId(roleId)) {
+      return customRoles.find((r) => r.id === roleId);
+    }
+    return ROLE_PRESETS.find((r) => r.id === roleId);
+  };
+
   return (
     <div className="space-y-1 p-2 bg-gray-700/30 rounded-lg">
       <div className="text-xs text-gray-400 mb-1">参加者一覧</div>
       {participants.map((participant, index) => {
-        const rolePreset = ROLE_PRESETS.find((r) => r.id === participant.role);
+        const roleInfo = getRoleInfo(participant.role);
+        const isCustom = participant.role && isCustomRoleId(participant.role);
         return (
           <div
             key={participant.id}
@@ -42,14 +54,27 @@ export function ParticipantList({
               value={participant.role || 'neutral'}
               onChange={(e) => onUpdateRole(participant.id, e.target.value as ParticipantRole)}
               disabled={disabled}
-              title={rolePreset?.description || '役割を選択'}
-              className="px-1.5 py-0.5 text-xs bg-gray-600 text-gray-200 rounded border-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+              title={roleInfo?.description || '役割を選択'}
+              className={`px-1.5 py-0.5 text-xs rounded border-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 ${
+                isCustom ? 'bg-purple-600/50 text-purple-200' : 'bg-gray-600 text-gray-200'
+              }`}
             >
-              {ROLE_PRESETS.map((role) => (
-                <option key={role.id} value={role.id}>
-                  {role.name}
-                </option>
-              ))}
+              <optgroup label="プリセット">
+                {ROLE_PRESETS.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name}
+                  </option>
+                ))}
+              </optgroup>
+              {customRoles.length > 0 && (
+                <optgroup label="カスタム">
+                  {customRoles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             {/* 削除ボタン */}
             <button
