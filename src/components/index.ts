@@ -6,6 +6,7 @@ export { SearchResultsDisplay } from './SearchResultsDisplay';
 export { AISelector } from './AISelector';
 export { SettingsPanel } from './SettingsPanel';
 export { InputForm } from './InputForm';
+export { DiscussionOptionsPanel } from './DiscussionOptionsPanel';
 export { FinalAnswer } from './FinalAnswer';
 export { ProgressIndicator } from './ProgressIndicator';
 export { SessionSidebar } from './SessionSidebar';
