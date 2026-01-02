@@ -31,6 +31,7 @@ import {
   getInterruptedState,
   clearInterruptedState,
 } from '@/lib/session-storage';
+import { processSSEStream, SSEEventHandlers } from '@/lib/sse-utils';
 import { InterruptedDiscussionState, InterruptedTurnState } from '@/types';
 import { useDiscussionSettings } from '@/hooks';
 
@@ -295,12 +296,14 @@ export default function Home() {
       finalAnswer: t.finalAnswer,
     })) || [];
 
+    // 収集用の変数
+    let collectedFinalAnswer = '';
+    let collectedSummaryPrompt = '';
+
     try {
       const response = await fetch('/api/summarize', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: currentTopic,
           participants,
@@ -319,78 +322,37 @@ export default function Home() {
         throw new Error('Failed to generate summary');
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body');
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let collectedFinalAnswer = '';
-      let collectedSummaryPrompt = '';
-
-      const processLine = (line: string) => {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
-          try {
-            const progressData = JSON.parse(data);
-
-            switch (progressData.type) {
-              case 'progress':
-                if (progressData.progress?.isSummarizing) {
-                  setProgress((prev) => ({ ...prev, isSummarizing: true }));
-                }
-                break;
-              case 'summary':
-                collectedFinalAnswer = progressData.finalAnswer;
-                collectedSummaryPrompt = progressData.summaryPrompt || '';
-                setCurrentFinalAnswer(collectedFinalAnswer);
-                setCurrentSummaryPrompt(collectedSummaryPrompt);
-                setProgress((prev) => ({ ...prev, isSummarizing: false }));
-                setIsGeneratingFollowUps(true);
-                break;
-              case 'followups':
-                if (progressData.suggestedFollowUps) {
-                  setSuggestedFollowUps(progressData.suggestedFollowUps);
-                }
-                setIsGeneratingFollowUps(false);
-                break;
-              case 'error':
-                console.error('Summary error:', progressData.error);
-                setError(progressData.error);
-                break;
-              case 'complete':
-                setIsGeneratingSummary(false);
-                setProgress((prev) => ({ ...prev, isSummarizing: false }));
-                setIsGeneratingFollowUps(false);
-                break;
-            }
-          } catch {
-            // JSON parse error, ignore
+      // SSEストリーム処理
+      const handlers: SSEEventHandlers = {
+        onProgress: (progress) => {
+          if (progress.isSummarizing) {
+            setProgress((prev) => ({ ...prev, isSummarizing: true }));
           }
-        }
+        },
+        onSummary: (finalAnswer, summaryPrompt) => {
+          collectedFinalAnswer = finalAnswer;
+          collectedSummaryPrompt = summaryPrompt || '';
+          setCurrentFinalAnswer(finalAnswer);
+          setCurrentSummaryPrompt(summaryPrompt || '');
+          setProgress((prev) => ({ ...prev, isSummarizing: false }));
+          setIsGeneratingFollowUps(true);
+        },
+        onFollowups: (followups) => {
+          setSuggestedFollowUps(followups);
+          setIsGeneratingFollowUps(false);
+        },
+        onError: (error) => {
+          console.error('Summary error:', error);
+          setError(error);
+        },
+        onComplete: () => {
+          setIsGeneratingSummary(false);
+          setProgress((prev) => ({ ...prev, isSummarizing: false }));
+          setIsGeneratingFollowUps(false);
+        },
       };
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          if (buffer.trim()) {
-            const remainingLines = buffer.split('\n\n');
-            for (const line of remainingLines) {
-              processLine(line);
-            }
-          }
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          processLine(line);
-        }
-      }
+      await processSSEStream(response, handlers);
 
       // 統合回答生成完了後、セッションにターンを追加して保存
       if (collectedFinalAnswer) {
@@ -459,7 +421,6 @@ export default function Home() {
       sessions.find(s => s.id === interruptedState.sessionId)
     );
     if (session) {
-      // セッションから中断状態を削除（再開したので）
       const updatedSession: DiscussionSession = {
         ...session,
         interruptedTurn: undefined,
@@ -497,12 +458,20 @@ export default function Home() {
       finalAnswer: t.finalAnswer,
     })) || [];
 
+    // 収集用の変数（クロージャでキャプチャ）
+    let collectedMessages: DiscussionMessage[] = [...interruptedState.messages];
+    let collectedFinalAnswer = '';
+    let collectedSummaryPrompt = '';
+    let currentProgressState = {
+      currentRound: interruptedState.currentRound,
+      currentParticipantIndex: interruptedState.currentParticipantIndex,
+    };
+    const resumeSession = currentSessionRef.current;
+
     try {
       const response = await fetch('/api/discuss', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: interruptedState.topic,
           participants: interruptedState.participants,
@@ -515,7 +484,6 @@ export default function Home() {
           directionGuide: interruptedState.directionGuide,
           terminationConfig: interruptedState.terminationConfig,
           messageVotes,
-          // 再開用のパラメータ
           resumeFrom: {
             messages: interruptedState.messages,
             currentRound: interruptedState.currentRound,
@@ -528,148 +496,89 @@ export default function Home() {
         throw new Error('Failed to resume discussion');
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body');
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let collectedMessages: DiscussionMessage[] = [...interruptedState.messages];
-      let collectedFinalAnswer = '';
-      let collectedSummaryPrompt = '';
-      // 進捗情報を追跡（中断時・自動保存時に使用）
-      let currentProgress = {
-        currentRound: interruptedState.currentRound,
-        currentParticipantIndex: interruptedState.currentParticipantIndex,
-      };
-      // 再開時のセッションを保持
-      const resumeSession = currentSessionRef.current;
-
-      const processLine = (line: string) => {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6);
-          try {
-            const progressData = JSON.parse(data);
-
-            switch (progressData.type) {
-              case 'progress':
-                currentProgress = {
-                  currentRound: progressData.progress.currentRound,
-                  currentParticipantIndex: progressData.progress.currentParticipantIndex,
-                };
-                setProgress({
-                  currentRound: progressData.progress.currentRound,
-                  totalRounds: progressData.progress.totalRounds,
-                  currentParticipantIndex: progressData.progress.currentParticipantIndex,
-                  totalParticipants: progressData.progress.totalParticipants,
-                  currentParticipant: progressData.progress.currentParticipant,
-                  isSummarizing: progressData.progress.isSummarizing,
-                });
-                break;
-              case 'message':
-                collectedMessages = [...collectedMessages, progressData.message];
-                setCurrentMessages(collectedMessages);
-                const messageParticipant = progressData.message;
-                if (messageParticipant) {
-                  setCompletedParticipants(prev => {
-                    const newSet = new Set(prev);
-                    newSet.add(`${messageParticipant.provider}-${messageParticipant.model}`);
-                    return newSet;
-                  });
-                }
-                // メッセージ受信のたびにセッションの中断状態を更新（自動保存）
-                {
-                  const latestSession = currentSessionRef.current;
-                  if (latestSession) {
-                    const interruptedTurn: InterruptedTurnState = {
-                      topic: interruptedState.topic,
-                      participants: interruptedState.participants, // 再開時の参加者を保存
-                      messages: collectedMessages,
-                      currentRound: currentProgress.currentRound,
-                      currentParticipantIndex: currentProgress.currentParticipantIndex,
-                      totalRounds: interruptedState.totalRounds,
-                      searchResults: interruptedState.searchResults,
-                      userProfile: interruptedState.userProfile,
-                      discussionMode: interruptedState.discussionMode,
-                      discussionDepth: interruptedState.discussionDepth,
-                      directionGuide: interruptedState.directionGuide,
-                      terminationConfig: interruptedState.terminationConfig,
-                      interruptedAt: new Date(),
-                    };
-                    const updatedSession: DiscussionSession = {
-                      ...latestSession,
-                      interruptedTurn,
-                      updatedAt: new Date(),
-                    };
-                    saveSession(updatedSession).catch(err => console.error('Failed to save interrupted state:', err));
-                    setSessions((prev) =>
-                      prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-                    );
-                  }
-                }
-                break;
-              case 'summary':
-                collectedFinalAnswer = progressData.finalAnswer;
-                collectedSummaryPrompt = progressData.summaryPrompt || '';
-                setCurrentFinalAnswer(collectedFinalAnswer);
-                setCurrentSummaryPrompt(collectedSummaryPrompt);
-                setProgress((prev) => ({ ...prev, isSummarizing: false }));
-                setIsGeneratingFollowUps(true);
-                break;
-              case 'followups':
-                if (progressData.suggestedFollowUps) {
-                  setSuggestedFollowUps(progressData.suggestedFollowUps);
-                }
-                setIsGeneratingFollowUps(false);
-                break;
-              case 'error':
-                console.error('Discussion error:', progressData.error);
-                if (progressData.error.includes('No messages were generated') ||
-                    progressData.error.includes('Failed to generate summary with all')) {
-                  setError(progressData.error);
-                }
-                break;
-              case 'complete':
-                setIsLoading(false);
-                setProgress((prev) => ({ ...prev, isSummarizing: false }));
-                break;
-            }
-          } catch {
-            // JSON parse error, ignore
+      // SSEストリーム処理
+      const handlers: SSEEventHandlers = {
+        onProgress: (progress) => {
+          currentProgressState = {
+            currentRound: progress.currentRound,
+            currentParticipantIndex: progress.currentParticipantIndex,
+          };
+          setProgress({
+            currentRound: progress.currentRound,
+            totalRounds: progress.totalRounds,
+            currentParticipantIndex: progress.currentParticipantIndex,
+            totalParticipants: progress.totalParticipants,
+            currentParticipant: progress.currentParticipant,
+            isSummarizing: progress.isSummarizing,
+          });
+        },
+        onMessage: (message) => {
+          collectedMessages = [...collectedMessages, message];
+          setCurrentMessages(collectedMessages);
+          setCompletedParticipants(prev => {
+            const newSet = new Set(prev);
+            newSet.add(`${message.provider}-${message.model}`);
+            return newSet;
+          });
+          // メッセージ受信のたびにセッションの中断状態を更新（自動保存）
+          const latestSession = currentSessionRef.current;
+          if (latestSession) {
+            const interruptedTurn: InterruptedTurnState = {
+              topic: interruptedState.topic,
+              participants: interruptedState.participants,
+              messages: collectedMessages,
+              currentRound: currentProgressState.currentRound,
+              currentParticipantIndex: currentProgressState.currentParticipantIndex,
+              totalRounds: interruptedState.totalRounds,
+              searchResults: interruptedState.searchResults,
+              userProfile: interruptedState.userProfile,
+              discussionMode: interruptedState.discussionMode,
+              discussionDepth: interruptedState.discussionDepth,
+              directionGuide: interruptedState.directionGuide,
+              terminationConfig: interruptedState.terminationConfig,
+              interruptedAt: new Date(),
+            };
+            const updatedSession: DiscussionSession = {
+              ...latestSession,
+              interruptedTurn,
+              updatedAt: new Date(),
+            };
+            saveSession(updatedSession).catch(err => console.error('Failed to save interrupted state:', err));
+            setSessions((prev) =>
+              prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+            );
           }
-        }
+        },
+        onSummary: (finalAnswer, summaryPrompt) => {
+          collectedFinalAnswer = finalAnswer;
+          collectedSummaryPrompt = summaryPrompt || '';
+          setCurrentFinalAnswer(finalAnswer);
+          setCurrentSummaryPrompt(summaryPrompt || '');
+          setProgress((prev) => ({ ...prev, isSummarizing: false }));
+          setIsGeneratingFollowUps(true);
+        },
+        onFollowups: (followups) => {
+          setSuggestedFollowUps(followups);
+          setIsGeneratingFollowUps(false);
+        },
+        onError: (error) => {
+          console.error('Discussion error:', error);
+          if (error.includes('No messages were generated') ||
+              error.includes('Failed to generate summary with all')) {
+            setError(error);
+          }
+        },
+        onComplete: () => {
+          setIsLoading(false);
+          setProgress((prev) => ({ ...prev, isSummarizing: false }));
+        },
       };
 
-      let wasInterrupted = false;
-
-      while (true) {
-        // 中断リクエストをチェック
-        if (interruptRequestedRef.current) {
-          wasInterrupted = true;
-          reader.cancel();
-          break;
-        }
-
-        const { done, value } = await reader.read();
-        if (done) {
-          if (buffer.trim()) {
-            const remainingLines = buffer.split('\n\n');
-            for (const line of remainingLines) {
-              processLine(line);
-            }
-          }
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          processLine(line);
-        }
-      }
+      const wasInterrupted = await processSSEStream(
+        response,
+        handlers,
+        () => interruptRequestedRef.current
+      );
 
       // 中断された場合、状態を保存
       if (wasInterrupted) {
@@ -678,8 +587,8 @@ export default function Home() {
           topic: interruptedState.topic,
           participants: interruptedState.participants,
           messages: collectedMessages,
-          currentRound: currentProgress.currentRound,
-          currentParticipantIndex: currentProgress.currentParticipantIndex,
+          currentRound: currentProgressState.currentRound,
+          currentParticipantIndex: currentProgressState.currentParticipantIndex,
           totalRounds: interruptedState.totalRounds,
           searchResults: interruptedState.searchResults,
           userProfile: interruptedState.userProfile,
@@ -695,7 +604,7 @@ export default function Home() {
         return;
       }
 
-      // 議論完了後、セッションにターンを追加して保存（中断状態もクリア）
+      // 議論完了後、セッションにターンを追加して保存
       if (collectedFinalAnswer) {
         const newTurn = createNewTurn(
           interruptedState.topic,
@@ -710,7 +619,7 @@ export default function Home() {
           const updatedSession: DiscussionSession = {
             ...latestSession,
             turns: [...latestSession.turns, newTurn],
-            interruptedTurn: undefined, // 完了したので中断状態をクリア
+            interruptedTurn: undefined,
             updatedAt: new Date(),
           };
           await saveSession(updatedSession);
@@ -768,7 +677,7 @@ export default function Home() {
       setIsLoading(true);
       setCurrentTopic(topic);
       setCompletedParticipants(new Set());
-      interruptRequestedRef.current = false; // 中断フラグをリセット
+      interruptRequestedRef.current = false;
       setProgress({
         currentRound: 1,
         totalRounds: terminationConfig.maxRounds,
@@ -801,26 +710,21 @@ export default function Home() {
           }
         } catch (err) {
           console.error('Search failed:', err);
-          // 検索に失敗しても議論は続行
         } finally {
           setIsSearching(false);
         }
       }
 
-      // 過去のターンを取得（継続議論用）- refを使って最新の値を取得
+      // 過去のターンを取得（継続議論用）
       let sessionAtStart = currentSessionRef.current;
       const previousTurns: PreviousTurnSummary[] = sessionAtStart?.turns.map((t) => ({
         topic: t.topic,
         finalAnswer: t.finalAnswer,
       })) || [];
 
-      // まだセッションに保存されていない直前のターン（prevFinalAnswer）があれば追加
-      // これにより、統合回答表示後に入力フィールドから質問した場合も文脈が引き継がれる
+      // まだセッションに保存されていない直前のターンがあれば追加
       if (prevTopic && prevFinalAnswer) {
-        previousTurns.push({
-          topic: prevTopic,
-          finalAnswer: prevFinalAnswer,
-        });
+        previousTurns.push({ topic: prevTopic, finalAnswer: prevFinalAnswer });
       }
 
       // 新規セッションの場合、議論開始時にセッションを作成
@@ -836,12 +740,16 @@ export default function Home() {
         sessionAtStart = newSession;
       }
 
+      // 収集用の変数（クロージャでキャプチャ）
+      let collectedMessages: DiscussionMessage[] = [];
+      let collectedFinalAnswer = '';
+      let collectedSummaryPrompt = '';
+      let currentProgressState = { currentRound: 1, currentParticipantIndex: 0 };
+
       try {
         const response = await fetch('/api/discuss', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             topic,
             participants,
@@ -854,7 +762,7 @@ export default function Home() {
             directionGuide,
             terminationConfig,
             messageVotes,
-            skipSummary: true, // 統合回答はユーザーが投票後に手動で生成
+            skipSummary: true,
           }),
         });
 
@@ -862,181 +770,118 @@ export default function Home() {
           throw new Error('Failed to start discussion');
         }
 
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error('No response body');
-        }
-
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let collectedMessages: DiscussionMessage[] = [];
-        let collectedFinalAnswer = '';
-        let collectedSummaryPrompt = '';
-        // 進捗情報を追跡（中断時・自動保存時に使用）
-        let currentProgress = { currentRound: 1, currentParticipantIndex: 0 };
-
-        const processLine = (line: string) => {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            try {
-              const progressData = JSON.parse(data);
-
-              switch (progressData.type) {
-                case 'progress':
-                  currentProgress = {
-                    currentRound: progressData.progress.currentRound,
-                    currentParticipantIndex: progressData.progress.currentParticipantIndex,
-                  };
-                  setProgress({
-                    currentRound: progressData.progress.currentRound,
-                    totalRounds: progressData.progress.totalRounds,
-                    currentParticipantIndex: progressData.progress.currentParticipantIndex,
-                    totalParticipants: progressData.progress.totalParticipants,
-                    currentParticipant: progressData.progress.currentParticipant,
-                    isSummarizing: progressData.progress.isSummarizing,
-                  });
-                  break;
-                case 'message':
-                  collectedMessages = [...collectedMessages, progressData.message];
-                  setCurrentMessages(collectedMessages);
-                  // メッセージを受信したら、その参加者を完了としてマーク
-                  const messageParticipant = progressData.message;
-                  if (messageParticipant) {
-                    setCompletedParticipants(prev => {
-                      const newSet = new Set(prev);
-                      newSet.add(`${messageParticipant.provider}-${messageParticipant.model}`);
-                      return newSet;
-                    });
-                  }
-                  // メッセージ受信のたびにセッションの中断状態を更新（自動保存）
-                  {
-                    const latestSession = currentSessionRef.current;
-                    if (latestSession) {
-                      const interruptedTurn: InterruptedTurnState = {
-                        topic,
-                        participants, // 現在の参加者を保存
-                        messages: collectedMessages,
-                        currentRound: currentProgress.currentRound,
-                        currentParticipantIndex: currentProgress.currentParticipantIndex,
-                        totalRounds: terminationConfig.maxRounds,
-                        searchResults: searchResults.length > 0 ? searchResults : undefined,
-                        userProfile,
-                        discussionMode,
-                        discussionDepth,
-                        directionGuide,
-                        terminationConfig,
-                        interruptedAt: new Date(),
-                      };
-                      const updatedSession: DiscussionSession = {
-                        ...latestSession,
-                        interruptedTurn,
-                        updatedAt: new Date(),
-                      };
-                      saveSession(updatedSession).catch(err => console.error('Failed to save interrupted state:', err));
-                      // sessionsリストも更新
-                      setSessions((prev) =>
-                        prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-                      );
-                    }
-                  }
-                  break;
-                case 'summary':
-                  collectedFinalAnswer = progressData.finalAnswer;
-                  collectedSummaryPrompt = progressData.summaryPrompt || '';
-                  setCurrentFinalAnswer(collectedFinalAnswer);
-                  setCurrentSummaryPrompt(collectedSummaryPrompt);
-                  setProgress((prev) => ({ ...prev, isSummarizing: false }));
-                  setIsGeneratingFollowUps(true);
-                  break;
-                case 'followups':
-                  if (progressData.suggestedFollowUps) {
-                    setSuggestedFollowUps(progressData.suggestedFollowUps);
-                  }
-                  setIsGeneratingFollowUps(false);
-                  break;
-                case 'error':
-                  console.error('Discussion error:', progressData.error);
-                  // 致命的なエラー（全プロバイダー失敗、統合回答生成失敗）のみ表示
-                  if (progressData.error.includes('No messages were generated') ||
-                      progressData.error.includes('Failed to generate summary with all')) {
-                    setError(progressData.error);
-                  }
-                  break;
-                case 'ready_for_summary':
-                  // 議論完了、統合回答待ち状態
-                  setAwaitingSummary(true);
-                  setIsLoading(false);
-                  // セッションの中断状態をクリア（議論は正常に完了した）
-                  // 注意: メッセージ受信時にinterruptedTurnが設定されるが、setCurrentSessionが呼ばれないため
-                  // currentSessionRef.currentには反映されていない。そのため無条件でクリアする。
-                  {
-                    const latestSession = currentSessionRef.current;
-                    if (latestSession) {
-                      const updatedSession: DiscussionSession = {
-                        ...latestSession,
-                        interruptedTurn: undefined,
-                        updatedAt: new Date(),
-                      };
-                      saveSession(updatedSession).catch(err => console.error('Failed to clear interrupted state:', err));
-                      setCurrentSession(updatedSession);
-                      setSessions((prev) =>
-                        prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-                      );
-                    }
-                  }
-                  break;
-                case 'complete':
-                  setIsLoading(false);
-                  setProgress((prev) => ({ ...prev, isSummarizing: false }));
-                  setIsGeneratingFollowUps(false);
-                  break;
-              }
-            } catch {
-              // JSON parse error, ignore
+        // SSEストリーム処理
+        const handlers: SSEEventHandlers = {
+          onProgress: (progress) => {
+            currentProgressState = {
+              currentRound: progress.currentRound,
+              currentParticipantIndex: progress.currentParticipantIndex,
+            };
+            setProgress({
+              currentRound: progress.currentRound,
+              totalRounds: progress.totalRounds,
+              currentParticipantIndex: progress.currentParticipantIndex,
+              totalParticipants: progress.totalParticipants,
+              currentParticipant: progress.currentParticipant,
+              isSummarizing: progress.isSummarizing,
+            });
+          },
+          onMessage: (message) => {
+            collectedMessages = [...collectedMessages, message];
+            setCurrentMessages(collectedMessages);
+            setCompletedParticipants(prev => {
+              const newSet = new Set(prev);
+              newSet.add(`${message.provider}-${message.model}`);
+              return newSet;
+            });
+            // メッセージ受信のたびにセッションの中断状態を更新（自動保存）
+            const latestSession = currentSessionRef.current;
+            if (latestSession) {
+              const interruptedTurn: InterruptedTurnState = {
+                topic,
+                participants,
+                messages: collectedMessages,
+                currentRound: currentProgressState.currentRound,
+                currentParticipantIndex: currentProgressState.currentParticipantIndex,
+                totalRounds: terminationConfig.maxRounds,
+                searchResults: searchResults.length > 0 ? searchResults : undefined,
+                userProfile,
+                discussionMode,
+                discussionDepth,
+                directionGuide,
+                terminationConfig,
+                interruptedAt: new Date(),
+              };
+              const updatedSession: DiscussionSession = {
+                ...latestSession,
+                interruptedTurn,
+                updatedAt: new Date(),
+              };
+              saveSession(updatedSession).catch(err => console.error('Failed to save interrupted state:', err));
+              setSessions((prev) =>
+                prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+              );
             }
-          }
+          },
+          onSummary: (finalAnswer, summaryPrompt) => {
+            collectedFinalAnswer = finalAnswer;
+            collectedSummaryPrompt = summaryPrompt || '';
+            setCurrentFinalAnswer(finalAnswer);
+            setCurrentSummaryPrompt(summaryPrompt || '');
+            setProgress((prev) => ({ ...prev, isSummarizing: false }));
+            setIsGeneratingFollowUps(true);
+          },
+          onFollowups: (followups) => {
+            setSuggestedFollowUps(followups);
+            setIsGeneratingFollowUps(false);
+          },
+          onError: (error) => {
+            console.error('Discussion error:', error);
+            if (error.includes('No messages were generated') ||
+                error.includes('Failed to generate summary with all')) {
+              setError(error);
+            }
+          },
+          onReadyForSummary: () => {
+            setAwaitingSummary(true);
+            setIsLoading(false);
+            // セッションの中断状態をクリア（議論は正常に完了した）
+            const latestSession = currentSessionRef.current;
+            if (latestSession) {
+              const updatedSession: DiscussionSession = {
+                ...latestSession,
+                interruptedTurn: undefined,
+                updatedAt: new Date(),
+              };
+              saveSession(updatedSession).catch(err => console.error('Failed to clear interrupted state:', err));
+              setCurrentSession(updatedSession);
+              setSessions((prev) =>
+                prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+              );
+            }
+          },
+          onComplete: () => {
+            setIsLoading(false);
+            setProgress((prev) => ({ ...prev, isSummarizing: false }));
+            setIsGeneratingFollowUps(false);
+          },
         };
 
-        let wasInterrupted = false;
-
-        while (true) {
-          // 中断リクエストをチェック
-          if (interruptRequestedRef.current) {
-            wasInterrupted = true;
-            reader.cancel();
-            break;
-          }
-
-          const { done, value } = await reader.read();
-          if (done) {
-            // ストリーム終了時にバッファに残っているデータを処理
-            if (buffer.trim()) {
-              const remainingLines = buffer.split('\n\n');
-              for (const line of remainingLines) {
-                processLine(line);
-              }
-            }
-            break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            processLine(line);
-          }
-        }
+        const wasInterrupted = await processSSEStream(
+          response,
+          handlers,
+          () => interruptRequestedRef.current
+        );
 
         // 中断された場合、状態を保存
         if (wasInterrupted) {
-          const interruptedState: InterruptedDiscussionState = {
+          const interrupted: InterruptedDiscussionState = {
             sessionId: sessionAtStart?.id || '',
             topic,
             participants,
             messages: collectedMessages,
-            currentRound: currentProgress.currentRound,
-            currentParticipantIndex: currentProgress.currentParticipantIndex,
+            currentRound: currentProgressState.currentRound,
+            currentParticipantIndex: currentProgressState.currentParticipantIndex,
             totalRounds: terminationConfig.maxRounds,
             searchResults: searchResults.length > 0 ? searchResults : undefined,
             userProfile,
@@ -1046,23 +891,28 @@ export default function Home() {
             terminationConfig,
             interruptedAt: new Date(),
           };
-          saveInterruptedState(interruptedState);
-          setInterruptedState(interruptedState);
+          saveInterruptedState(interrupted);
+          setInterruptedState(interrupted);
           setIsLoading(false);
           return;
         }
 
-        // 議論完了後、セッションにターンを追加して保存（中断状態もクリア）
-        // awaitingSummaryの場合は、統合回答が生成されるまでターンをクリアしない
+        // 議論完了後、セッションにターンを追加して保存
         if (collectedFinalAnswer) {
-          const newTurn = createNewTurn(topic, collectedMessages, collectedFinalAnswer, searchResults.length > 0 ? searchResults : undefined, collectedSummaryPrompt || undefined);
+          const newTurn = createNewTurn(
+            topic,
+            collectedMessages,
+            collectedFinalAnswer,
+            searchResults.length > 0 ? searchResults : undefined,
+            collectedSummaryPrompt || undefined
+          );
           const latestSession = currentSessionRef.current;
 
           if (latestSession) {
             const updatedSession: DiscussionSession = {
               ...latestSession,
               turns: [...latestSession.turns, newTurn],
-              interruptedTurn: undefined, // 完了したので中断状態をクリア
+              interruptedTurn: undefined,
               updatedAt: new Date(),
             };
             await saveSession(updatedSession);
@@ -1071,18 +921,15 @@ export default function Home() {
               prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
             );
           }
-          // localStorageの中断状態もクリア
           clearInterruptedState();
           setInterruptedState(null);
 
-          // 現在のターンをクリア（セッションに保存済み）
           setCurrentTopic('');
           setCurrentMessages([]);
           setCurrentFinalAnswer('');
           setCurrentSearchResults([]);
           setSuggestedFollowUps([]);
         }
-        // awaitingSummaryの場合は、現在の状態を維持（ユーザーが投票・統合回答生成できるように）
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
