@@ -1,13 +1,8 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import {
-  DiscussionMessage,
-  DiscussionParticipant,
   DiscussionSession,
-  SearchResult,
-  MessageVote,
-  FollowUpQuestion,
   DeepDiveType,
   DEEP_DIVE_PRESETS,
 } from '@/types';
@@ -19,26 +14,7 @@ import {
   SessionSidebar,
   MobileHeader,
 } from '@/components';
-import {
-  getAllSessions,
-  saveSession,
-  createNewSession,
-  createNewTurn,
-  saveInterruptedState,
-  clearInterruptedState,
-} from '@/lib/session-storage';
-import { processSSEStream, SSEEventHandlers, createInterruptedState, getPreviousTurns } from '@/lib/sse-utils';
-import { InterruptedTurnState } from '@/types';
-import { useDiscussionSettings, useSessionManager } from '@/hooks';
-
-interface ProgressState {
-  currentRound: number;
-  totalRounds: number;
-  currentParticipantIndex: number;
-  totalParticipants: number;
-  currentParticipant: DiscussionParticipant | null;
-  isSummarizing: boolean;
-}
+import { useDiscussionSettings, useSessionManager, useDiscussion } from '@/hooks';
 
 export default function Home() {
   // 設定関連（カスタムフックを使用）
@@ -71,21 +47,36 @@ export default function Home() {
     setSessions,
     setCurrentSession,
     setInterruptedState,
-    newSession: sessionManagerNewSession,
     deleteSession: sessionManagerDeleteSession,
     renameSession: sessionManagerRenameSession,
     updateAndSaveSession,
     discardInterrupted,
   } = useSessionManager();
 
-  // 現在進行中のターン
-  const [currentMessages, setCurrentMessages] = useState<DiscussionMessage[]>([]);
-  const [currentFinalAnswer, setCurrentFinalAnswer] = useState<string>('');
-  const [currentSummaryPrompt, setCurrentSummaryPrompt] = useState<string>('');
-  const [currentTopic, setCurrentTopic] = useState<string>('');
-
-  // ローディング状態
-  const [isLoading, setIsLoading] = useState(false);
+  // 議論状態とアクション（カスタムフックを使用）
+  const {
+    currentMessages,
+    currentFinalAnswer,
+    currentSummaryPrompt,
+    currentTopic,
+    currentSearchResults,
+    isLoading,
+    isSearching,
+    isGeneratingFollowUps,
+    isGeneratingSummary,
+    awaitingSummary,
+    progress,
+    completedParticipants,
+    suggestedFollowUps,
+    error,
+    messageVotes,
+    handleVote,
+    clearCurrentTurnState,
+    handleInterrupt,
+    startDiscussion,
+    resumeDiscussion,
+    generateSummary,
+  } = useDiscussion();
 
   // サイドバー・設定パネルの開閉状態
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -93,64 +84,14 @@ export default function Home() {
   // PC用サイドバー折りたたみ状態
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsCollapsed, setIsSettingsCollapsed] = useState(false);
-
-  // その他の状態
-  const [messageVotes, setMessageVotes] = useState<MessageVote[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [currentSearchResults, setCurrentSearchResults] = useState<SearchResult[]>([]);
-  const [error, setError] = useState<string | null>(null);
   // フォローアップ用のプリセットトピック
   const [presetTopic, setPresetTopic] = useState<string>('');
-  // 中断リクエストフラグ
-  const interruptRequestedRef = useRef(false);
-  const [progress, setProgress] = useState<ProgressState>({
-    currentRound: 0,
-    totalRounds: 0,
-    currentParticipantIndex: 0,
-    totalParticipants: 0,
-    currentParticipant: null,
-    isSummarizing: false,
-  });
-  // 完了した参加者を追跡
-  const [completedParticipants, setCompletedParticipants] = useState<Set<string>>(new Set());
-  // フォローアップ質問
-  const [suggestedFollowUps, setSuggestedFollowUps] = useState<FollowUpQuestion[]>([]);
-  const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
-  // 統合回答待機状態（議論完了後、ユーザーが投票してから生成）
-  const [awaitingSummary, setAwaitingSummary] = useState(false);
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-
-  // 投票を追加/更新するハンドラー
-  const handleVote = useCallback((messageId: string, vote: 'agree' | 'disagree' | 'neutral') => {
-    setMessageVotes((prev: MessageVote[]) => {
-      const existing = prev.findIndex(v => v.messageId === messageId);
-      if (existing >= 0) {
-        const updated = [...prev];
-        updated[existing] = { messageId, vote, timestamp: new Date() };
-        return updated;
-      }
-      return [...prev, { messageId, vote, timestamp: new Date() }];
-    });
-  }, []);
-
-  // 現在のターン状態をクリア（共通ヘルパー）
-  const clearCurrentTurnState = useCallback(() => {
-    setCurrentMessages([]);
-    setCurrentFinalAnswer('');
-    setCurrentTopic('');
-    setCurrentSearchResults([]);
-    setError(null);
-    setSuggestedFollowUps([]);
-    setIsGeneratingFollowUps(false);
-    setAwaitingSummary(false);
-    setIsGeneratingSummary(false);
-  }, []);
 
   // 新しいセッションを開始
   const handleNewSession = useCallback(() => {
     setCurrentSession(null);
     clearCurrentTurnState();
-  }, [clearCurrentTurnState]);
+  }, [setCurrentSession, clearCurrentTurnState]);
 
   // セッションを選択
   const handleSelectSession = useCallback((session: DiscussionSession) => {
@@ -195,7 +136,7 @@ export default function Home() {
       });
       setInterruptedState(null);
     }
-  }, [restoreFromSession, clearCurrentTurnState]);
+  }, [restoreFromSession, clearCurrentTurnState, setCurrentSession, setInterruptedState]);
 
   // セッションを削除
   const handleDeleteSession = useCallback(async (id: string) => {
@@ -205,9 +146,13 @@ export default function Home() {
     }
   }, [currentSession, sessionManagerDeleteSession, clearCurrentTurnState]);
 
+  // セッションの名前を変更
+  const handleRenameSession = useCallback(async (id: string, newTitle: string) => {
+    await sessionManagerRenameSession(id, newTitle);
+  }, [sessionManagerRenameSession]);
+
   // フォローアップ質問を設定
   const handleFollowUp = useCallback((topic: string, _previousAnswer: string) => {
-    // previousAnswerはpreviousTurns経由でAPIに渡される
     const followUpPrompt = `「${topic}」についてもう少し詳しく教えてください。`;
     setPresetTopic(followUpPrompt);
   }, []);
@@ -246,619 +191,57 @@ export default function Home() {
     setPresetTopic('');
   }, []);
 
-  // 議論を中断
-  const handleInterrupt = useCallback(() => {
-    interruptRequestedRef.current = true;
-  }, []);
-
   // 中断状態を破棄
   const handleDiscardInterrupted = useCallback(() => {
     discardInterrupted();
   }, [discardInterrupted]);
 
-  // 統合回答を生成（投票後に手動で実行）
+  // 統合回答を生成
   const handleGenerateSummary = useCallback(async () => {
-    if (currentMessages.length === 0) return;
-
-    setIsGeneratingSummary(true);
-    setAwaitingSummary(false);
-    setError(null);
-
-    // 過去のターンを取得
-    const previousTurns = getPreviousTurns(currentSessionRef.current);
-
-    // 収集用の変数
-    let collectedFinalAnswer = '';
-    let collectedSummaryPrompt = '';
-
-    try {
-      const response = await fetch('/api/summarize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: currentTopic,
-          participants,
-          messages: currentMessages,
-          previousTurns,
-          searchResults: currentSearchResults,
-          userProfile,
-          discussionMode,
-          discussionDepth,
-          directionGuide,
-          messageVotes,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate summary');
-      }
-
-      // SSEストリーム処理
-      const handlers: SSEEventHandlers = {
-        onProgress: (progress) => {
-          if (progress.isSummarizing) {
-            setProgress((prev) => ({ ...prev, isSummarizing: true }));
-          }
-        },
-        onSummary: (finalAnswer, summaryPrompt) => {
-          collectedFinalAnswer = finalAnswer;
-          collectedSummaryPrompt = summaryPrompt || '';
-          setCurrentFinalAnswer(finalAnswer);
-          setCurrentSummaryPrompt(summaryPrompt || '');
-          setProgress((prev) => ({ ...prev, isSummarizing: false }));
-          setIsGeneratingFollowUps(true);
-        },
-        onFollowups: (followups) => {
-          setSuggestedFollowUps(followups);
-          setIsGeneratingFollowUps(false);
-        },
-        onError: (error) => {
-          console.error('Summary error:', error);
-          setError(error);
-        },
-        onComplete: () => {
-          setIsGeneratingSummary(false);
-          setProgress((prev) => ({ ...prev, isSummarizing: false }));
-          setIsGeneratingFollowUps(false);
-        },
-      };
-
-      await processSSEStream(response, handlers);
-
-      // 統合回答生成完了後、セッションにターンを追加して保存
-      if (collectedFinalAnswer) {
-        const newTurn = createNewTurn(
-          currentTopic,
-          currentMessages,
-          collectedFinalAnswer,
-          currentSearchResults.length > 0 ? currentSearchResults : undefined,
-          collectedSummaryPrompt || undefined
-        );
-        const latestSession = currentSessionRef.current;
-
-        if (latestSession) {
-          await updateAndSaveSession({
-            turns: [...latestSession.turns, newTurn],
-            interruptedTurn: undefined,
-          });
-        }
-
-        // localStorageの中断状態もクリア
-        clearInterruptedState();
-        setInterruptedState(null);
-
-        // 現在のターンをクリア
-        clearCurrentTurnState();
-        setMessageVotes([]);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setIsGeneratingSummary(false);
-    }
-  }, [currentMessages, currentTopic, participants, currentSearchResults, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes]);
+    await generateSummary({
+      participants,
+      userProfile,
+      discussionMode,
+      discussionDepth,
+      directionGuide,
+      currentSessionRef,
+      setInterruptedState,
+      updateAndSaveSession,
+    });
+  }, [participants, userProfile, discussionMode, discussionDepth, directionGuide, currentSessionRef, setInterruptedState, updateAndSaveSession, generateSummary]);
 
   // 中断した議論を再開
   const handleResumeDiscussion = useCallback(async () => {
     if (!interruptedState) return;
-
-    // 中断状態をクリア（localStorage）
-    clearInterruptedState();
-    setInterruptedState(null);
-
-    // 参加者と設定を復元
-    restoreFromSession({
-      participants: interruptedState.participants,
-      discussionMode: interruptedState.discussionMode,
-      discussionDepth: interruptedState.discussionDepth,
-      directionGuide: interruptedState.directionGuide,
-      terminationConfig: interruptedState.terminationConfig,
-      userProfile: interruptedState.userProfile,
+    await resumeDiscussion({
+      interruptedState,
+      restoreFromSession,
+      currentSessionRef,
+      setCurrentSession,
+      setSessions,
+      setInterruptedState,
+      updateAndSaveSession,
     });
-
-    // セッションを復元し、中断状態をクリア
-    const session = await getAllSessions().then(sessions =>
-      sessions.find(s => s.id === interruptedState.sessionId)
-    );
-    if (session) {
-      const updatedSession: DiscussionSession = {
-        ...session,
-        interruptedTurn: undefined,
-      };
-      await saveSession(updatedSession);
-      setCurrentSession(updatedSession);
-      setSessions((prev) =>
-        prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-      );
-    }
-
-    // 中断時のメッセージを復元して表示
-    setCurrentTopic(interruptedState.topic);
-    setCurrentMessages(interruptedState.messages);
-    setCurrentSearchResults(interruptedState.searchResults || []);
-
-    // 再開用のAPIを呼び出す
-    setIsLoading(true);
-    setError(null);
-    interruptRequestedRef.current = false;
-    setCompletedParticipants(new Set());
-    setProgress({
-      currentRound: interruptedState.currentRound,
-      totalRounds: interruptedState.totalRounds,
-      currentParticipantIndex: interruptedState.currentParticipantIndex,
-      totalParticipants: interruptedState.participants.length,
-      currentParticipant: interruptedState.participants[interruptedState.currentParticipantIndex],
-      isSummarizing: false,
-    });
-
-    // 過去のターンを取得
-    const previousTurns = getPreviousTurns(session || currentSessionRef.current);
-
-    // 収集用の変数（クロージャでキャプチャ）
-    let collectedMessages: DiscussionMessage[] = [...interruptedState.messages];
-    let collectedFinalAnswer = '';
-    let collectedSummaryPrompt = '';
-    let currentProgressState = {
-      currentRound: interruptedState.currentRound,
-      currentParticipantIndex: interruptedState.currentParticipantIndex,
-    };
-    const resumeSession = currentSessionRef.current;
-
-    try {
-      const response = await fetch('/api/discuss', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: interruptedState.topic,
-          participants: interruptedState.participants,
-          rounds: interruptedState.totalRounds,
-          previousTurns,
-          searchResults: interruptedState.searchResults,
-          userProfile: interruptedState.userProfile,
-          discussionMode: interruptedState.discussionMode,
-          discussionDepth: interruptedState.discussionDepth,
-          directionGuide: interruptedState.directionGuide,
-          terminationConfig: interruptedState.terminationConfig,
-          messageVotes,
-          resumeFrom: {
-            messages: interruptedState.messages,
-            currentRound: interruptedState.currentRound,
-            currentParticipantIndex: interruptedState.currentParticipantIndex,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to resume discussion');
-      }
-
-      // SSEストリーム処理
-      const handlers: SSEEventHandlers = {
-        onProgress: (progress) => {
-          currentProgressState = {
-            currentRound: progress.currentRound,
-            currentParticipantIndex: progress.currentParticipantIndex,
-          };
-          setProgress({
-            currentRound: progress.currentRound,
-            totalRounds: progress.totalRounds,
-            currentParticipantIndex: progress.currentParticipantIndex,
-            totalParticipants: progress.totalParticipants,
-            currentParticipant: progress.currentParticipant,
-            isSummarizing: progress.isSummarizing,
-          });
-        },
-        onMessage: (message) => {
-          collectedMessages = [...collectedMessages, message];
-          setCurrentMessages(collectedMessages);
-          setCompletedParticipants(prev => {
-            const newSet = new Set(prev);
-            newSet.add(`${message.provider}-${message.model}`);
-            return newSet;
-          });
-          // メッセージ受信のたびにセッションの中断状態を更新（自動保存）
-          const latestSession = currentSessionRef.current;
-          if (latestSession) {
-            const interruptedTurn: InterruptedTurnState = {
-              topic: interruptedState.topic,
-              participants: interruptedState.participants,
-              messages: collectedMessages,
-              currentRound: currentProgressState.currentRound,
-              currentParticipantIndex: currentProgressState.currentParticipantIndex,
-              totalRounds: interruptedState.totalRounds,
-              searchResults: interruptedState.searchResults,
-              userProfile: interruptedState.userProfile,
-              discussionMode: interruptedState.discussionMode,
-              discussionDepth: interruptedState.discussionDepth,
-              directionGuide: interruptedState.directionGuide,
-              terminationConfig: interruptedState.terminationConfig,
-              interruptedAt: new Date(),
-            };
-            const updatedSession: DiscussionSession = {
-              ...latestSession,
-              interruptedTurn,
-              updatedAt: new Date(),
-            };
-            saveSession(updatedSession).catch(err => console.error('Failed to save interrupted state:', err));
-            setSessions((prev) =>
-              prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-            );
-          }
-        },
-        onSummary: (finalAnswer, summaryPrompt) => {
-          collectedFinalAnswer = finalAnswer;
-          collectedSummaryPrompt = summaryPrompt || '';
-          setCurrentFinalAnswer(finalAnswer);
-          setCurrentSummaryPrompt(summaryPrompt || '');
-          setProgress((prev) => ({ ...prev, isSummarizing: false }));
-          setIsGeneratingFollowUps(true);
-        },
-        onFollowups: (followups) => {
-          setSuggestedFollowUps(followups);
-          setIsGeneratingFollowUps(false);
-        },
-        onError: (error) => {
-          console.error('Discussion error:', error);
-          if (error.includes('No messages were generated') ||
-              error.includes('Failed to generate summary with all')) {
-            setError(error);
-          }
-        },
-        onComplete: () => {
-          setIsLoading(false);
-          setProgress((prev) => ({ ...prev, isSummarizing: false }));
-        },
-      };
-
-      const wasInterrupted = await processSSEStream(
-        response,
-        handlers,
-        () => interruptRequestedRef.current
-      );
-
-      // 中断された場合、状態を保存
-      if (wasInterrupted) {
-        const newInterruptedState = createInterruptedState({
-          sessionId: resumeSession?.id || '',
-          topic: interruptedState.topic,
-          participants: interruptedState.participants,
-          messages: collectedMessages,
-          currentRound: currentProgressState.currentRound,
-          currentParticipantIndex: currentProgressState.currentParticipantIndex,
-          totalRounds: interruptedState.totalRounds,
-          searchResults: interruptedState.searchResults,
-          userProfile: interruptedState.userProfile,
-          discussionMode: interruptedState.discussionMode,
-          discussionDepth: interruptedState.discussionDepth,
-          directionGuide: interruptedState.directionGuide,
-          terminationConfig: interruptedState.terminationConfig,
-        });
-        saveInterruptedState(newInterruptedState);
-        setInterruptedState(newInterruptedState);
-        setIsLoading(false);
-        return;
-      }
-
-      // 議論完了後、セッションにターンを追加して保存
-      if (collectedFinalAnswer) {
-        const newTurn = createNewTurn(
-          interruptedState.topic,
-          collectedMessages,
-          collectedFinalAnswer,
-          interruptedState.searchResults,
-          collectedSummaryPrompt || undefined
-        );
-        const latestSession = currentSessionRef.current;
-
-        if (latestSession) {
-          await updateAndSaveSession({
-            turns: [...latestSession.turns, newTurn],
-            interruptedTurn: undefined,
-          });
-        }
-
-        clearCurrentTurnState();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [interruptedState, restoreFromSession, updateAndSaveSession, clearCurrentTurnState]);
-
-  // セッションの名前を変更
-  const handleRenameSession = useCallback(async (id: string, newTitle: string) => {
-    await sessionManagerRenameSession(id, newTitle);
-  }, [sessionManagerRenameSession]);
+  }, [interruptedState, restoreFromSession, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, resumeDiscussion]);
 
   // 議論を開始
-  const handleStartDiscussion = useCallback(
-    async (topic: string) => {
-      if (participants.length === 0) {
-        setError('少なくとも1つのAIモデルを選択してください');
-        return;
-      }
-
-      // 状態をクリアする前に、直前のターン情報を保存
-      const prevTopic = currentTopic;
-      const prevFinalAnswer = currentFinalAnswer;
-
-      setCurrentMessages([]);
-      setCurrentFinalAnswer('');
-      setCurrentSearchResults([]);
-      setSuggestedFollowUps([]);
-      setIsGeneratingFollowUps(false);
-      setError(null);
-      setIsLoading(true);
-      setCurrentTopic(topic);
-      setCompletedParticipants(new Set());
-      interruptRequestedRef.current = false;
-      setProgress({
-        currentRound: 1,
-        totalRounds: terminationConfig.maxRounds,
-        currentParticipantIndex: 0,
-        totalParticipants: participants.length,
-        currentParticipant: participants[0],
-        isSummarizing: false,
-      });
-
-      // 検索が有効な場合、先に検索を実行
-      let searchResults: SearchResult[] = [];
-      if (searchConfig.enabled) {
-        setIsSearching(true);
-        try {
-          const searchQuery = searchConfig.query || topic;
-          const searchResponse = await fetch('/api/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: searchQuery,
-              type: searchConfig.searchType,
-              limit: searchConfig.maxResults,
-              language: searchConfig.language || 'ja',
-            }),
-          });
-          if (searchResponse.ok) {
-            const searchData = await searchResponse.json();
-            searchResults = searchData.results || [];
-            setCurrentSearchResults(searchResults);
-          }
-        } catch (err) {
-          console.error('Search failed:', err);
-        } finally {
-          setIsSearching(false);
-        }
-      }
-
-      // 過去のターンを取得（継続議論用）
-      let sessionAtStart = currentSessionRef.current;
-      const previousTurns = getPreviousTurns(sessionAtStart);
-
-      // まだセッションに保存されていない直前のターンがあれば追加
-      if (prevTopic && prevFinalAnswer) {
-        previousTurns.push({ topic: prevTopic, finalAnswer: prevFinalAnswer });
-      }
-
-      // 新規セッションの場合、議論開始時にセッションを作成
-      if (!sessionAtStart) {
-        const newSession = createNewSession(
-          topic.slice(0, 50) + (topic.length > 50 ? '...' : ''),
-          participants,
-          terminationConfig.maxRounds
-        );
-        await saveSession(newSession);
-        setCurrentSession(newSession);
-        setSessions((prev) => [newSession, ...prev]);
-        sessionAtStart = newSession;
-      }
-
-      // 収集用の変数（クロージャでキャプチャ）
-      let collectedMessages: DiscussionMessage[] = [];
-      let collectedFinalAnswer = '';
-      let collectedSummaryPrompt = '';
-      let currentProgressState = { currentRound: 1, currentParticipantIndex: 0 };
-
-      try {
-        const response = await fetch('/api/discuss', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            topic,
-            participants,
-            rounds: terminationConfig.maxRounds,
-            previousTurns,
-            searchResults,
-            userProfile,
-            discussionMode,
-            discussionDepth,
-            directionGuide,
-            terminationConfig,
-            messageVotes,
-            skipSummary: true,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to start discussion');
-        }
-
-        // SSEストリーム処理
-        const handlers: SSEEventHandlers = {
-          onProgress: (progress) => {
-            currentProgressState = {
-              currentRound: progress.currentRound,
-              currentParticipantIndex: progress.currentParticipantIndex,
-            };
-            setProgress({
-              currentRound: progress.currentRound,
-              totalRounds: progress.totalRounds,
-              currentParticipantIndex: progress.currentParticipantIndex,
-              totalParticipants: progress.totalParticipants,
-              currentParticipant: progress.currentParticipant,
-              isSummarizing: progress.isSummarizing,
-            });
-          },
-          onMessage: (message) => {
-            collectedMessages = [...collectedMessages, message];
-            setCurrentMessages(collectedMessages);
-            setCompletedParticipants(prev => {
-              const newSet = new Set(prev);
-              newSet.add(`${message.provider}-${message.model}`);
-              return newSet;
-            });
-            // メッセージ受信のたびにセッションの中断状態を更新（自動保存）
-            const latestSession = currentSessionRef.current;
-            if (latestSession) {
-              const interruptedTurn: InterruptedTurnState = {
-                topic,
-                participants,
-                messages: collectedMessages,
-                currentRound: currentProgressState.currentRound,
-                currentParticipantIndex: currentProgressState.currentParticipantIndex,
-                totalRounds: terminationConfig.maxRounds,
-                searchResults: searchResults.length > 0 ? searchResults : undefined,
-                userProfile,
-                discussionMode,
-                discussionDepth,
-                directionGuide,
-                terminationConfig,
-                interruptedAt: new Date(),
-              };
-              const updatedSession: DiscussionSession = {
-                ...latestSession,
-                interruptedTurn,
-                updatedAt: new Date(),
-              };
-              saveSession(updatedSession).catch(err => console.error('Failed to save interrupted state:', err));
-              setSessions((prev) =>
-                prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-              );
-            }
-          },
-          onSummary: (finalAnswer, summaryPrompt) => {
-            collectedFinalAnswer = finalAnswer;
-            collectedSummaryPrompt = summaryPrompt || '';
-            setCurrentFinalAnswer(finalAnswer);
-            setCurrentSummaryPrompt(summaryPrompt || '');
-            setProgress((prev) => ({ ...prev, isSummarizing: false }));
-            setIsGeneratingFollowUps(true);
-          },
-          onFollowups: (followups) => {
-            setSuggestedFollowUps(followups);
-            setIsGeneratingFollowUps(false);
-          },
-          onError: (error) => {
-            console.error('Discussion error:', error);
-            if (error.includes('No messages were generated') ||
-                error.includes('Failed to generate summary with all')) {
-              setError(error);
-            }
-          },
-          onReadyForSummary: () => {
-            setAwaitingSummary(true);
-            setIsLoading(false);
-            // セッションの中断状態をクリア（議論は正常に完了した）
-            const latestSession = currentSessionRef.current;
-            if (latestSession) {
-              const updatedSession: DiscussionSession = {
-                ...latestSession,
-                interruptedTurn: undefined,
-                updatedAt: new Date(),
-              };
-              saveSession(updatedSession).catch(err => console.error('Failed to clear interrupted state:', err));
-              setCurrentSession(updatedSession);
-              setSessions((prev) =>
-                prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-              );
-            }
-          },
-          onComplete: () => {
-            setIsLoading(false);
-            setProgress((prev) => ({ ...prev, isSummarizing: false }));
-            setIsGeneratingFollowUps(false);
-          },
-        };
-
-        const wasInterrupted = await processSSEStream(
-          response,
-          handlers,
-          () => interruptRequestedRef.current
-        );
-
-        // 中断された場合、状態を保存
-        if (wasInterrupted) {
-          const interrupted = createInterruptedState({
-            sessionId: sessionAtStart?.id || '',
-            topic,
-            participants,
-            messages: collectedMessages,
-            currentRound: currentProgressState.currentRound,
-            currentParticipantIndex: currentProgressState.currentParticipantIndex,
-            totalRounds: terminationConfig.maxRounds,
-            searchResults: searchResults.length > 0 ? searchResults : undefined,
-            userProfile,
-            discussionMode,
-            discussionDepth,
-            directionGuide,
-            terminationConfig,
-          });
-          saveInterruptedState(interrupted);
-          setInterruptedState(interrupted);
-          setIsLoading(false);
-          return;
-        }
-
-        // 議論完了後、セッションにターンを追加して保存
-        if (collectedFinalAnswer) {
-          const newTurn = createNewTurn(
-            topic,
-            collectedMessages,
-            collectedFinalAnswer,
-            searchResults.length > 0 ? searchResults : undefined,
-            collectedSummaryPrompt || undefined
-          );
-          const latestSession = currentSessionRef.current;
-
-          if (latestSession) {
-            await updateAndSaveSession({
-              turns: [...latestSession.turns, newTurn],
-              interruptedTurn: undefined,
-            });
-          }
-          clearInterruptedState();
-          setInterruptedState(null);
-
-          clearCurrentTurnState();
-          setSuggestedFollowUps([]);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes, updateAndSaveSession, clearCurrentTurnState]
-  );
+  const handleStartDiscussion = useCallback(async (topic: string) => {
+    await startDiscussion({
+      topic,
+      participants,
+      terminationConfig,
+      searchConfig,
+      userProfile,
+      discussionMode,
+      discussionDepth,
+      directionGuide,
+      currentSessionRef,
+      setCurrentSession,
+      setSessions,
+      setInterruptedState,
+      updateAndSaveSession,
+    });
+  }, [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, startDiscussion]);
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">
