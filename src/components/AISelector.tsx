@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS } from '@/types';
+import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS, ParticipantRole, isCustomRoleId } from '@/types';
 import { useAISelector, LATEST_MODEL_COUNT } from '@/hooks/useAISelector';
 import { useCustomRoles } from '@/hooks/useCustomRoles';
 import { ParticipantList, ProviderSection } from './ai-selector';
@@ -45,6 +45,25 @@ export function AISelector({
     duplicateCustomRole,
   } = useCustomRoles();
 
+  // ロール更新時にカスタムロール情報も含める
+  const handleUpdateRole = (id: string, role: ParticipantRole) => {
+    if (isCustomRoleId(role)) {
+      const customRole = customRoles.find((r) => r.id === role);
+      if (customRole) {
+        // カスタムロールの場合は名前とプロンプトも設定
+        const updated = participants.map((p) =>
+          p.id === id
+            ? { ...p, role, customRoleName: customRole.name, customRolePrompt: customRole.prompt }
+            : p
+        );
+        onParticipantsChange(updated);
+        return;
+      }
+    }
+    // プリセットロールの場合はカスタム情報をクリア
+    updateParticipantRole(id, role);
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -67,7 +86,7 @@ export function AISelector({
         participants={participants}
         customRoles={customRoles}
         disabled={disabled}
-        onUpdateRole={updateParticipantRole}
+        onUpdateRole={handleUpdateRole}
         onRemove={removeParticipant}
       />
 

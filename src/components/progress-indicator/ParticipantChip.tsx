@@ -1,6 +1,6 @@
 'use client';
 
-import { DiscussionParticipant, ROLE_PRESETS } from '@/types';
+import { DiscussionParticipant, ROLE_PRESETS, isCustomRoleId } from '@/types';
 
 interface ParticipantChipProps {
   participant: DiscussionParticipant;
@@ -24,11 +24,19 @@ export function ParticipantChip({
       ? p.model.slice(0, 12) + '...'
       : p.model;
 
-  // ロール名を取得（中立以外の場合のみ表示）
-  const rolePreset = p.role && p.role !== 'neutral'
-    ? ROLE_PRESETS.find((r) => r.id === p.role)
-    : undefined;
+  // ロール情報を取得（中立以外の場合のみ表示）
+  const getRoleInfo = (): { name: string; isCustom: boolean } | undefined => {
+    if (!p.role || p.role === 'neutral') return undefined;
+    // カスタムロールの場合は参加者に保存された名前を使用
+    if (isCustomRoleId(p.role) && p.customRoleName) {
+      return { name: p.customRoleName, isCustom: true };
+    }
+    // プリセットロールの場合
+    const preset = ROLE_PRESETS.find((r) => r.id === p.role);
+    return preset ? { name: preset.name, isCustom: false } : undefined;
+  };
 
+  const roleInfo = getRoleInfo();
   const participantKey = `${p.provider}-${p.model}-${index}`;
 
   return (
@@ -51,7 +59,7 @@ export function ParticipantChip({
         // @ts-expect-error CSS custom property for ring color
         '--tw-ring-color': isActive ? p.color : undefined,
       }}
-      title={`${p.displayName}${rolePreset ? ` [${rolePreset.name}]` : ''}${isActive ? ' (実行中)' : isCompleted ? ' (完了)' : ' (待機中)'}`}
+      title={`${p.displayName}${roleInfo ? ` [${roleInfo.name}]` : ''}${isActive ? ' (実行中)' : isCompleted ? ' (完了)' : ' (待機中)'}`}
     >
       {/* ステータスインジケーター */}
       <div className="relative">
@@ -77,9 +85,9 @@ export function ParticipantChip({
         {shortName}
       </span>
       {/* ロール表示（中立以外） */}
-      {rolePreset && (
-        <span className="text-gray-400 text-[10px]">
-          [{rolePreset.name}]
+      {roleInfo && (
+        <span className={`text-[10px] ${roleInfo.isCustom ? 'text-purple-400' : 'text-gray-400'}`}>
+          [{roleInfo.name}]
         </span>
       )}
     </div>
