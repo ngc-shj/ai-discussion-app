@@ -5,7 +5,6 @@ import {
   DiscussionMessage,
   DiscussionParticipant,
   DiscussionSession,
-  PreviousTurnSummary,
   SearchResult,
   MessageVote,
   FollowUpQuestion,
@@ -31,7 +30,7 @@ import {
   getInterruptedState,
   clearInterruptedState,
 } from '@/lib/session-storage';
-import { processSSEStream, SSEEventHandlers } from '@/lib/sse-utils';
+import { processSSEStream, SSEEventHandlers, createInterruptedState, getPreviousTurns } from '@/lib/sse-utils';
 import { InterruptedDiscussionState, InterruptedTurnState } from '@/types';
 import { useDiscussionSettings } from '@/hooks';
 
@@ -314,11 +313,7 @@ export default function Home() {
     setError(null);
 
     // 過去のターンを取得
-    const sessionForTurns = currentSessionRef.current;
-    const previousTurns: PreviousTurnSummary[] = sessionForTurns?.turns.map((t) => ({
-      topic: t.topic,
-      finalAnswer: t.finalAnswer,
-    })) || [];
+    const previousTurns = getPreviousTurns(currentSessionRef.current);
 
     // 収集用の変数
     let collectedFinalAnswer = '';
@@ -465,11 +460,7 @@ export default function Home() {
     });
 
     // 過去のターンを取得
-    const sessionForTurns = session || currentSessionRef.current;
-    const previousTurns: PreviousTurnSummary[] = sessionForTurns?.turns.map((t) => ({
-      topic: t.topic,
-      finalAnswer: t.finalAnswer,
-    })) || [];
+    const previousTurns = getPreviousTurns(session || currentSessionRef.current);
 
     // 収集用の変数（クロージャでキャプチャ）
     let collectedMessages: DiscussionMessage[] = [...interruptedState.messages];
@@ -595,7 +586,7 @@ export default function Home() {
 
       // 中断された場合、状態を保存
       if (wasInterrupted) {
-        const newInterruptedState: InterruptedDiscussionState = {
+        const newInterruptedState = createInterruptedState({
           sessionId: resumeSession?.id || '',
           topic: interruptedState.topic,
           participants: interruptedState.participants,
@@ -609,8 +600,7 @@ export default function Home() {
           discussionDepth: interruptedState.discussionDepth,
           directionGuide: interruptedState.directionGuide,
           terminationConfig: interruptedState.terminationConfig,
-          interruptedAt: new Date(),
-        };
+        });
         saveInterruptedState(newInterruptedState);
         setInterruptedState(newInterruptedState);
         setIsLoading(false);
@@ -720,10 +710,7 @@ export default function Home() {
 
       // 過去のターンを取得（継続議論用）
       let sessionAtStart = currentSessionRef.current;
-      const previousTurns: PreviousTurnSummary[] = sessionAtStart?.turns.map((t) => ({
-        topic: t.topic,
-        finalAnswer: t.finalAnswer,
-      })) || [];
+      const previousTurns = getPreviousTurns(sessionAtStart);
 
       // まだセッションに保存されていない直前のターンがあれば追加
       if (prevTopic && prevFinalAnswer) {
@@ -878,7 +865,7 @@ export default function Home() {
 
         // 中断された場合、状態を保存
         if (wasInterrupted) {
-          const interrupted: InterruptedDiscussionState = {
+          const interrupted = createInterruptedState({
             sessionId: sessionAtStart?.id || '',
             topic,
             participants,
@@ -892,8 +879,7 @@ export default function Home() {
             discussionDepth,
             directionGuide,
             terminationConfig,
-            interruptedAt: new Date(),
-          };
+          });
           saveInterruptedState(interrupted);
           setInterruptedState(interrupted);
           setIsLoading(false);

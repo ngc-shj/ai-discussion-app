@@ -3,7 +3,16 @@
 import {
   DiscussionMessage,
   DiscussionParticipant,
+  DiscussionSession,
   FollowUpQuestion,
+  InterruptedDiscussionState,
+  PreviousTurnSummary,
+  SearchResult,
+  UserProfile,
+  DiscussionMode,
+  DiscussionDepth,
+  DirectionGuide,
+  TerminationConfig,
 } from '@/types';
 
 // SSEイベントの型定義
@@ -166,4 +175,66 @@ export async function processSSEStream(
   }
 
   return wasInterrupted;
+}
+
+// ============================================
+// ヘルパー関数
+// ============================================
+
+/**
+ * InterruptedDiscussionState を作成するためのパラメータ
+ */
+export interface CreateInterruptedStateParams {
+  sessionId: string;
+  topic: string;
+  participants: DiscussionParticipant[];
+  messages: DiscussionMessage[];
+  currentRound: number;
+  currentParticipantIndex: number;
+  totalRounds: number;
+  searchResults?: SearchResult[];
+  userProfile?: UserProfile;
+  discussionMode?: DiscussionMode;
+  discussionDepth?: DiscussionDepth;
+  directionGuide?: DirectionGuide;
+  terminationConfig?: TerminationConfig;
+}
+
+/**
+ * InterruptedDiscussionState オブジェクトを作成
+ * 中断時の状態保存で使用する共通ヘルパー
+ */
+export function createInterruptedState(
+  params: CreateInterruptedStateParams
+): InterruptedDiscussionState {
+  return {
+    sessionId: params.sessionId,
+    topic: params.topic,
+    participants: params.participants,
+    messages: params.messages,
+    currentRound: params.currentRound,
+    currentParticipantIndex: params.currentParticipantIndex,
+    totalRounds: params.totalRounds,
+    searchResults: params.searchResults,
+    userProfile: params.userProfile,
+    discussionMode: params.discussionMode,
+    discussionDepth: params.discussionDepth,
+    directionGuide: params.directionGuide,
+    terminationConfig: params.terminationConfig,
+    interruptedAt: new Date(),
+  };
+}
+
+/**
+ * セッションから過去のターンの要約リストを取得
+ * 議論継続時のコンテキスト提供用
+ */
+export function getPreviousTurns(
+  session: DiscussionSession | null | undefined
+): PreviousTurnSummary[] {
+  if (!session?.turns) return [];
+  return session.turns.map((t) => ({
+    topic: t.topic,
+    finalAnswer: t.finalAnswer,
+  }));
 }
