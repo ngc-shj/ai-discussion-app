@@ -1195,9 +1195,11 @@ export default function Home() {
                   setAwaitingSummary(true);
                   setIsLoading(false);
                   // セッションの中断状態をクリア（議論は正常に完了した）
+                  // 注意: メッセージ受信時にinterruptedTurnが設定されるが、setCurrentSessionが呼ばれないため
+                  // currentSessionRef.currentには反映されていない。そのため無条件でクリアする。
                   {
                     const latestSession = currentSessionRef.current;
-                    if (latestSession && latestSession.interruptedTurn) {
+                    if (latestSession) {
                       const updatedSession: DiscussionSession = {
                         ...latestSession,
                         interruptedTurn: undefined,
