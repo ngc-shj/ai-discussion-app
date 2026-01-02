@@ -21,9 +21,15 @@ export interface SessionManagerState {
   sessions: DiscussionSession[];
   currentSession: DiscussionSession | null;
   interruptedState: InterruptedDiscussionState | null;
+  currentSessionRef: React.RefObject<DiscussionSession | null>;
 }
 
 export interface SessionManagerActions {
+  // Low-level setters (for direct state manipulation in handlers)
+  setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
+  setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
+  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  // High-level actions
   loadSessions: () => Promise<void>;
   selectSession: (session: DiscussionSession) => void;
   newSession: () => void;
@@ -31,9 +37,8 @@ export interface SessionManagerActions {
   renameSession: (id: string, newTitle: string) => Promise<void>;
   createSession: (title: string, participants: DiscussionParticipant[], rounds: number) => Promise<DiscussionSession>;
   updateSession: (session: DiscussionSession) => Promise<void>;
-  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
   discardInterrupted: () => void;
-  currentSessionRef: React.RefObject<DiscussionSession | null>;
 }
 
 export function useSessionManager(): SessionManagerState & SessionManagerActions {
@@ -166,12 +171,43 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
     setInterruptedStateInternal(null);
   }, []);
 
+  // セッションを更新して保存（共通ヘルパー）
+  const updateAndSaveSession = useCallback(async (
+    updates: Partial<DiscussionSession>,
+    options?: { async?: boolean }
+  ) => {
+    const latestSession = currentSessionRef.current;
+    if (!latestSession) return;
+
+    const updatedSession: DiscussionSession = {
+      ...latestSession,
+      ...updates,
+      updatedAt: new Date(),
+    };
+
+    if (options?.async) {
+      saveSession(updatedSession).catch(err => console.error('Failed to save session:', err));
+    } else {
+      await saveSession(updatedSession);
+    }
+
+    setCurrentSession(updatedSession);
+    setSessions((prev) =>
+      prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+    );
+  }, []);
+
   return {
     // State
     sessions,
     currentSession,
     interruptedState,
-    // Actions
+    currentSessionRef,
+    // Low-level setters
+    setSessions,
+    setCurrentSession,
+    setInterruptedState,
+    // High-level actions
     loadSessions,
     selectSession,
     newSession,
@@ -179,8 +215,7 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
     renameSession,
     createSession,
     updateSession,
-    setInterruptedState,
+    updateAndSaveSession,
     discardInterrupted,
-    currentSessionRef,
   };
 }

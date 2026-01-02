@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   DiscussionMessage,
   DiscussionParticipant,
@@ -22,17 +22,14 @@ import {
 import {
   getAllSessions,
   saveSession,
-  deleteSession as deleteSessionFromDB,
-  updateSessionTitle,
   createNewSession,
   createNewTurn,
   saveInterruptedState,
-  getInterruptedState,
   clearInterruptedState,
 } from '@/lib/session-storage';
 import { processSSEStream, SSEEventHandlers, createInterruptedState, getPreviousTurns } from '@/lib/sse-utils';
-import { InterruptedDiscussionState, InterruptedTurnState } from '@/types';
-import { useDiscussionSettings } from '@/hooks';
+import { InterruptedTurnState } from '@/types';
+import { useDiscussionSettings, useSessionManager } from '@/hooks';
 
 interface ProgressState {
   currentRound: number;
@@ -65,13 +62,21 @@ export default function Home() {
     restoreFromSession,
   } = useDiscussionSettings();
 
-  // セッション管理
-  const [sessions, setSessions] = useState<DiscussionSession[]>([]);
-  const [currentSession, setCurrentSession] = useState<DiscussionSession | null>(null);
-
-  // 最新のセッションを参照するためのref
-  const currentSessionRef = useRef<DiscussionSession | null>(null);
-  currentSessionRef.current = currentSession;
+  // セッション管理（カスタムフックを使用）
+  const {
+    sessions,
+    currentSession,
+    currentSessionRef,
+    interruptedState,
+    setSessions,
+    setCurrentSession,
+    setInterruptedState,
+    newSession: sessionManagerNewSession,
+    deleteSession: sessionManagerDeleteSession,
+    renameSession: sessionManagerRenameSession,
+    updateAndSaveSession,
+    discardInterrupted,
+  } = useSessionManager();
 
   // 現在進行中のターン
   const [currentMessages, setCurrentMessages] = useState<DiscussionMessage[]>([]);
@@ -96,8 +101,6 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   // フォローアップ用のプリセットトピック
   const [presetTopic, setPresetTopic] = useState<string>('');
-  // 中断された議論の状態
-  const [interruptedState, setInterruptedState] = useState<InterruptedDiscussionState | null>(null);
   // 中断リクエストフラグ
   const interruptRequestedRef = useRef(false);
   const [progress, setProgress] = useState<ProgressState>({
@@ -116,25 +119,6 @@ export default function Home() {
   // 統合回答待機状態（議論完了後、ユーザーが投票してから生成）
   const [awaitingSummary, setAwaitingSummary] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-
-  // セッション一覧を読み込み
-  useEffect(() => {
-    async function loadSessions() {
-      try {
-        const loadedSessions = await getAllSessions();
-        setSessions(loadedSessions);
-      } catch (err) {
-        console.error('Failed to load sessions:', err);
-      }
-    }
-    loadSessions();
-
-    // 中断された議論があるかチェック
-    const savedInterrupted = getInterruptedState();
-    if (savedInterrupted) {
-      setInterruptedState(savedInterrupted);
-    }
-  }, []);
 
   // 投票を追加/更新するハンドラー
   const handleVote = useCallback((messageId: string, vote: 'agree' | 'disagree' | 'neutral') => {
@@ -160,32 +144,6 @@ export default function Home() {
     setIsGeneratingFollowUps(false);
     setAwaitingSummary(false);
     setIsGeneratingSummary(false);
-  }, []);
-
-  // セッションを更新して保存（共通ヘルパー）
-  const updateAndSaveSession = useCallback(async (
-    updates: Partial<DiscussionSession>,
-    options?: { async?: boolean }
-  ) => {
-    const latestSession = currentSessionRef.current;
-    if (!latestSession) return;
-
-    const updatedSession: DiscussionSession = {
-      ...latestSession,
-      ...updates,
-      updatedAt: new Date(),
-    };
-
-    if (options?.async) {
-      saveSession(updatedSession).catch(err => console.error('Failed to save session:', err));
-    } else {
-      await saveSession(updatedSession);
-    }
-
-    setCurrentSession(updatedSession);
-    setSessions((prev) =>
-      prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
-    );
   }, []);
 
   // 新しいセッションを開始
@@ -241,16 +199,11 @@ export default function Home() {
 
   // セッションを削除
   const handleDeleteSession = useCallback(async (id: string) => {
-    try {
-      await deleteSessionFromDB(id);
-      setSessions((prev) => prev.filter((s) => s.id !== id));
-      if (currentSession?.id === id) {
-        handleNewSession();
-      }
-    } catch (err) {
-      console.error('Failed to delete session:', err);
+    await sessionManagerDeleteSession(id);
+    if (currentSession?.id === id) {
+      clearCurrentTurnState();
     }
-  }, [currentSession, handleNewSession]);
+  }, [currentSession, sessionManagerDeleteSession, clearCurrentTurnState]);
 
   // フォローアップ質問を設定
   const handleFollowUp = useCallback((topic: string, _previousAnswer: string) => {
@@ -300,9 +253,8 @@ export default function Home() {
 
   // 中断状態を破棄
   const handleDiscardInterrupted = useCallback(() => {
-    clearInterruptedState();
-    setInterruptedState(null);
-  }, []);
+    discardInterrupted();
+  }, [discardInterrupted]);
 
   // 統合回答を生成（投票後に手動で実行）
   const handleGenerateSummary = useCallback(async () => {
@@ -636,18 +588,8 @@ export default function Home() {
 
   // セッションの名前を変更
   const handleRenameSession = useCallback(async (id: string, newTitle: string) => {
-    try {
-      await updateSessionTitle(id, newTitle);
-      setSessions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, title: newTitle, updatedAt: new Date() } : s))
-      );
-      if (currentSession?.id === id) {
-        setCurrentSession((prev) => prev ? { ...prev, title: newTitle } : null);
-      }
-    } catch (err) {
-      console.error('Failed to rename session:', err);
-    }
-  }, [currentSession]);
+    await sessionManagerRenameSession(id, newTitle);
+  }, [sessionManagerRenameSession]);
 
   // 議論を開始
   const handleStartDiscussion = useCallback(
