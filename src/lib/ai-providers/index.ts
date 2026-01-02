@@ -9,7 +9,7 @@ export { ClaudeProvider } from './claude';
 export { OllamaProvider } from './ollama';
 export { OpenAIProvider } from './openai';
 export { GeminiProvider } from './gemini';
-export { createDiscussionPrompt } from './types';
+export { createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from './types';
 export type { AIProvider, ModelInfo } from './types';
 
 // プロバイダーのファクトリー関数

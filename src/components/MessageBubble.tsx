@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { DiscussionMessage, DEFAULT_PROVIDERS, getOllamaModelColor } from '@/types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
@@ -10,6 +11,7 @@ export interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message, vote, onVote }: MessageBubbleProps) {
+  const [showPrompt, setShowPrompt] = useState(false);
   const provider = DEFAULT_PROVIDERS.find((p) => p.id === message.provider);
   const isOllama = message.provider === 'ollama';
   const color = isOllama && message.model ? getOllamaModelColor(message.model) : (provider?.color || '#6B7280');
@@ -43,9 +45,38 @@ export function MessageBubble({ message, vote, onVote }: MessageBubbleProps) {
             <MarkdownRenderer content={message.content} />
           )}
         </div>
+        {/* プロンプト表示ボタン・投票ボタン */}
+        {!message.isLoading && (
+          <div className="flex items-center gap-1 mt-1.5">
+            {/* プロンプト表示トグル */}
+            {message.prompt && (
+              <button
+                type="button"
+                onClick={() => setShowPrompt(!showPrompt)}
+                className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded transition-colors ${
+                  showPrompt
+                    ? 'bg-purple-600 text-white'
+                    : 'text-gray-400 hover:text-purple-400 hover:bg-gray-700'
+                }`}
+                title="プロンプトを表示"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                <span className="hidden sm:inline">Prompt</span>
+              </button>
+            )}
+          </div>
+        )}
+        {/* プロンプト表示エリア */}
+        {showPrompt && message.prompt && (
+          <div className="mt-2 bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
+            {message.prompt}
+          </div>
+        )}
         {/* 投票ボタン */}
         {onVote && !message.isLoading && (
-          <div className="flex items-center gap-1 mt-1.5">
+          <div className="flex items-center gap-1 mt-1">
             <button
               type="button"
               onClick={() => onVote('agree')}

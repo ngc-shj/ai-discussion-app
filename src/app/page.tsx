@@ -19,6 +19,9 @@ import {
   TerminationConfig,
   MessageVote,
   generateParticipantId,
+  FollowUpQuestion,
+  DeepDiveType,
+  DEEP_DIVE_PRESETS,
 } from '@/types';
 import {
   DiscussionPanel,
@@ -138,6 +141,9 @@ export default function Home() {
   });
   // 完了した参加者を追跡
   const [completedParticipants, setCompletedParticipants] = useState<Set<string>>(new Set());
+  // フォローアップ質問
+  const [suggestedFollowUps, setSuggestedFollowUps] = useState<FollowUpQuestion[]>([]);
+  const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
 
   // セッション一覧を読み込み
   useEffect(() => {
@@ -354,6 +360,8 @@ export default function Home() {
     setCurrentFinalAnswer('');
     setCurrentTopic('');
     setError(null);
+    setSuggestedFollowUps([]);
+    setIsGeneratingFollowUps(false);
   }, []);
 
   // セッションを選択
@@ -363,6 +371,8 @@ export default function Home() {
     setCurrentFinalAnswer('');
     setCurrentTopic('');
     setError(null);
+    setSuggestedFollowUps([]);
+    setIsGeneratingFollowUps(false);
 
     // セッションに中断状態がある場合、interruptedStateにセットし、設定も復元
     if (session.interruptedTurn) {
@@ -431,11 +441,35 @@ export default function Home() {
   }, [currentSession, handleNewSession]);
 
   // フォローアップ質問を設定
-  const handleFollowUp = useCallback((topic: string, previousAnswer: string) => {
-    // 回答の最初の100文字を参考として含める
-    const answerPreview = previousAnswer.slice(0, 100) + (previousAnswer.length > 100 ? '...' : '');
-    const followUpPrompt = `「${topic}」についてもう少し詳しく教えてください。特に以下の点について深掘りしたいです：\n\n（前回の回答より: ${answerPreview}）`;
+  const handleFollowUp = useCallback((topic: string, _previousAnswer: string) => {
+    // previousAnswerはpreviousTurns経由でAPIに渡される
+    const followUpPrompt = `「${topic}」についてもう少し詳しく教えてください。`;
     setPresetTopic(followUpPrompt);
+  }, []);
+
+  // 深掘りモードで議論を開始
+  const handleDeepDive = useCallback((topic: string, _previousAnswer: string, type: DeepDiveType, customPrompt?: string) => {
+    // previousAnswerはpreviousTurns経由でAPIに渡される
+    const preset = DEEP_DIVE_PRESETS.find(p => p.id === type);
+    const focusArea = type === 'custom' && customPrompt ? customPrompt : preset?.prompt || '';
+
+    const deepDivePrompt = `【深掘り議論】${preset?.name || 'カスタム'}観点\n\n元のトピック: ${topic}\n\n${focusArea}\n\nこの観点から詳しく議論してください。`;
+    setPresetTopic(deepDivePrompt);
+  }, []);
+
+  // 反論を生成
+  const handleCounterargument = useCallback((topic: string, _previousAnswer: string) => {
+    // previousAnswerはpreviousTurns経由でAPIに渡される
+    const counterargumentPrompt = `【反論モード】前回の結論に対して、批判的な視点から反論や別の見解を提示してください。\n\n元のトピック: ${topic}\n\n【指示】\n- 前回の結論の弱点や見落としを指摘してください\n- 別の視点からの反論を展開してください\n- 建設的な批判を心がけてください`;
+    setPresetTopic(counterargumentPrompt);
+  }, []);
+
+  // 議論を分岐
+  const handleFork = useCallback((_turnId: string, topic: string, _previousAnswer: string, label: string, perspective: string) => {
+    // _turnIdは将来的に分岐追跡に使用予定
+    // previousAnswerはpreviousTurns経由でAPIに渡される
+    const forkPrompt = `【分岐議論】${label}\n\n元のトピック: ${topic}\n\n【新しい視点】\n${perspective}\n\nこの新しい視点から議論を展開してください。`;
+    setPresetTopic(forkPrompt);
   }, []);
 
   // プリセットトピックをクリア
@@ -637,6 +671,13 @@ export default function Home() {
                 collectedFinalAnswer = progressData.finalAnswer;
                 setCurrentFinalAnswer(collectedFinalAnswer);
                 setProgress((prev) => ({ ...prev, isSummarizing: false }));
+                setIsGeneratingFollowUps(true);
+                break;
+              case 'followups':
+                if (progressData.suggestedFollowUps) {
+                  setSuggestedFollowUps(progressData.suggestedFollowUps);
+                }
+                setIsGeneratingFollowUps(false);
                 break;
               case 'error':
                 console.error('Discussion error:', progressData.error);
@@ -769,9 +810,15 @@ export default function Home() {
         return;
       }
 
+      // 状態をクリアする前に、直前のターン情報を保存
+      const prevTopic = currentTopic;
+      const prevFinalAnswer = currentFinalAnswer;
+
       setCurrentMessages([]);
       setCurrentFinalAnswer('');
       setCurrentSearchResults([]);
+      setSuggestedFollowUps([]);
+      setIsGeneratingFollowUps(false);
       setError(null);
       setIsLoading(true);
       setCurrentTopic(topic);
@@ -821,6 +868,15 @@ export default function Home() {
         topic: t.topic,
         finalAnswer: t.finalAnswer,
       })) || [];
+
+      // まだセッションに保存されていない直前のターン（prevFinalAnswer）があれば追加
+      // これにより、統合回答表示後に入力フィールドから質問した場合も文脈が引き継がれる
+      if (prevTopic && prevFinalAnswer) {
+        previousTurns.push({
+          topic: prevTopic,
+          finalAnswer: prevFinalAnswer,
+        });
+      }
 
       // 新規セッションの場合、議論開始時にセッションを作成
       if (!sessionAtStart) {
@@ -940,6 +996,13 @@ export default function Home() {
                   collectedFinalAnswer = progressData.finalAnswer;
                   setCurrentFinalAnswer(collectedFinalAnswer);
                   setProgress((prev) => ({ ...prev, isSummarizing: false }));
+                  setIsGeneratingFollowUps(true);
+                  break;
+                case 'followups':
+                  if (progressData.suggestedFollowUps) {
+                    setSuggestedFollowUps(progressData.suggestedFollowUps);
+                  }
+                  setIsGeneratingFollowUps(false);
                   break;
                 case 'error':
                   console.error('Discussion error:', progressData.error);
@@ -952,6 +1015,7 @@ export default function Home() {
                 case 'complete':
                   setIsLoading(false);
                   setProgress((prev) => ({ ...prev, isSummarizing: false }));
+                  setIsGeneratingFollowUps(false);
                   break;
               }
             } catch {
@@ -1042,6 +1106,7 @@ export default function Home() {
           setCurrentMessages([]);
           setCurrentFinalAnswer('');
           setCurrentSearchResults([]);
+          setSuggestedFollowUps([]);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -1204,8 +1269,13 @@ export default function Home() {
           isSummarizing={progress.isSummarizing}
           searchResults={currentSearchResults}
           onFollowUp={handleFollowUp}
+          onDeepDive={handleDeepDive}
+          onCounterargument={handleCounterargument}
+          onFork={handleFork}
           messageVotes={messageVotes}
           onVote={handleVote}
+          suggestedFollowUps={suggestedFollowUps}
+          isGeneratingFollowUps={isGeneratingFollowUps}
         />
 
         {/* 進捗インジケーター */}
