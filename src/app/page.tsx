@@ -447,30 +447,34 @@ export default function Home() {
     setPresetTopic(followUpPrompt);
   }, []);
 
+  // セッションの元のトピックを取得（最初のターンのトピック）
+  const getOriginalTopic = useCallback(() => {
+    return currentSession?.turns[0]?.topic || '';
+  }, [currentSession]);
+
   // 深掘りモードで議論を開始
-  const handleDeepDive = useCallback((topic: string, _previousAnswer: string, type: DeepDiveType, customPrompt?: string) => {
-    // previousAnswerはpreviousTurns経由でAPIに渡される
+  const handleDeepDive = useCallback((_topic: string, _previousAnswer: string, type: DeepDiveType, customPrompt?: string) => {
     const preset = DEEP_DIVE_PRESETS.find(p => p.id === type);
     const focusArea = type === 'custom' && customPrompt ? customPrompt : preset?.prompt || '';
+    const originalTopic = getOriginalTopic();
 
-    const deepDivePrompt = `【深掘り議論】${preset?.name || 'カスタム'}観点\n\n元のトピック: ${topic}\n\n${focusArea}\n\nこの観点から詳しく議論してください。`;
+    const deepDivePrompt = `【深掘り議論】${preset?.name || 'カスタム'}観点\n\n元のトピック: ${originalTopic}\n\n${focusArea}\n\nこの観点から詳しく議論してください。`;
     setPresetTopic(deepDivePrompt);
-  }, []);
+  }, [getOriginalTopic]);
 
   // 反論を生成
-  const handleCounterargument = useCallback((topic: string, _previousAnswer: string) => {
-    // previousAnswerはpreviousTurns経由でAPIに渡される
-    const counterargumentPrompt = `【反論モード】前回の結論に対して、批判的な視点から反論や別の見解を提示してください。\n\n元のトピック: ${topic}\n\n【指示】\n- 前回の結論の弱点や見落としを指摘してください\n- 別の視点からの反論を展開してください\n- 建設的な批判を心がけてください`;
+  const handleCounterargument = useCallback((_topic: string, _previousAnswer: string) => {
+    const originalTopic = getOriginalTopic();
+    const counterargumentPrompt = `【反論モード】前回の結論に対して、批判的な視点から反論や別の見解を提示してください。\n\n元のトピック: ${originalTopic}\n\n【指示】\n- 前回の結論の弱点や見落としを指摘してください\n- 別の視点からの反論を展開してください\n- 建設的な批判を心がけてください`;
     setPresetTopic(counterargumentPrompt);
-  }, []);
+  }, [getOriginalTopic]);
 
   // 議論を分岐
-  const handleFork = useCallback((_turnId: string, topic: string, _previousAnswer: string, label: string, perspective: string) => {
-    // _turnIdは将来的に分岐追跡に使用予定
-    // previousAnswerはpreviousTurns経由でAPIに渡される
-    const forkPrompt = `【分岐議論】${label}\n\n元のトピック: ${topic}\n\n【新しい視点】\n${perspective}\n\nこの新しい視点から議論を展開してください。`;
+  const handleFork = useCallback((_turnId: string, _topic: string, _previousAnswer: string, label: string, perspective: string) => {
+    const originalTopic = getOriginalTopic();
+    const forkPrompt = `【分岐議論】${label}\n\n元のトピック: ${originalTopic}\n\n【新しい視点】\n${perspective}\n\nこの新しい視点から議論を展開してください。`;
     setPresetTopic(forkPrompt);
-  }, []);
+  }, [getOriginalTopic]);
 
   // プリセットトピックをクリア
   const handlePresetTopicClear = useCallback(() => {
