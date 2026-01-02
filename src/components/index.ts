@@ -1,5 +1,8 @@
 export { MessageBubble } from './MessageBubble';
 export { DiscussionPanel } from './DiscussionPanel';
+export { TurnDisplay } from './TurnDisplay';
+export { CurrentTurnDisplay } from './CurrentTurnDisplay';
+export { SearchResultsDisplay } from './SearchResultsDisplay';
 export { AISelector } from './AISelector';
 export { SettingsPanel } from './SettingsPanel';
 export { InputForm } from './InputForm';
