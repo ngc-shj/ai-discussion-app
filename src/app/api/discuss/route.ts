@@ -19,6 +19,10 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          const sendSSE = (data: unknown) => {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          };
+
           for await (const progress of runDiscussion({
             topic: body.topic,
             participants: body.participants,
@@ -33,9 +37,16 @@ export async function POST(request: NextRequest) {
             resumeFrom: body.resumeFrom,
             messageVotes: body.messageVotes,
             skipSummary: body.skipSummary,
+            onMessageChunk: (messageId, chunk, accumulatedContent) => {
+              sendSSE({
+                type: 'message_chunk',
+                messageId,
+                chunk,
+                accumulatedContent,
+              });
+            },
           })) {
-            const data = JSON.stringify(progress);
-            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+            sendSSE(progress);
           }
           controller.close();
         } catch (error) {

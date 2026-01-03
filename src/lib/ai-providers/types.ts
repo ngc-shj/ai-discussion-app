@@ -6,12 +6,20 @@ export interface ModelInfo {
   name: string;
 }
 
+// ストリーミングコールバック型
+export type StreamChunkCallback = (chunk: string) => void;
+
 // AIプロバイダーの抽象インターフェース
 export interface AIProvider {
   readonly type: AIProviderType;
   readonly name: string;
 
   generate(request: AIRequest): Promise<AIResponse>;
+  // ストリーミング生成（オプション）- 対応プロバイダーのみ実装
+  generateStream?(
+    request: AIRequest,
+    onChunk: StreamChunkCallback
+  ): Promise<AIResponse>;
   isAvailable(): Promise<boolean>;
   listModels(): Promise<ModelInfo[]>;
 }

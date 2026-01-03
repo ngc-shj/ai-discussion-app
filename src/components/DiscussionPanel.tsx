@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { DiscussionTurn, DiscussionMessage, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType } from '@/types';
+import { StreamingMessage } from '@/hooks';
 import { TurnDisplay } from './TurnDisplay';
 import { CurrentTurnDisplay } from './CurrentTurnDisplay';
 
@@ -25,6 +26,7 @@ interface DiscussionPanelProps {
   awaitingSummary?: boolean;
   isGeneratingSummary?: boolean;
   onGenerateSummary?: () => void;
+  streamingMessage?: StreamingMessage | null;
 }
 
 export function DiscussionPanel({
@@ -47,6 +49,7 @@ export function DiscussionPanel({
   awaitingSummary,
   isGeneratingSummary,
   onGenerateSummary,
+  streamingMessage,
 }: DiscussionPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -106,6 +109,7 @@ export function DiscussionPanel({
           awaitingSummary={awaitingSummary}
           isGeneratingSummary={isGeneratingSummary}
           onGenerateSummary={onGenerateSummary}
+          streamingMessage={streamingMessage}
         />
       )}
     </div>

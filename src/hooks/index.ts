@@ -4,7 +4,7 @@ export type { DiscussionSettingsState, DiscussionSettingsActions } from './useDi
 export { useSessionManager } from './useSessionManager';
 export type { SessionManagerState, SessionManagerActions } from './useSessionManager';
 export { useDiscussion } from './useDiscussion';
-export type { DiscussionState, DiscussionActions, ProgressState } from './useDiscussion';
+export type { DiscussionState, DiscussionActions, ProgressState, StreamingMessage } from './useDiscussion';
 export { useInputForm } from './useInputForm';
 export type { UseInputFormProps, UseInputFormReturn } from './useInputForm';
 export { useCustomRoles } from './useCustomRoles';

@@ -12,6 +12,7 @@ export interface DiscussionMessage {
   round: number;
   timestamp: Date;
   isLoading?: boolean;
+  isStreaming?: boolean;
   prompt?: string; // AIに渡されたプロンプト（確認用）
 }
 

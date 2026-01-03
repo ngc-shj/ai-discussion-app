@@ -41,6 +41,11 @@ export interface ProgressState {
   isSummarizing: boolean;
 }
 
+export interface StreamingMessage {
+  messageId: string;
+  content: string;
+}
+
 export interface DiscussionState {
   currentMessages: DiscussionMessage[];
   currentFinalAnswer: string;
@@ -58,6 +63,7 @@ export interface DiscussionState {
   error: string | null;
   messageVotes: MessageVote[];
   discussionParticipants: DiscussionParticipant[];
+  streamingMessage: StreamingMessage | null;
 }
 
 export interface DiscussionActions {
@@ -161,6 +167,7 @@ interface CreateSSEHandlersParams {
   setAwaitingSummary?: React.Dispatch<React.SetStateAction<boolean>>;
   setIsLoading?: React.Dispatch<React.SetStateAction<boolean>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
+  setStreamingMessage?: React.Dispatch<React.SetStateAction<StreamingMessage | null>>;
   collectedMessagesRef: { current: DiscussionMessage[] };
   collectedFinalAnswerRef: { current: string };
   collectedSummaryPromptRef: { current: string };
@@ -184,6 +191,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     setAwaitingSummary,
     setIsLoading,
     setError,
+    setStreamingMessage,
     collectedMessagesRef,
     collectedFinalAnswerRef,
     collectedSummaryPromptRef,
@@ -207,6 +215,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       });
     },
     onMessage: (message) => {
+      setStreamingMessage?.(null);
       collectedMessagesRef.current = [...collectedMessagesRef.current, message];
       setCurrentMessages(collectedMessagesRef.current);
       setCompletedParticipants((prev) => {
@@ -244,6 +253,9 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
           prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
         );
       }
+    },
+    onMessageChunk: (messageId, _chunk, accumulatedContent) => {
+      setStreamingMessage?.({ messageId, content: accumulatedContent });
     },
     onSummary: (finalAnswer, summaryPrompt) => {
       collectedFinalAnswerRef.current = finalAnswer;
@@ -315,6 +327,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [error, setError] = useState<string | null>(null);
   const [messageVotes, setMessageVotes] = useState<MessageVote[]>([]);
   const [discussionParticipants, setDiscussionParticipants] = useState<DiscussionParticipant[]>([]);
+  const [streamingMessage, setStreamingMessage] = useState<StreamingMessage | null>(null);
 
   const interruptRequestedRef = useRef(false);
 
@@ -607,6 +620,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setAwaitingSummary,
           setIsLoading,
           setError,
+          setStreamingMessage,
           collectedMessagesRef,
           collectedFinalAnswerRef,
           collectedSummaryPromptRef,
@@ -796,6 +810,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setIsGeneratingFollowUps,
           setIsLoading,
           setError,
+          setStreamingMessage,
           collectedMessagesRef,
           collectedFinalAnswerRef,
           collectedSummaryPromptRef,
@@ -875,6 +890,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     error,
     messageVotes,
     discussionParticipants,
+    streamingMessage,
     setCurrentMessages,
     setCurrentFinalAnswer,
     setCurrentTopic,

@@ -16,8 +16,11 @@ import {
  * 議論の進捗情報
  */
 export interface DiscussionProgress {
-  type: 'message' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'terminated' | 'followups' | 'ready_for_summary';
+  type: 'message' | 'message_chunk' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'terminated' | 'followups' | 'ready_for_summary';
   message?: DiscussionMessage;
+  messageId?: string;
+  chunk?: string;
+  accumulatedContent?: string;
   finalAnswer?: string;
   summaryPrompt?: string;
   error?: string;
@@ -61,7 +64,13 @@ export interface DiscussionRequest {
   resumeFrom?: ResumeFromState; // 中断からの再開用
   messageVotes?: MessageVote[]; // ユーザーの投票（統合回答に反映）
   skipSummary?: boolean; // 統合回答生成をスキップ（ユーザーが投票後に手動で生成）
+  onMessageChunk?: OnMessageChunkCallback; // ストリーミングチャンクのコールバック
 }
+
+/**
+ * ストリーミングチャンクのコールバック型
+ */
+export type OnMessageChunkCallback = (messageId: string, chunk: string, accumulatedContent: string) => void;
 
 /**
  * プロバイダーの表示名を取得

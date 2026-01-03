@@ -118,8 +118,20 @@ export async function* runDiscussion(
         directionGuide
       );
 
-      // AIに問い合わせ
-      const response = await provider.generate({ prompt });
+      // メッセージIDを事前に生成
+      const newMessageId = `msg-${++messageId}`;
+
+      // ストリーミング対応プロバイダーの場合はストリーミングを使用
+      let response;
+      if (provider.generateStream && request.onMessageChunk) {
+        let accumulatedContent = '';
+        response = await provider.generateStream({ prompt }, (chunk) => {
+          accumulatedContent += chunk;
+          request.onMessageChunk!(newMessageId, chunk, accumulatedContent);
+        });
+      } else {
+        response = await provider.generate({ prompt });
+      }
 
       if (response.error) {
         yield {
@@ -130,7 +142,7 @@ export async function* runDiscussion(
       }
 
       const message: DiscussionMessage = {
-        id: `msg-${++messageId}`,
+        id: newMessageId,
         provider: participant.provider,
         model: participant.model,
         content: response.content,

@@ -77,6 +77,7 @@ export default function Home() {
     startDiscussion,
     resumeDiscussion,
     generateSummary,
+    streamingMessage,
   } = useDiscussion();
 
   // サイドバー・設定パネルの開閉状態
@@ -403,6 +404,7 @@ export default function Home() {
           awaitingSummary={awaitingSummary}
           isGeneratingSummary={isGeneratingSummary}
           onGenerateSummary={handleGenerateSummary}
+          streamingMessage={streamingMessage}
         />
 
         {/* 進捗インジケーター */}

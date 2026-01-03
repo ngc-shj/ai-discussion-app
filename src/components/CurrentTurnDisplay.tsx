@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { DiscussionMessage, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType } from '@/types';
+import { StreamingMessage } from '@/hooks';
 import { MessageBubble } from './MessageBubble';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FollowUpSuggestions } from './FollowUpSuggestions';
@@ -27,6 +28,7 @@ interface CurrentTurnDisplayProps {
   awaitingSummary?: boolean;
   isGeneratingSummary?: boolean;
   onGenerateSummary?: () => void;
+  streamingMessage?: StreamingMessage | null;
 }
 
 export function CurrentTurnDisplay({
@@ -47,6 +49,7 @@ export function CurrentTurnDisplay({
   awaitingSummary,
   isGeneratingSummary,
   onGenerateSummary,
+  streamingMessage,
 }: CurrentTurnDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -171,7 +174,20 @@ export function CurrentTurnDisplay({
                   onVote={onVote ? (vote) => onVote(message.id, vote) : undefined}
                 />
               ))}
-              {isLoading && messages.length === 0 && (
+              {streamingMessage && (
+                <MessageBubble
+                  key={streamingMessage.messageId}
+                  message={{
+                    id: streamingMessage.messageId,
+                    provider: 'ollama',
+                    content: streamingMessage.content,
+                    round: 0,
+                    timestamp: new Date(),
+                    isStreaming: true,
+                  }}
+                />
+              )}
+              {isLoading && messages.length === 0 && !streamingMessage && (
                 <div className="flex items-center gap-2 py-3 md:py-4">
                   <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-blue-400 rounded-full" />
                   <span className="text-gray-400 text-sm md:text-base">議論を開始中...</span>
