@@ -1,22 +1,35 @@
 'use client';
 
 import { useState } from 'react';
-import { DiscussionMessage, DEFAULT_PROVIDERS, getOllamaModelColor } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, DEFAULT_PROVIDERS, getOllamaModelColor, formatParticipantDisplayName } from '@/types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 export interface MessageBubbleProps {
   message: DiscussionMessage;
+  participants?: DiscussionParticipant[]; // 実行中は参加者リストから取得
   vote?: 'agree' | 'disagree' | 'neutral';
   onVote?: (vote: 'agree' | 'disagree' | 'neutral') => void;
 }
 
-export function MessageBubble({ message, vote, onVote }: MessageBubbleProps) {
+export function MessageBubble({ message, participants, vote, onVote }: MessageBubbleProps) {
   const [showPrompt, setShowPrompt] = useState(false);
   const provider = DEFAULT_PROVIDERS.find((p) => p.id === message.provider);
   const isOllama = message.provider === 'ollama';
-  const color = isOllama && message.model ? getOllamaModelColor(message.model) : (provider?.color || '#6B7280');
+
+  // 参加者を取得（実行中は participants から、履歴表示時はスナップショットを使用）
+  const participant = participants?.find(p => p.id === message.participantId);
+
+  // 色: 参加者から取得 → メッセージのスナップショット → フォールバック
+  const color = participant?.color
+    || message.color
+    || (isOllama && message.model ? getOllamaModelColor(message.model) : (provider?.color || '#6B7280'));
+
+  // 表示名: 参加者から取得 → メッセージのスナップショット → フォールバック
   const baseName = provider?.name || message.provider;
-  const displayName = message.model ? `${baseName} (${message.model})` : baseName;
+  const fallbackDisplayName = message.model ? `${baseName} (${message.model})` : baseName;
+  const displayName = participant
+    ? formatParticipantDisplayName(participant)
+    : (message.displayName || fallbackDisplayName);
 
   return (
     <div className="flex gap-2 md:gap-3 mb-3 md:mb-4">

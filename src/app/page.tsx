@@ -462,6 +462,7 @@ export default function Home() {
         <DiscussionPanel
           turns={currentSession?.turns || []}
           currentMessages={currentMessages}
+          participants={isLoading ? discussionParticipants : participants}
           currentTopic={currentTopic}
           currentFinalAnswer={currentFinalAnswer}
           currentSummaryPrompt={currentSummaryPrompt}

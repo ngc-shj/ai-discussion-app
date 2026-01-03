@@ -4,7 +4,7 @@ export { DEFAULT_PROVIDERS, getOllamaModelColor } from './provider';
 
 // Participant types
 export type { PresetRoleId, ParticipantRole, RolePreset, CustomRole, DiscussionParticipant } from './participant';
-export { ROLE_PRESETS, generateParticipantId, generateCustomRoleId, isCustomRoleId } from './participant';
+export { ROLE_PRESETS, generateParticipantId, generateCustomRoleId, isCustomRoleId, formatParticipantDisplayName } from './participant';
 
 // Message types
 export type {

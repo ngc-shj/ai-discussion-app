@@ -43,6 +43,7 @@ export interface ProgressState {
 
 export interface StreamingMessage {
   messageId: string;
+  participantId: string; // 参加者への参照
   content: string;
   provider: string;
   model?: string;
@@ -285,7 +286,12 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       }
     },
     onMessageChunk: (messageId, _chunk, accumulatedContent, provider, model, round) => {
-      setStreamingMessage?.({ messageId, content: accumulatedContent, provider, model, round });
+      // 現在の参加者IDを取得
+      const currentParticipantIndex = currentProgressStateRef.current.currentParticipantIndex;
+      const currentParticipant = context.participants[currentParticipantIndex];
+      const participantId = currentParticipant?.id || '';
+
+      setStreamingMessage?.({ messageId, participantId, content: accumulatedContent, provider, model, round });
     },
     onSummary: (finalAnswer, summaryPrompt) => {
       collectedFinalAnswerRef.current = finalAnswer;
@@ -343,6 +349,9 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     onComplete: () => {
       setIsLoading?.(false);
       setIsGeneratingFollowUps(false);
+      // 注意: ここでsummaryStateを'idle'にしない
+      // startDiscussionの場合: onReadyForSummaryで'awaiting'に設定されるので、それを維持する
+      // generateSummaryの場合: onSummaryで'idle'に設定されるので、ここでは不要
     },
   };
 }
@@ -389,7 +398,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setCurrentTopic('');
     setCurrentSearchResults([]);
     setError(null);
-    setSuggestedFollowUps([]);
+    // suggestedFollowUpsはクリアしない（次のアクション用に保持する必要がある）
+    // 新しい議論開始時やセッション切り替え時に個別にクリアする
     setIsGeneratingFollowUps(false);
     setSummaryState('idle');
   }, []);
@@ -446,6 +456,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       const previousTurns = getPreviousTurns(currentSessionRef.current);
       let collectedFinalAnswer = '';
       let collectedSummaryPrompt = '';
+      let collectedFollowUps: FollowUpQuestion[] = [];
 
       try {
         const response = await fetch('/api/summarize', {
@@ -478,9 +489,13 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             collectedSummaryPrompt = summaryPrompt || '';
             setCurrentFinalAnswer(finalAnswer);
             setCurrentSummaryPrompt(summaryPrompt || '');
+            // 状態遷移: 'generating' → 'idle'
+            // 統合回答の生成が完了したので、アクションボタンとフォローアップ質問を表示可能にする
+            setSummaryState('idle');
             setIsGeneratingFollowUps(true);
           },
           onFollowups: (followups) => {
+            collectedFollowUps = followups;
             setSuggestedFollowUps(followups);
             setIsGeneratingFollowUps(false);
           },
@@ -502,7 +517,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             currentMessages,
             collectedFinalAnswer,
             currentSearchResults.length > 0 ? currentSearchResults : undefined,
-            collectedSummaryPrompt || undefined
+            collectedSummaryPrompt || undefined,
+            collectedFollowUps.length > 0 ? collectedFollowUps : undefined
           );
           const latestSession = currentSessionRef.current;
 
@@ -521,6 +537,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
+        // エラー時のフォールバック: summaryStateを確実にidleに戻す
+        // 成功時はonSummaryで既にidleに設定されているので二重設定になるが問題ない
         setSummaryState('idle');
       }
     },
@@ -560,6 +578,9 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       setCurrentSearchResults([]);
       setSuggestedFollowUps([]);
       setIsGeneratingFollowUps(false);
+      // 新しい議論開始時にsummaryStateをリセット
+      // 前回の議論が'awaiting'や'generating'で終わっていた場合に備える
+      setSummaryState('idle');
       setError(null);
       setIsLoading(true);
       setCurrentTopic(topic);
@@ -924,6 +945,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           }
 
           clearCurrentTurnState();
+          setSuggestedFollowUps([]);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');

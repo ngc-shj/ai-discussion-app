@@ -158,7 +158,7 @@ export function useDiscussionSettings(): DiscussionSettingsState & DiscussionSet
                   id: generateParticipantId(),
                   provider: providerId,
                   model: model.id,
-                  displayName: isOllama ? `Ollama (${model.name})` : `${provider.name} (${model.name})`,
+                  displayName: model.name,
                   color: isOllama ? getOllamaModelColor(model.id) : provider.color,
                 });
               }
