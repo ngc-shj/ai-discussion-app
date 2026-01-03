@@ -7,3 +7,4 @@ export { useDiscussion } from './useDiscussion';
 export type { DiscussionState, DiscussionActions, ProgressState } from './useDiscussion';
 export { useInputForm } from './useInputForm';
 export type { UseInputFormProps, UseInputFormReturn } from './useInputForm';
+export { useCustomRoles } from './useCustomRoles';

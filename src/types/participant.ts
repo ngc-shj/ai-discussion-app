@@ -1,21 +1,43 @@
 import { AIProviderType } from './provider';
 
-// 議論参加者のロール
-export type ParticipantRole =
+// プリセットロールのID
+export type PresetRoleId =
   | 'neutral'      // 中立的な立場
   | 'advocate'     // 賛成派・推進派
   | 'critic'       // 反対派・批判的
   | 'expert'       // 専門家・技術的視点
   | 'creative'     // 創造的・革新的視点
-  | 'practical'    // 実用的・現実的視点
-  | 'custom';      // カスタムロール
+  | 'practical';   // 実用的・現実的視点
+
+// 議論参加者のロール（プリセット or カスタムロールID）
+export type ParticipantRole = PresetRoleId | string;
 
 // プリセットロールの定義
 export interface RolePreset {
-  id: ParticipantRole;
+  id: PresetRoleId;
   name: string;
   description: string;
   prompt: string;
+}
+
+// カスタムロールの定義
+export interface CustomRole {
+  id: string; // ユニークID（custom-xxx形式）
+  name: string;
+  description: string;
+  prompt: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// カスタムロールIDを生成
+export function generateCustomRoleId(): string {
+  return `custom-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+// ロールがカスタムロールかどうかを判定
+export function isCustomRoleId(roleId: string): boolean {
+  return roleId.startsWith('custom-');
 }
 
 // プリセットロール一覧
@@ -66,7 +88,8 @@ export interface DiscussionParticipant {
   displayName: string;
   color: string;
   role?: ParticipantRole;
-  customRolePrompt?: string; // role === 'custom' の場合に使用
+  displayRoleName?: string; // ロールの表示名（プリセット・カスタム共通）
+  customRolePrompt?: string; // カスタムロール（custom-xxx）の場合のプロンプト
 }
 
 // 参加者IDを生成

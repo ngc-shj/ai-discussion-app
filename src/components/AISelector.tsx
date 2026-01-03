@@ -1,8 +1,11 @@
 'use client';
 
-import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS } from '@/types';
+import { useState } from 'react';
+import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS, ParticipantRole, isCustomRoleId, ROLE_PRESETS } from '@/types';
 import { useAISelector, LATEST_MODEL_COUNT } from '@/hooks/useAISelector';
+import { useCustomRoles } from '@/hooks/useCustomRoles';
 import { ParticipantList, ProviderSection } from './ai-selector';
+import { RoleEditor } from './RoleEditor';
 
 interface AISelectorProps {
   participants: DiscussionParticipant[];
@@ -19,6 +22,8 @@ export function AISelector({
   availability,
   disabled,
 }: AISelectorProps) {
+  const [showRoleEditor, setShowRoleEditor] = useState(false);
+
   const {
     expandedProviders,
     showAllModels,
@@ -26,24 +31,67 @@ export function AISelector({
     setShowAllModels,
     addParticipant,
     removeParticipant,
-    updateParticipantRole,
     getParticipantCountForModel,
     getFilteredModels,
     getSelectedCountForProvider,
   } = useAISelector({ participants, onParticipantsChange });
 
+  const {
+    customRoles,
+    addCustomRole,
+    updateCustomRole,
+    deleteCustomRole,
+    duplicateCustomRole,
+  } = useCustomRoles();
+
+  // ロール更新時にロール情報を設定
+  const handleUpdateRole = (id: string, role: ParticipantRole) => {
+    if (isCustomRoleId(role)) {
+      const customRole = customRoles.find((r) => r.id === role);
+      if (customRole) {
+        // カスタムロールの場合
+        const updated = participants.map((p) =>
+          p.id === id
+            ? { ...p, role, displayRoleName: customRole.name, customRolePrompt: customRole.prompt }
+            : p
+        );
+        onParticipantsChange(updated);
+        return;
+      }
+    }
+    // プリセットロールの場合
+    const preset = ROLE_PRESETS.find((r) => r.id === role);
+    const updated = participants.map((p) =>
+      p.id === id
+        ? { ...p, role, displayRoleName: preset?.name, customRolePrompt: undefined }
+        : p
+    );
+    onParticipantsChange(updated);
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <label className="text-sm font-medium text-gray-300">参加AI</label>
-        <span className="text-xs text-gray-500">{participants.length}人参加</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowRoleEditor(true)}
+            className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+            title="カスタムロールを管理"
+          >
+            ロール管理
+          </button>
+          <span className="text-xs text-gray-500">{participants.length}人参加</span>
+        </div>
       </div>
 
       {/* 選択された参加者一覧 */}
       <ParticipantList
         participants={participants}
+        customRoles={customRoles}
         disabled={disabled}
-        onUpdateRole={updateParticipantRole}
+        onUpdateRole={handleUpdateRole}
         onRemove={removeParticipant}
       />
 
@@ -102,6 +150,18 @@ export function AISelector({
       <p className="text-xs text-gray-500">
         同じモデルを異なる役割で複数追加できます
       </p>
+
+      {/* ロール編集モーダル */}
+      {showRoleEditor && (
+        <RoleEditor
+          customRoles={customRoles}
+          onAdd={addCustomRole}
+          onUpdate={updateCustomRole}
+          onDelete={deleteCustomRole}
+          onDuplicate={duplicateCustomRole}
+          onClose={() => setShowRoleEditor(false)}
+        />
+      )}
     </div>
   );
 }

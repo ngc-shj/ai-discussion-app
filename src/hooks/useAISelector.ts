@@ -7,6 +7,7 @@ import {
   DiscussionParticipant,
   ParticipantRole,
   generateParticipantId,
+  ROLE_PRESETS,
 } from '@/types';
 
 // 最新モデルの数（各プロバイダーごと）
@@ -69,6 +70,7 @@ export function useAISelector({
       color: string,
       role: ParticipantRole = 'neutral'
     ) => {
+      const preset = ROLE_PRESETS.find((r) => r.id === role);
       const newParticipant: DiscussionParticipant = {
         id: generateParticipantId(),
         provider,
@@ -76,6 +78,7 @@ export function useAISelector({
         displayName,
         color,
         role,
+        displayRoleName: preset?.name,
       };
       onParticipantsChange([...participants, newParticipant]);
     },

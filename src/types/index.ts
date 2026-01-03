@@ -3,8 +3,8 @@ export type { AIProviderType, ModelInfo, AIProviderConfig, AIRequest, AIResponse
 export { DEFAULT_PROVIDERS, getOllamaModelColor } from './provider';
 
 // Participant types
-export type { ParticipantRole, RolePreset, DiscussionParticipant } from './participant';
-export { ROLE_PRESETS, generateParticipantId } from './participant';
+export type { PresetRoleId, ParticipantRole, RolePreset, CustomRole, DiscussionParticipant } from './participant';
+export { ROLE_PRESETS, generateParticipantId, generateCustomRoleId, isCustomRoleId } from './participant';
 
 // Message types
 export type {
