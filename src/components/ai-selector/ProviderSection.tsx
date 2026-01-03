@@ -91,7 +91,7 @@ export function ProviderSection({
             <>
               {filteredModels.map((model) => {
                 const modelColor = isOllama ? getOllamaModelColor(model.id) : provider.color;
-                const displayName = isOllama ? `Ollama (${model.name})` : `${provider.name} (${model.name})`;
+                const displayName = model.name;
                 const count = getParticipantCount(model.id);
 
                 return (

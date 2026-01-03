@@ -1,4 +1,4 @@
-import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile, formatParticipantDisplayName } from '@/types';
 import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from '../ai-providers';
 import { DiscussionProgress, DiscussionRequest, getProviderDisplayName } from './types';
 import { checkConsensus, checkTerminationKeywords } from './termination';
@@ -142,12 +142,17 @@ export async function* runDiscussion(
 
       const message: DiscussionMessage = {
         id: newMessageId,
+        participantId: participant.id, // 参加者への参照
         provider: participant.provider,
         model: participant.model,
         content: response.content,
         round,
         timestamp: new Date(),
         prompt,
+        // 表示用情報のスナップショット（永続化・履歴表示用）
+        displayName: formatParticipantDisplayName(participant),
+        displayRoleName: participant.displayRoleName,
+        color: participant.color,
       };
 
       messages.push(message);

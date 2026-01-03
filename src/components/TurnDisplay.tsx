@@ -59,7 +59,7 @@ export function TurnDisplay({
   const handleCopyDiscussion = async () => {
     try {
       const discussionText = turn.messages
-        .map(m => `【${m.model || m.provider}】\n${m.content}`)
+        .map(m => `【${m.displayName || m.model || m.provider}】\n${m.content}`)
         .join('\n\n');
       await navigator.clipboard.writeText(discussionText);
       setDiscussionCopied(true);

@@ -12,6 +12,7 @@ export type SummaryState =
 // 議論メッセージ
 export interface DiscussionMessage {
   id: string;
+  participantId: string; // 参加者への参照（実行中はこれで参照）
   provider: AIProviderType;
   model?: string;
   content: string;
@@ -20,6 +21,11 @@ export interface DiscussionMessage {
   isLoading?: boolean;
   isStreaming?: boolean;
   prompt?: string; // AIに渡されたプロンプト（確認用）
+  // 表示用情報のスナップショット（永続化・履歴表示用）
+  // 実行中は participantId から取得、保存時にスナップショットとして設定
+  displayName?: string; // 表示名（例: "批判的 (llama3.2:latest)"）
+  displayRoleName?: string; // ロール名（例: "批判的"）
+  color?: string; // 参加者の色
 }
 
 // 議論の状態

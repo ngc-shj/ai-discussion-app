@@ -1,6 +1,6 @@
 'use client';
 
-import { DiscussionParticipant, isCustomRoleId, ROLE_PRESETS } from '@/types';
+import { DiscussionParticipant, formatParticipantDisplayName } from '@/types';
 
 interface ParticipantChipProps {
   participant: DiscussionParticipant;
@@ -17,23 +17,14 @@ export function ParticipantChip({
 }: ParticipantChipProps) {
   const isPending = !isActive && !isCompleted;
 
-  // 表示名を短縮（MessageBubbleと統一するため、displayNameを使用）
-  // displayNameは「Ollama (llama3.2:latest)」のような形式
-  const shortName = p.displayName.length > 20
-    ? p.displayName.slice(0, 17) + '...'
-    : p.displayName;
+  // 統一された表示名を生成: "ロール名 (モデル名)" 形式、中立はモデル名のみ
+  const fullDisplayName = formatParticipantDisplayName(p);
 
-  // ロール情報（中立以外の場合のみ表示）
-  // displayRoleNameがない場合はフォールバック（プリセット→ROLE_PRESETS、カスタム→「カスタム」）
-  const isCustomRole = p.role ? isCustomRoleId(p.role) : false;
-  const getRoleName = () => {
-    if (p.displayRoleName) return p.displayRoleName;
-    if (!p.role) return undefined;
-    if (isCustomRole) return 'カスタム'; // カスタムロールのフォールバック
-    return ROLE_PRESETS.find((r) => r.id === p.role)?.name;
-  };
-  const roleName = getRoleName();
-  const showRole = p.role && p.role !== 'neutral' && roleName;
+  // 表示名を短縮（長い場合）
+  const shortName = fullDisplayName.length > 25
+    ? fullDisplayName.slice(0, 22) + '...'
+    : fullDisplayName;
+
   const participantKey = `${p.provider}-${p.model}-${index}`;
 
   return (
@@ -56,7 +47,7 @@ export function ParticipantChip({
         // @ts-expect-error CSS custom property for ring color
         '--tw-ring-color': isActive ? p.color : undefined,
       }}
-      title={`${p.displayName}${showRole ? ` [${roleName}]` : ''}${isActive ? ' (実行中)' : isCompleted ? ' (完了)' : ' (待機中)'}`}
+      title={`${fullDisplayName}${isActive ? ' (実行中)' : isCompleted ? ' (完了)' : ' (待機中)'}`}
     >
       {/* ステータスインジケーター */}
       <div className="relative">
@@ -74,19 +65,13 @@ export function ParticipantChip({
           </svg>
         )}
       </div>
-      {/* モデル名 */}
+      {/* 表示名: ロール名 (モデル名) 形式 */}
       <span
         className={`font-medium ${isPending ? 'text-gray-500' : ''}`}
         style={{ color: isPending ? undefined : p.color }}
       >
         {shortName}
       </span>
-      {/* ロール表示（中立以外） */}
-      {showRole && (
-        <span className={`text-[10px] ${isCustomRole ? 'text-purple-400' : 'text-gray-400'}`}>
-          [{roleName}]
-        </span>
-      )}
     </div>
   );
 }

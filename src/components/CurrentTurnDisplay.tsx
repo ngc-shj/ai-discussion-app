@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { DiscussionMessage, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, formatParticipantDisplayName } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { MessageBubble } from './MessageBubble';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -13,6 +13,7 @@ import { SearchResultsDisplay } from './SearchResultsDisplay';
 interface CurrentTurnDisplayProps {
   topic: string;
   messages: DiscussionMessage[];
+  participants?: DiscussionParticipant[]; // 実行中の参加者リスト
   finalAnswer?: string;
   summaryPrompt?: string;
   isLoading: boolean;
@@ -32,6 +33,7 @@ interface CurrentTurnDisplayProps {
 export function CurrentTurnDisplay({
   topic,
   messages,
+  participants,
   finalAnswer,
   summaryPrompt,
   isLoading,
@@ -77,7 +79,14 @@ export function CurrentTurnDisplay({
   const handleCopyDiscussion = async () => {
     try {
       const discussionText = messages
-        .map(m => `【${m.model || m.provider}】\n${m.content}`)
+        .map(m => {
+          // 参加者から表示名を取得、なければスナップショットまたはフォールバック
+          const participant = participants?.find(p => p.id === m.participantId);
+          const displayName = participant
+            ? formatParticipantDisplayName(participant)
+            : (m.displayName || m.model || m.provider);
+          return `【${displayName}】\n${m.content}`;
+        })
         .join('\n\n');
       await navigator.clipboard.writeText(discussionText);
       setDiscussionCopied(true);
@@ -166,6 +175,7 @@ export function CurrentTurnDisplay({
                 <MessageBubble
                   key={message.id}
                   message={message}
+                  participants={participants}
                   vote={messageVotes?.find(v => v.messageId === message.id)?.vote}
                   onVote={onVote ? (vote) => onVote(message.id, vote) : undefined}
                 />
@@ -173,8 +183,10 @@ export function CurrentTurnDisplay({
               {streamingMessage && (
                 <MessageBubble
                   key={streamingMessage.messageId}
+                  participants={participants}
                   message={{
                     id: streamingMessage.messageId,
+                    participantId: streamingMessage.participantId,
                     provider: streamingMessage.provider as import('@/types').AIProviderType,
                     model: streamingMessage.model,
                     content: streamingMessage.content,

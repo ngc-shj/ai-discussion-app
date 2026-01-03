@@ -43,6 +43,7 @@ export interface ProgressState {
 
 export interface StreamingMessage {
   messageId: string;
+  participantId: string; // 参加者への参照
   content: string;
   provider: string;
   model?: string;
@@ -285,7 +286,12 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       }
     },
     onMessageChunk: (messageId, _chunk, accumulatedContent, provider, model, round) => {
-      setStreamingMessage?.({ messageId, content: accumulatedContent, provider, model, round });
+      // 現在の参加者IDを取得
+      const currentParticipantIndex = currentProgressStateRef.current.currentParticipantIndex;
+      const currentParticipant = context.participants[currentParticipantIndex];
+      const participantId = currentParticipant?.id || '';
+
+      setStreamingMessage?.({ messageId, participantId, content: accumulatedContent, provider, model, round });
     },
     onSummary: (finalAnswer, summaryPrompt) => {
       collectedFinalAnswerRef.current = finalAnswer;

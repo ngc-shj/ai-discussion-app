@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { DiscussionParticipant, ROLE_PRESETS, ParticipantRole, CustomRole, isCustomRoleId } from '@/types';
 
 interface ParticipantListProps {
@@ -8,6 +9,34 @@ interface ParticipantListProps {
   disabled?: boolean;
   onUpdateRole: (id: string, role: ParticipantRole) => void;
   onRemove: (id: string) => void;
+}
+
+// ツールチップ付きの参加者名コンポーネント
+function ParticipantName({ displayName }: { displayName: string }) {
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltipPos({ x: rect.left, y: rect.top - 4 });
+  };
+
+  return (
+    <span
+      className="text-gray-300 truncate min-w-0 flex-1 cursor-default"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setTooltipPos(null)}
+    >
+      {displayName}
+      {tooltipPos && (
+        <span
+          className="fixed z-[9999] px-2 py-1 text-xs text-white bg-gray-900 border border-gray-600 rounded shadow-lg whitespace-nowrap pointer-events-none -translate-y-full"
+          style={{ left: tooltipPos.x, top: tooltipPos.y }}
+        >
+          {displayName}
+        </span>
+      )}
+    </span>
+  );
 }
 
 export function ParticipantList({
@@ -46,16 +75,14 @@ export function ParticipantList({
               className="w-3 h-3 rounded-full shrink-0"
               style={{ backgroundColor: participant.color }}
             />
-            <span className="text-gray-300 truncate flex-1" title={participant.displayName}>
-              {participant.displayName}
-            </span>
+            <ParticipantName displayName={participant.displayName} />
             {/* 役割選択 */}
             <select
               value={participant.role || 'neutral'}
               onChange={(e) => onUpdateRole(participant.id, e.target.value as ParticipantRole)}
               disabled={disabled}
-              title={roleInfo?.description || '役割を選択'}
-              className={`px-1.5 py-0.5 text-xs rounded border-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 ${
+              title={`${roleInfo?.name || '役割を選択'}${roleInfo?.description ? `: ${roleInfo.description}` : ''}`}
+              className={`shrink-0 w-16 px-1 py-0.5 text-xs rounded border-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 cursor-pointer ${
                 isCustom ? 'bg-purple-600/50 text-purple-200' : 'bg-gray-600 text-gray-200'
               }`}
             >

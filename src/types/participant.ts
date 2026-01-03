@@ -96,3 +96,17 @@ export interface DiscussionParticipant {
 export function generateParticipantId(): string {
   return `participant-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 }
+
+// 参加者の表示名を生成
+// 形式: "ロール名 (モデル名)" - 中立ロールの場合はモデル名のみ
+export function formatParticipantDisplayName(participant: DiscussionParticipant): string {
+  const modelName = participant.model;
+  const roleName = participant.displayRoleName;
+
+  // 中立ロールまたはロール名がない場合はモデル名のみ
+  if (!roleName || participant.role === 'neutral') {
+    return modelName;
+  }
+
+  return `${roleName} (${modelName})`;
+}

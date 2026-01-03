@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { DiscussionTurn, DiscussionMessage, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState } from '@/types';
+import { DiscussionTurn, DiscussionMessage, DiscussionParticipant, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { TurnDisplay } from './TurnDisplay';
 import { CurrentTurnDisplay } from './CurrentTurnDisplay';
@@ -9,6 +9,7 @@ import { CurrentTurnDisplay } from './CurrentTurnDisplay';
 interface DiscussionPanelProps {
   turns: DiscussionTurn[];
   currentMessages: DiscussionMessage[];
+  participants?: DiscussionParticipant[]; // 実行中の参加者リスト
   currentTopic?: string;
   currentFinalAnswer?: string;
   currentSummaryPrompt?: string;
@@ -30,6 +31,7 @@ interface DiscussionPanelProps {
 export function DiscussionPanel({
   turns,
   currentMessages,
+  participants,
   currentTopic,
   currentFinalAnswer,
   currentSummaryPrompt,
@@ -90,6 +92,7 @@ export function DiscussionPanel({
         <CurrentTurnDisplay
           topic={currentTopic}
           messages={currentMessages}
+          participants={participants}
           finalAnswer={currentFinalAnswer}
           summaryPrompt={currentSummaryPrompt}
           isLoading={isLoading}
