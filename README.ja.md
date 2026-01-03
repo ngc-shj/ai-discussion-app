@@ -6,6 +6,8 @@
 
 ## 機能
 
+### 基本機能
+
 - **マルチAI議論**: 複数のAIモデルが順番に発言し、前の意見を踏まえて議論を深める
 - **ラウンドロビン形式**: 指定したラウンド数だけ各AIが順番に発言
 - **統合回答生成**: 議論終了後、全ての意見を統合した回答を自動生成
@@ -14,6 +16,25 @@
 - **進捗の可視化**: 選択したモデルと実行状態（待機中/実行中/完了）を視覚的に表示
 - **セッション管理**: 議論履歴をIndexedDBに保存、複数セッションの管理が可能
 - **レスポンシブ対応**: PC・モバイル両対応のUI
+
+### 議論モード
+
+- **Free**: 制約のない自由な議論
+- **Brainstorm**: 多様なアイデアや可能性を生成
+- **Debate**: 対立する視点を持つ構造化された議論
+- **Consensus**: 参加者間での合意形成を目指す
+- **Critique**: 批判的な分析と評価
+- **Counterargument**: 反対意見の生成
+
+### 高度な機能
+
+- **カスタムロール**: 参加者にカスタマイズしたプロンプトでロールを定義
+- **フォローアップ提案**: 議論後にAIが生成する追加質問
+- **深掘り分析**: 特定トピックの詳細な分析
+- **議論のフォーク**: 別の方向性を探るための議論の分岐
+- **メッセージ投票**: 議論内の個々のメッセージを評価
+- **中断した議論の復旧**: 中断された議論を再開
+- **終了条件**: ラウンド数、合意検出、手動で議論を終了
 
 ## 対応AIプロバイダー
 
@@ -170,14 +191,17 @@ docker run -d \
 
 ## 技術スタック
 
-- **フレームワーク**: Next.js 14+ (App Router)
-- **言語**: TypeScript
-- **スタイリング**: Tailwind CSS
+- **フレームワーク**: Next.js 16 (App Router)
+- **言語**: TypeScript 5
+- **UI**: React 19
+- **スタイリング**: Tailwind CSS 4
 - **データ永続化**: IndexedDB (idb)
 - **AI SDK**:
   - `@anthropic-ai/sdk` (Claude)
   - `openai` (OpenAI)
   - `@google/generative-ai` (Gemini)
+  - Ollama (HTTP API)
+- **Markdown**: react-markdown, remark-gfm, rehype-highlight
 - **ストリーミング**: Server-Sent Events (SSE)
 
 ## プロジェクト構成
@@ -188,21 +212,39 @@ ai-discussion-app/
 │   ├── app/
 │   │   ├── page.tsx           # メインUI
 │   │   └── api/
-│   │       ├── discuss/       # 議論APIエンドポイント
+│   │       ├── discuss/       # 議論APIエンドポイント (SSE)
 │   │       ├── models/        # 利用可能モデルエンドポイント
 │   │       ├── providers/     # プロバイダー可用性チェック
-│   │       └── search/        # SearXNG検索エンドポイント
-│   ├── components/
+│   │       ├── search/        # SearXNG検索エンドポイント
+│   │       └── summarize/     # 統合回答生成
+│   ├── components/            # React UIコンポーネント (~20)
 │   │   ├── DiscussionPanel.tsx
-│   │   ├── ProgressIndicator.tsx
 │   │   ├── SettingsPanel.tsx
+│   │   ├── InputForm.tsx
+│   │   ├── AISelector.tsx
+│   │   ├── RoleEditor.tsx
+│   │   ├── FinalAnswer.tsx
+│   │   ├── FollowUpSuggestions.tsx
+│   │   ├── DeepDiveModal.tsx
+│   │   ├── ForkModal.tsx
+│   │   └── ...
+│   ├── hooks/                 # カスタムReactフック
+│   │   ├── useDiscussion.ts
+│   │   ├── useDiscussionSettings.ts
+│   │   ├── useSessionManager.ts
 │   │   └── ...
 │   ├── lib/
 │   │   ├── ai-providers/      # AIプロバイダー実装
-│   │   ├── discussion-engine.ts
-│   │   └── session-storage.ts
-│   └── types/
-│       └── index.ts
+│   │   ├── discussion-engine/ # 議論オーケストレーション
+│   │   ├── session-storage.ts
+│   │   └── sse-utils.ts
+│   └── types/                 # TypeScript型定義
+│       ├── index.ts
+│       ├── provider.ts
+│       ├── participant.ts
+│       ├── message.ts
+│       ├── config.ts
+│       └── session.ts
 ├── .env.local.example
 └── package.json
 ```

@@ -6,6 +6,8 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 
 ## Features
 
+### Core Features
+
 - **Multi-AI Discussion**: Multiple AI models take turns speaking, deepening the discussion based on previous opinions
 - **Round-Robin Format**: Each AI speaks in turn for the specified number of rounds
 - **Integrated Answer Generation**: Automatically generates an answer integrating all opinions after the discussion
@@ -14,6 +16,25 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 - **Progress Visualization**: Visual display of selected models and their execution status (pending/active/completed)
 - **Session Management**: Save discussion history to IndexedDB, manage multiple sessions
 - **Responsive Design**: UI compatible with both PC and mobile devices
+
+### Discussion Modes
+
+- **Free**: Open discussion without specific constraints
+- **Brainstorm**: Generate diverse ideas and possibilities
+- **Debate**: Structured argumentation with opposing viewpoints
+- **Consensus**: Work toward agreement among participants
+- **Critique**: Critical analysis and evaluation
+- **Counterargument**: Generate opposing perspectives
+
+### Advanced Features
+
+- **Custom Roles**: Define custom roles with personalized prompts for participants
+- **Follow-up Suggestions**: AI-generated follow-up questions after discussions
+- **Deep Dive Analysis**: In-depth analysis of specific topics
+- **Discussion Forking**: Branch discussions to explore alternative directions
+- **Message Voting**: Rate individual messages in discussions
+- **Interrupted Discussion Recovery**: Resume discussions that were interrupted
+- **Termination Conditions**: End discussions by rounds, consensus detection, or manually
 
 ## Supported AI Providers
 
@@ -167,14 +188,17 @@ When enabled, the app searches for relevant information before the discussion st
 
 ## Tech Stack
 
-- **Framework**: Next.js 14+ (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript 5
+- **UI**: React 19
+- **Styling**: Tailwind CSS 4
 - **Data Persistence**: IndexedDB (idb)
 - **AI SDKs**:
   - `@anthropic-ai/sdk` (Claude)
   - `openai` (OpenAI)
   - `@google/generative-ai` (Gemini)
+  - Ollama (HTTP API)
+- **Markdown**: react-markdown, remark-gfm, rehype-highlight
 - **Streaming**: Server-Sent Events (SSE)
 
 ## Project Structure
@@ -185,21 +209,39 @@ ai-discussion-app/
 │   ├── app/
 │   │   ├── page.tsx           # Main UI
 │   │   └── api/
-│   │       ├── discuss/       # Discussion API endpoint
+│   │       ├── discuss/       # Discussion API endpoint (SSE)
 │   │       ├── models/        # Available models endpoint
 │   │       ├── providers/     # Provider availability check
-│   │       └── search/        # SearXNG search endpoint
-│   ├── components/
+│   │       ├── search/        # SearXNG search endpoint
+│   │       └── summarize/     # Integrated answer generation
+│   ├── components/            # React UI components (~20)
 │   │   ├── DiscussionPanel.tsx
-│   │   ├── ProgressIndicator.tsx
 │   │   ├── SettingsPanel.tsx
+│   │   ├── InputForm.tsx
+│   │   ├── AISelector.tsx
+│   │   ├── RoleEditor.tsx
+│   │   ├── FinalAnswer.tsx
+│   │   ├── FollowUpSuggestions.tsx
+│   │   ├── DeepDiveModal.tsx
+│   │   ├── ForkModal.tsx
+│   │   └── ...
+│   ├── hooks/                 # Custom React hooks
+│   │   ├── useDiscussion.ts
+│   │   ├── useDiscussionSettings.ts
+│   │   ├── useSessionManager.ts
 │   │   └── ...
 │   ├── lib/
 │   │   ├── ai-providers/      # AI provider implementations
-│   │   ├── discussion-engine.ts
-│   │   └── session-storage.ts
-│   └── types/
-│       └── index.ts
+│   │   ├── discussion-engine/ # Discussion orchestration
+│   │   ├── session-storage.ts
+│   │   └── sse-utils.ts
+│   └── types/                 # TypeScript type definitions
+│       ├── index.ts
+│       ├── provider.ts
+│       ├── participant.ts
+│       ├── message.ts
+│       ├── config.ts
+│       └── session.ts
 ├── .env.local.example
 └── package.json
 ```
