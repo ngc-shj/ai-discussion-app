@@ -22,6 +22,7 @@ export interface SessionManagerState {
   currentSession: DiscussionSession | null;
   interruptedState: InterruptedDiscussionState | null;
   currentSessionRef: React.RefObject<DiscussionSession | null>;
+  isInitialLoadComplete: boolean;
 }
 
 export interface SessionManagerActions {
@@ -30,7 +31,7 @@ export interface SessionManagerActions {
   setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
   setInterruptedState: (state: InterruptedDiscussionState | null) => void;
   // High-level actions
-  loadSessions: () => Promise<void>;
+  loadSessions: () => Promise<DiscussionSession[]>;
   selectSession: (session: DiscussionSession) => void;
   newSession: () => void;
   deleteSession: (id: string) => Promise<void>;
@@ -45,6 +46,7 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
   const [currentSession, setCurrentSession] = useState<DiscussionSession | null>(null);
   const [interruptedState, setInterruptedStateInternal] = useState<InterruptedDiscussionState | null>(null);
+  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
 
   // 最新のセッションを参照するためのref
   const currentSessionRef = useRef<DiscussionSession | null>(null);
@@ -55,20 +57,58 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
     try {
       const loadedSessions = await getAllSessions();
       setSessions(loadedSessions);
+      return loadedSessions;
     } catch (err) {
       console.error('Failed to load sessions:', err);
+      return [];
     }
   }, []);
 
   // 初期ロード
   useEffect(() => {
-    loadSessions();
+    const init = async () => {
+      const loadedSessions = await loadSessions();
 
-    // 中断された議論があるかチェック
-    const savedInterrupted = getInterruptedState();
-    if (savedInterrupted) {
-      setInterruptedStateInternal(savedInterrupted);
-    }
+      // まず localStorage から中断状態をチェック（手動中断の場合）
+      const savedInterrupted = getInterruptedState();
+      if (savedInterrupted) {
+        setInterruptedStateInternal(savedInterrupted);
+        // 対応するセッションを選択
+        const session = loadedSessions.find(s => s.id === savedInterrupted.sessionId);
+        if (session) {
+          setCurrentSession(session);
+        }
+        setIsInitialLoadComplete(true);
+        return;
+      }
+
+      // IndexedDB から中断状態を持つ最新のセッションを探す（自動保存の場合）
+      const sessionWithInterrupted = loadedSessions.find(s => s.interruptedTurn);
+      if (sessionWithInterrupted) {
+        setCurrentSession(sessionWithInterrupted);
+        const turn = sessionWithInterrupted.interruptedTurn!;
+        const interrupted: InterruptedDiscussionState = {
+          sessionId: sessionWithInterrupted.id,
+          topic: turn.topic,
+          participants: turn.participants || sessionWithInterrupted.participants,
+          messages: turn.messages,
+          currentRound: turn.currentRound,
+          currentParticipantIndex: turn.currentParticipantIndex,
+          totalRounds: turn.totalRounds,
+          searchResults: turn.searchResults,
+          userProfile: turn.userProfile,
+          discussionMode: turn.discussionMode,
+          discussionDepth: turn.discussionDepth,
+          directionGuide: turn.directionGuide,
+          terminationConfig: turn.terminationConfig,
+          interruptedAt: turn.interruptedAt,
+          summaryState: turn.summaryState,
+        };
+        setInterruptedStateInternal(interrupted);
+      }
+      setIsInitialLoadComplete(true);
+    };
+    init();
   }, [loadSessions]);
 
   // 新しいセッションを開始
@@ -98,6 +138,7 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
         directionGuide: turn.directionGuide,
         terminationConfig: turn.terminationConfig,
         interruptedAt: turn.interruptedAt,
+        summaryState: turn.summaryState,
       };
       setInterruptedStateInternal(interrupted);
     } else {
@@ -203,6 +244,7 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
     currentSession,
     interruptedState,
     currentSessionRef,
+    isInitialLoadComplete,
     // Low-level setters
     setSessions,
     setCurrentSession,

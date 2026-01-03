@@ -37,12 +37,15 @@ export async function POST(request: NextRequest) {
             resumeFrom: body.resumeFrom,
             messageVotes: body.messageVotes,
             skipSummary: body.skipSummary,
-            onMessageChunk: (messageId, chunk, accumulatedContent) => {
+            onMessageChunk: (messageId, chunk, accumulatedContent, provider, model, round) => {
               sendSSE({
                 type: 'message_chunk',
                 messageId,
                 chunk,
                 accumulatedContent,
+                provider,
+                model,
+                round,
               });
             },
           })) {

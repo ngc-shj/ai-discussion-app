@@ -70,7 +70,6 @@ export async function* runDiscussion(
           currentParticipantIndex: pIndex,
           totalParticipants: participants.length,
           currentParticipant: participant,
-          isSummarizing: false,
         },
       };
 
@@ -127,7 +126,7 @@ export async function* runDiscussion(
         let accumulatedContent = '';
         response = await provider.generateStream({ prompt }, (chunk) => {
           accumulatedContent += chunk;
-          request.onMessageChunk!(newMessageId, chunk, accumulatedContent);
+          request.onMessageChunk!(newMessageId, chunk, accumulatedContent, participant.provider, participant.model, round);
         });
       } else {
         response = await provider.generate({ prompt });
@@ -251,7 +250,6 @@ async function* generateSummary(
       currentParticipantIndex: participants.length - 1,
       totalParticipants: participants.length,
       currentParticipant: participants[0],
-      isSummarizing: true,
     },
   };
 

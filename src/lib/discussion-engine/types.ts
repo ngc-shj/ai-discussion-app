@@ -34,7 +34,6 @@ export interface DiscussionProgress {
     currentParticipantIndex: number;
     totalParticipants: number;
     currentParticipant: DiscussionParticipant;
-    isSummarizing: boolean;
   };
 }
 
@@ -70,7 +69,7 @@ export interface DiscussionRequest {
 /**
  * ストリーミングチャンクのコールバック型
  */
-export type OnMessageChunkCallback = (messageId: string, chunk: string, accumulatedContent: string) => void;
+export type OnMessageChunkCallback = (messageId: string, chunk: string, accumulatedContent: string, provider: string, model: string | undefined, round: number) => void;
 
 /**
  * プロバイダーの表示名を取得

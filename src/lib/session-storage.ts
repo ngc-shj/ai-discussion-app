@@ -57,30 +57,36 @@ function serializeSession(session: DiscussionSession): Record<string, unknown> {
 
 // セッションを復元（文字列をDate型に変換）
 function deserializeSession(data: Record<string, unknown>): DiscussionSession {
-  const interruptedTurnData = data.interruptedTurn as Record<string, unknown> | undefined;
+  try {
+    const interruptedTurnData = data.interruptedTurn as Record<string, unknown> | undefined;
+    const turnsData = data.turns as Array<Record<string, unknown>> | undefined;
 
-  return {
-    ...data,
-    createdAt: new Date(data.createdAt as string),
-    updatedAt: new Date(data.updatedAt as string),
-    turns: (data.turns as Array<Record<string, unknown>>).map((turn) => ({
-      ...turn,
-      createdAt: new Date(turn.createdAt as string),
-      messages: (turn.messages as Array<Record<string, unknown>>).map((msg) => ({
-        ...msg,
-        timestamp: new Date(msg.timestamp as string),
+    return {
+      ...data,
+      createdAt: new Date(data.createdAt as string),
+      updatedAt: new Date(data.updatedAt as string),
+      turns: (turnsData || []).map((turn) => ({
+        ...turn,
+        createdAt: new Date(turn.createdAt as string),
+        messages: ((turn.messages as Array<Record<string, unknown>>) || []).map((msg) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp as string),
+        })),
       })),
-    })),
-    // 中断状態がある場合はデシリアライズ
-    interruptedTurn: interruptedTurnData ? {
-      ...interruptedTurnData,
-      interruptedAt: new Date(interruptedTurnData.interruptedAt as string),
-      messages: (interruptedTurnData.messages as Array<Record<string, unknown>>).map((msg) => ({
-        ...msg,
-        timestamp: new Date(msg.timestamp as string),
-      })),
-    } : undefined,
-  } as DiscussionSession;
+      // 中断状態がある場合はデシリアライズ
+      interruptedTurn: interruptedTurnData ? {
+        ...interruptedTurnData,
+        interruptedAt: new Date(interruptedTurnData.interruptedAt as string),
+        messages: ((interruptedTurnData.messages as Array<Record<string, unknown>>) || []).map((msg) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp as string),
+        })),
+      } : undefined,
+    } as DiscussionSession;
+  } catch (err) {
+    console.error('Failed to deserialize session:', err, data);
+    throw err;
+  }
 }
 
 export async function getAllSessions(): Promise<DiscussionSession[]> {
@@ -95,7 +101,11 @@ export async function getAllSessions(): Promise<DiscussionSession[]> {
     request.onsuccess = () => {
       const cursor = request.result;
       if (cursor) {
-        sessions.push(deserializeSession(cursor.value));
+        try {
+          sessions.push(deserializeSession(cursor.value));
+        } catch (err) {
+          console.error('Failed to deserialize session, skipping:', cursor.value?.id, err);
+        }
         cursor.continue();
       } else {
         resolve(sessions);

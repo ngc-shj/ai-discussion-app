@@ -3,6 +3,12 @@ import { DiscussionParticipant } from './participant';
 import { SearchResult, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig } from './config';
 import { FollowUpQuestion } from './followup';
 
+// 統合回答の状態
+export type SummaryState =
+  | 'idle'           // 通常状態（議論中または議論前）
+  | 'awaiting'       // 統合回答ボタン表示中（ユーザーのクリック待ち）
+  | 'generating';    // 統合回答生成中
+
 // 議論メッセージ
 export interface DiscussionMessage {
   id: string;
@@ -78,6 +84,7 @@ export interface InterruptedTurnState {
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
   interruptedAt: Date;
+  summaryState?: SummaryState; // 統合回答の状態
 }
 
 // メッセージへの投票/評価
@@ -111,4 +118,5 @@ export interface InterruptedDiscussionState {
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
   interruptedAt: Date;
+  summaryState?: SummaryState; // 統合回答の状態
 }

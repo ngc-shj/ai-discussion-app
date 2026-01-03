@@ -8,6 +8,7 @@ export { ROLE_PRESETS, generateParticipantId, generateCustomRoleId, isCustomRole
 
 // Message types
 export type {
+  SummaryState,
   DiscussionMessage,
   DiscussionState,
   PreviousTurnSummary,

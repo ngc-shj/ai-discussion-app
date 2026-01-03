@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   DiscussionSession,
   DeepDiveType,
@@ -38,21 +38,6 @@ export default function Home() {
     restoreFromSession,
   } = useDiscussionSettings();
 
-  // セッション管理（カスタムフックを使用）
-  const {
-    sessions,
-    currentSession,
-    currentSessionRef,
-    interruptedState,
-    setSessions,
-    setCurrentSession,
-    setInterruptedState,
-    deleteSession: sessionManagerDeleteSession,
-    renameSession: sessionManagerRenameSession,
-    updateAndSaveSession,
-    discardInterrupted,
-  } = useSessionManager();
-
   // 議論状態とアクション（カスタムフックを使用）
   const {
     currentMessages,
@@ -63,8 +48,7 @@ export default function Home() {
     isLoading,
     isSearching,
     isGeneratingFollowUps,
-    isGeneratingSummary,
-    awaitingSummary,
+    summaryState,
     progress,
     completedParticipants,
     suggestedFollowUps,
@@ -73,12 +57,29 @@ export default function Home() {
     discussionParticipants,
     handleVote,
     clearCurrentTurnState,
+    restoreDiscussionState,
     handleInterrupt,
     startDiscussion,
     resumeDiscussion,
     generateSummary,
     streamingMessage,
   } = useDiscussion();
+
+  // セッション管理（カスタムフックを使用）
+  const {
+    sessions,
+    currentSession,
+    currentSessionRef,
+    interruptedState,
+    isInitialLoadComplete,
+    setSessions,
+    setCurrentSession,
+    setInterruptedState,
+    deleteSession: sessionManagerDeleteSession,
+    renameSession: sessionManagerRenameSession,
+    updateAndSaveSession,
+    discardInterrupted,
+  } = useSessionManager();
 
   // サイドバー・設定パネルの開閉状態
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -89,6 +90,55 @@ export default function Home() {
   // フォローアップ用のプリセットトピック
   const [presetTopic, setPresetTopic] = useState<string>('');
 
+  // 初期ロード完了フラグ
+  const initialRestoreDoneRef = useRef(false);
+
+  // 初期ロード時に中断状態を復元
+  useEffect(() => {
+    // 初期ロードが完了し、中断状態があり、まだ復元していない場合のみ実行
+    if (!isInitialLoadComplete) return;
+    if (!interruptedState) return;
+    if (initialRestoreDoneRef.current) return;
+
+    initialRestoreDoneRef.current = true;
+
+    // 設定を復元
+    restoreFromSession({
+      participants: interruptedState.participants,
+      discussionMode: interruptedState.discussionMode,
+      discussionDepth: interruptedState.discussionDepth,
+      directionGuide: interruptedState.directionGuide,
+      terminationConfig: interruptedState.terminationConfig,
+      userProfile: interruptedState.userProfile,
+    });
+
+    // 議論の表示状態を復元
+    restoreDiscussionState({
+      topic: interruptedState.topic,
+      messages: interruptedState.messages,
+      searchResults: interruptedState.searchResults,
+      summaryState: interruptedState.summaryState,
+    });
+
+    // 統合回答生成中だった場合は自動的に再開
+    if (interruptedState.summaryState === 'generating') {
+      // 少し遅延させて状態が安定してから再開
+      setTimeout(() => {
+        generateSummary({
+          participants: interruptedState.participants,
+          userProfile: interruptedState.userProfile || userProfile,
+          discussionMode: interruptedState.discussionMode || discussionMode,
+          discussionDepth: interruptedState.discussionDepth || discussionDepth,
+          directionGuide: interruptedState.directionGuide || directionGuide,
+          currentSessionRef,
+          setInterruptedState,
+          updateAndSaveSession,
+        });
+      }, 100);
+    }
+  }, [isInitialLoadComplete, interruptedState, restoreFromSession, restoreDiscussionState, generateSummary, currentSessionRef, setInterruptedState, updateAndSaveSession, userProfile, discussionMode, discussionDepth, directionGuide]);
+
+
   // 新しいセッションを開始
   const handleNewSession = useCallback(() => {
     setCurrentSession(null);
@@ -98,7 +148,6 @@ export default function Home() {
   // セッションを選択
   const handleSelectSession = useCallback((session: DiscussionSession) => {
     setCurrentSession(session);
-    clearCurrentTurnState();
 
     // セッションに中断状態がある場合、interruptedStateにセットし、設定も復元
     if (session.interruptedTurn) {
@@ -112,6 +161,14 @@ export default function Home() {
         directionGuide: turn.directionGuide,
         terminationConfig: turn.terminationConfig,
         userProfile: turn.userProfile,
+      });
+
+      // 議論の表示状態を復元（メッセージ、トピック、summaryState等）
+      restoreDiscussionState({
+        topic: turn.topic,
+        messages: turn.messages,
+        searchResults: turn.searchResults,
+        summaryState: turn.summaryState,
       });
 
       setInterruptedState({
@@ -129,12 +186,30 @@ export default function Home() {
         directionGuide: turn.directionGuide,
         terminationConfig: turn.terminationConfig,
         interruptedAt: turn.interruptedAt,
+        summaryState: turn.summaryState,
       });
+
+      // 統合回答生成中だった場合は自動的に再開
+      if (turn.summaryState === 'generating') {
+        setTimeout(() => {
+          generateSummary({
+            participants: turn.participants || session.participants,
+            userProfile: turn.userProfile || userProfile,
+            discussionMode: turn.discussionMode || discussionMode,
+            discussionDepth: turn.discussionDepth || discussionDepth,
+            directionGuide: turn.directionGuide || directionGuide,
+            currentSessionRef,
+            setInterruptedState,
+            updateAndSaveSession,
+          });
+        }, 100);
+      }
     } else {
-      // 中断状態がない場合は参加者設定を復元しない（現在の設定を維持）
+      // 中断状態がない場合は現在の表示をクリア
+      clearCurrentTurnState();
       setInterruptedState(null);
     }
-  }, [restoreFromSession, clearCurrentTurnState, setCurrentSession, setInterruptedState]);
+  }, [restoreFromSession, restoreDiscussionState, clearCurrentTurnState, setCurrentSession, setInterruptedState, generateSummary, userProfile, discussionMode, discussionDepth, directionGuide, currentSessionRef, updateAndSaveSession]);
 
   // セッションを削除
   const handleDeleteSession = useCallback(async (id: string) => {
@@ -337,7 +412,7 @@ export default function Home() {
         )}
 
         {/* 中断された議論の復元バナー */}
-        {interruptedState && !isLoading && (
+        {interruptedState && !isLoading && interruptedState.summaryState !== 'awaiting' && interruptedState.summaryState !== 'generating' && (
           <div className="mx-3 md:mx-4 mt-3 md:mt-4 p-3 bg-yellow-900/50 border border-yellow-700 rounded-lg shrink-0">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -391,7 +466,7 @@ export default function Home() {
           currentFinalAnswer={currentFinalAnswer}
           currentSummaryPrompt={currentSummaryPrompt}
           isLoading={isLoading}
-          isSummarizing={progress.isSummarizing}
+          summaryState={summaryState}
           searchResults={currentSearchResults}
           onFollowUp={handleFollowUp}
           onDeepDive={handleDeepDive}
@@ -401,8 +476,6 @@ export default function Home() {
           onVote={handleVote}
           suggestedFollowUps={suggestedFollowUps}
           isGeneratingFollowUps={isGeneratingFollowUps}
-          awaitingSummary={awaitingSummary}
-          isGeneratingSummary={isGeneratingSummary}
           onGenerateSummary={handleGenerateSummary}
           streamingMessage={streamingMessage}
         />
@@ -416,7 +489,7 @@ export default function Home() {
           currentParticipant={progress.currentParticipant}
           totalProviders={progress.totalParticipants}
           currentProviderIndex={progress.currentParticipantIndex}
-          isSummarizing={progress.isSummarizing}
+          isSummarizing={summaryState === 'generating'}
           isSearching={isSearching}
           participants={isLoading ? discussionParticipants : participants}
           completedParticipants={completedParticipants}
