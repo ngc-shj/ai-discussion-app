@@ -88,8 +88,8 @@ export interface DiscussionParticipant {
   displayName: string;
   color: string;
   role?: ParticipantRole;
+  displayRoleName?: string; // ロールの表示名（プリセット・カスタム共通）
   customRolePrompt?: string; // カスタムロール（custom-xxx）の場合のプロンプト
-  customRoleName?: string; // カスタムロール（custom-xxx）の場合の表示名
 }
 
 // 参加者IDを生成

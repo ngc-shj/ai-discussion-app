@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS, ParticipantRole, isCustomRoleId } from '@/types';
+import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS, ParticipantRole, isCustomRoleId, ROLE_PRESETS } from '@/types';
 import { useAISelector, LATEST_MODEL_COUNT } from '@/hooks/useAISelector';
 import { useCustomRoles } from '@/hooks/useCustomRoles';
 import { ParticipantList, ProviderSection } from './ai-selector';
@@ -31,7 +31,6 @@ export function AISelector({
     setShowAllModels,
     addParticipant,
     removeParticipant,
-    updateParticipantRole,
     getParticipantCountForModel,
     getFilteredModels,
     getSelectedCountForProvider,
@@ -45,23 +44,29 @@ export function AISelector({
     duplicateCustomRole,
   } = useCustomRoles();
 
-  // ロール更新時にカスタムロール情報も含める
+  // ロール更新時にロール情報を設定
   const handleUpdateRole = (id: string, role: ParticipantRole) => {
     if (isCustomRoleId(role)) {
       const customRole = customRoles.find((r) => r.id === role);
       if (customRole) {
-        // カスタムロールの場合は名前とプロンプトも設定
+        // カスタムロールの場合
         const updated = participants.map((p) =>
           p.id === id
-            ? { ...p, role, customRoleName: customRole.name, customRolePrompt: customRole.prompt }
+            ? { ...p, role, displayRoleName: customRole.name, customRolePrompt: customRole.prompt }
             : p
         );
         onParticipantsChange(updated);
         return;
       }
     }
-    // プリセットロールの場合はカスタム情報をクリア
-    updateParticipantRole(id, role);
+    // プリセットロールの場合
+    const preset = ROLE_PRESETS.find((r) => r.id === role);
+    const updated = participants.map((p) =>
+      p.id === id
+        ? { ...p, role, displayRoleName: preset?.name, customRolePrompt: undefined }
+        : p
+    );
+    onParticipantsChange(updated);
   };
 
   return (

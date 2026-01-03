@@ -57,6 +57,7 @@ export interface DiscussionState {
   suggestedFollowUps: FollowUpQuestion[];
   error: string | null;
   messageVotes: MessageVote[];
+  discussionParticipants: DiscussionParticipant[];
 }
 
 export interface DiscussionActions {
@@ -313,6 +314,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [suggestedFollowUps, setSuggestedFollowUps] = useState<FollowUpQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [messageVotes, setMessageVotes] = useState<MessageVote[]>([]);
+  const [discussionParticipants, setDiscussionParticipants] = useState<DiscussionParticipant[]>([]);
 
   const interruptRequestedRef = useRef(false);
 
@@ -489,6 +491,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       setError(null);
       setIsLoading(true);
       setCurrentTopic(topic);
+      setDiscussionParticipants(participants);
       setCompletedParticipants(new Set());
       interruptRequestedRef.current = false;
       setProgress({
@@ -712,6 +715,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       setCurrentTopic(interruptedState.topic);
       setCurrentMessages(interruptedState.messages);
       setCurrentSearchResults(interruptedState.searchResults || []);
+      setDiscussionParticipants(interruptedState.participants);
       setIsLoading(true);
       setError(null);
       interruptRequestedRef.current = false;
@@ -870,6 +874,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     suggestedFollowUps,
     error,
     messageVotes,
+    discussionParticipants,
     setCurrentMessages,
     setCurrentFinalAnswer,
     setCurrentTopic,

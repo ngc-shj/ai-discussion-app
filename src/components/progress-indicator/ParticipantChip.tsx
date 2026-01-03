@@ -1,6 +1,6 @@
 'use client';
 
-import { DiscussionParticipant, ROLE_PRESETS, isCustomRoleId } from '@/types';
+import { DiscussionParticipant, isCustomRoleId, ROLE_PRESETS } from '@/types';
 
 interface ParticipantChipProps {
   participant: DiscussionParticipant;
@@ -24,19 +24,17 @@ export function ParticipantChip({
       ? p.model.slice(0, 12) + '...'
       : p.model;
 
-  // ロール情報を取得（中立以外の場合のみ表示）
-  const getRoleInfo = (): { name: string; isCustom: boolean } | undefined => {
-    if (!p.role || p.role === 'neutral') return undefined;
-    // カスタムロールの場合は参加者に保存された名前を使用
-    if (isCustomRoleId(p.role) && p.customRoleName) {
-      return { name: p.customRoleName, isCustom: true };
-    }
-    // プリセットロールの場合
-    const preset = ROLE_PRESETS.find((r) => r.id === p.role);
-    return preset ? { name: preset.name, isCustom: false } : undefined;
+  // ロール情報（中立以外の場合のみ表示）
+  // displayRoleNameがない場合はフォールバック（プリセット→ROLE_PRESETS、カスタム→「カスタム」）
+  const isCustomRole = p.role ? isCustomRoleId(p.role) : false;
+  const getRoleName = () => {
+    if (p.displayRoleName) return p.displayRoleName;
+    if (!p.role) return undefined;
+    if (isCustomRole) return 'カスタム'; // カスタムロールのフォールバック
+    return ROLE_PRESETS.find((r) => r.id === p.role)?.name;
   };
-
-  const roleInfo = getRoleInfo();
+  const roleName = getRoleName();
+  const showRole = p.role && p.role !== 'neutral' && roleName;
   const participantKey = `${p.provider}-${p.model}-${index}`;
 
   return (
@@ -59,7 +57,7 @@ export function ParticipantChip({
         // @ts-expect-error CSS custom property for ring color
         '--tw-ring-color': isActive ? p.color : undefined,
       }}
-      title={`${p.displayName}${roleInfo ? ` [${roleInfo.name}]` : ''}${isActive ? ' (実行中)' : isCompleted ? ' (完了)' : ' (待機中)'}`}
+      title={`${p.displayName}${showRole ? ` [${roleName}]` : ''}${isActive ? ' (実行中)' : isCompleted ? ' (完了)' : ' (待機中)'}`}
     >
       {/* ステータスインジケーター */}
       <div className="relative">
@@ -85,9 +83,9 @@ export function ParticipantChip({
         {shortName}
       </span>
       {/* ロール表示（中立以外） */}
-      {roleInfo && (
-        <span className={`text-[10px] ${roleInfo.isCustom ? 'text-purple-400' : 'text-gray-400'}`}>
-          [{roleInfo.name}]
+      {showRole && (
+        <span className={`text-[10px] ${isCustomRole ? 'text-purple-400' : 'text-gray-400'}`}>
+          [{roleName}]
         </span>
       )}
     </div>

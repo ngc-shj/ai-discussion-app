@@ -70,6 +70,7 @@ export default function Home() {
     suggestedFollowUps,
     error,
     messageVotes,
+    discussionParticipants,
     handleVote,
     clearCurrentTurnState,
     handleInterrupt,
@@ -102,7 +103,7 @@ export default function Home() {
     if (session.interruptedTurn) {
       const turn = session.interruptedTurn;
 
-      // 中断時の設定を復元
+      // 中断時の設定を復元（参加者を含む）
       restoreFromSession({
         participants: turn.participants || session.participants,
         discussionMode: turn.discussionMode,
@@ -129,11 +130,7 @@ export default function Home() {
         interruptedAt: turn.interruptedAt,
       });
     } else {
-      // 中断状態がない場合はセッションの設定を適用
-      restoreFromSession({
-        participants: session.participants,
-        rounds: session.rounds,
-      });
+      // 中断状態がない場合は参加者設定を復元しない（現在の設定を維持）
       setInterruptedState(null);
     }
   }, [restoreFromSession, clearCurrentTurnState, setCurrentSession, setInterruptedState]);
@@ -419,7 +416,7 @@ export default function Home() {
           currentProviderIndex={progress.currentParticipantIndex}
           isSummarizing={progress.isSummarizing}
           isSearching={isSearching}
-          participants={participants}
+          participants={isLoading ? discussionParticipants : participants}
           completedParticipants={completedParticipants}
           onInterrupt={handleInterrupt}
         />
