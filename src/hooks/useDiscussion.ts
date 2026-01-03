@@ -16,6 +16,7 @@ import {
   DirectionGuide,
   TerminationConfig,
   SearchConfig,
+  SummaryState,
 } from '@/types';
 import {
   getAllSessions,
@@ -38,7 +39,14 @@ export interface ProgressState {
   currentParticipantIndex: number;
   totalParticipants: number;
   currentParticipant: DiscussionParticipant | null;
-  isSummarizing: boolean;
+}
+
+export interface StreamingMessage {
+  messageId: string;
+  content: string;
+  provider: string;
+  model?: string;
+  round: number;
 }
 
 export interface DiscussionState {
@@ -50,14 +58,21 @@ export interface DiscussionState {
   isLoading: boolean;
   isSearching: boolean;
   isGeneratingFollowUps: boolean;
-  isGeneratingSummary: boolean;
-  awaitingSummary: boolean;
+  summaryState: SummaryState;
   progress: ProgressState;
   completedParticipants: Set<string>;
   suggestedFollowUps: FollowUpQuestion[];
   error: string | null;
   messageVotes: MessageVote[];
   discussionParticipants: DiscussionParticipant[];
+  streamingMessage: StreamingMessage | null;
+}
+
+export interface RestoreDiscussionStateParams {
+  topic: string;
+  messages: DiscussionMessage[];
+  searchResults?: SearchResult[];
+  summaryState?: SummaryState;
 }
 
 export interface DiscussionActions {
@@ -69,6 +84,7 @@ export interface DiscussionActions {
   setMessageVotes: React.Dispatch<React.SetStateAction<MessageVote[]>>;
   handleVote: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   clearCurrentTurnState: () => void;
+  restoreDiscussionState: (params: RestoreDiscussionStateParams) => void;
   handleInterrupt: () => void;
   startDiscussion: (params: StartDiscussionParams) => Promise<void>;
   resumeDiscussion: (params: ResumeDiscussionParams) => Promise<void>;
@@ -125,7 +141,6 @@ const INITIAL_PROGRESS: ProgressState = {
   currentParticipantIndex: 0,
   totalParticipants: 0,
   currentParticipant: null,
-  isSummarizing: false,
 };
 
 // ============================================
@@ -158,9 +173,10 @@ interface CreateSSEHandlersParams {
   setCurrentSummaryPrompt: React.Dispatch<React.SetStateAction<string>>;
   setSuggestedFollowUps: React.Dispatch<React.SetStateAction<FollowUpQuestion[]>>;
   setIsGeneratingFollowUps: React.Dispatch<React.SetStateAction<boolean>>;
-  setAwaitingSummary?: React.Dispatch<React.SetStateAction<boolean>>;
+  setSummaryState?: React.Dispatch<React.SetStateAction<SummaryState>>;
   setIsLoading?: React.Dispatch<React.SetStateAction<boolean>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
+  setStreamingMessage?: React.Dispatch<React.SetStateAction<StreamingMessage | null>>;
   collectedMessagesRef: { current: DiscussionMessage[] };
   collectedFinalAnswerRef: { current: string };
   collectedSummaryPromptRef: { current: string };
@@ -181,9 +197,10 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     setCurrentSummaryPrompt,
     setSuggestedFollowUps,
     setIsGeneratingFollowUps,
-    setAwaitingSummary,
+    setSummaryState,
     setIsLoading,
     setError,
+    setStreamingMessage,
     collectedMessagesRef,
     collectedFinalAnswerRef,
     collectedSummaryPromptRef,
@@ -203,10 +220,10 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
         currentParticipantIndex: progressData.currentParticipantIndex,
         totalParticipants: progressData.totalParticipants,
         currentParticipant: progressData.currentParticipant,
-        isSummarizing: progressData.isSummarizing,
       });
     },
     onMessage: (message) => {
+      setStreamingMessage?.(null);
       collectedMessagesRef.current = [...collectedMessagesRef.current, message];
       setCurrentMessages(collectedMessagesRef.current);
       setCompletedParticipants((prev) => {
@@ -215,14 +232,35 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
         return newSet;
       });
       // 自動保存
+      // 次に発言すべきAIの位置を計算
+      const currentRound = currentProgressStateRef.current.currentRound;
+      const currentPIndex = currentProgressStateRef.current.currentParticipantIndex;
+      const totalParticipants = context.participants.length;
+
+      // 次の位置を計算（ラウンド内で最後の参加者なら次のラウンドへ）
+      let nextRound = currentRound;
+      let nextParticipantIndex = currentPIndex + 1;
+      let isAllComplete = false;
+      if (nextParticipantIndex >= totalParticipants) {
+        nextRound = currentRound + 1;
+        nextParticipantIndex = 0;
+        // 全ラウンド完了したかチェック
+        if (nextRound > context.totalRounds) {
+          isAllComplete = true;
+          // 範囲外にならないよう調整
+          nextRound = context.totalRounds;
+          nextParticipantIndex = totalParticipants - 1;
+        }
+      }
+
       const latestSession = currentSessionRef.current;
       if (latestSession) {
         const interruptedTurn: InterruptedTurnState = {
           topic: context.topic,
           participants: context.participants,
           messages: collectedMessagesRef.current,
-          currentRound: currentProgressStateRef.current.currentRound,
-          currentParticipantIndex: currentProgressStateRef.current.currentParticipantIndex,
+          currentRound: nextRound,
+          currentParticipantIndex: nextParticipantIndex,
           totalRounds: context.totalRounds,
           searchResults: context.searchResults,
           userProfile: context.userProfile,
@@ -231,6 +269,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
           directionGuide: context.directionGuide,
           terminationConfig: context.terminationConfig,
           interruptedAt: new Date(),
+          summaryState: isAllComplete ? 'awaiting' : 'idle',
         };
         const updatedSession: DiscussionSession = {
           ...latestSession,
@@ -245,12 +284,14 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
         );
       }
     },
+    onMessageChunk: (messageId, _chunk, accumulatedContent, provider, model, round) => {
+      setStreamingMessage?.({ messageId, content: accumulatedContent, provider, model, round });
+    },
     onSummary: (finalAnswer, summaryPrompt) => {
       collectedFinalAnswerRef.current = finalAnswer;
       collectedSummaryPromptRef.current = summaryPrompt || '';
       setCurrentFinalAnswer(finalAnswer);
       setCurrentSummaryPrompt(summaryPrompt || '');
-      setProgress((prev) => ({ ...prev, isSummarizing: false }));
       setIsGeneratingFollowUps(true);
     },
     onFollowups: (followups) => {
@@ -268,17 +309,29 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     },
     onReadyForSummary: includeReadyForSummary
       ? () => {
-          setAwaitingSummary?.(true);
+          setSummaryState?.('awaiting');
           setIsLoading?.(false);
           const latestSession = currentSessionRef.current;
           if (latestSession) {
+            // summaryState: 'awaiting'状態を保持した中断状態を保存
+            const interruptedTurn: InterruptedTurnState = {
+              topic: context.topic,
+              participants: context.participants,
+              messages: collectedMessagesRef.current,
+              currentRound: currentProgressStateRef.current.currentRound,
+              currentParticipantIndex: currentProgressStateRef.current.currentParticipantIndex,
+              totalRounds: context.totalRounds,
+              searchResults: context.searchResults,
+              interruptedAt: new Date(),
+              summaryState: 'awaiting',
+            };
             const updatedSession: DiscussionSession = {
               ...latestSession,
-              interruptedTurn: undefined,
+              interruptedTurn,
               updatedAt: new Date(),
             };
             saveSession(updatedSession).catch((err) =>
-              console.error('Failed to clear interrupted state:', err)
+              console.error('Failed to save awaiting summary state:', err)
             );
             setCurrentSession?.(updatedSession);
             setSessions((prev) =>
@@ -289,7 +342,6 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       : undefined,
     onComplete: () => {
       setIsLoading?.(false);
-      setProgress((prev) => ({ ...prev, isSummarizing: false }));
       setIsGeneratingFollowUps(false);
     },
   };
@@ -307,14 +359,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [awaitingSummary, setAwaitingSummary] = useState(false);
+  const [summaryState, setSummaryState] = useState<SummaryState>('idle');
   const [progress, setProgress] = useState<ProgressState>(INITIAL_PROGRESS);
   const [completedParticipants, setCompletedParticipants] = useState<Set<string>>(new Set());
   const [suggestedFollowUps, setSuggestedFollowUps] = useState<FollowUpQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [messageVotes, setMessageVotes] = useState<MessageVote[]>([]);
   const [discussionParticipants, setDiscussionParticipants] = useState<DiscussionParticipant[]>([]);
+  const [streamingMessage, setStreamingMessage] = useState<StreamingMessage | null>(null);
 
   const interruptRequestedRef = useRef(false);
 
@@ -339,8 +391,19 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setError(null);
     setSuggestedFollowUps([]);
     setIsGeneratingFollowUps(false);
-    setAwaitingSummary(false);
-    setIsGeneratingSummary(false);
+    setSummaryState('idle');
+  }, []);
+
+  const restoreDiscussionState = useCallback((params: RestoreDiscussionStateParams) => {
+    setCurrentTopic(params.topic);
+    setCurrentMessages(params.messages);
+    setCurrentSearchResults(params.searchResults || []);
+    setSummaryState(params.summaryState || 'idle');
+    setCurrentFinalAnswer('');
+    setCurrentSummaryPrompt('');
+    setError(null);
+    setSuggestedFollowUps([]);
+    setIsGeneratingFollowUps(false);
   }, []);
 
   const handleInterrupt = useCallback(() => {
@@ -363,9 +426,22 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         updateAndSaveSession,
       } = params;
 
-      setIsGeneratingSummary(true);
-      setAwaitingSummary(false);
+      setSummaryState('generating');
       setError(null);
+      // 復元・破棄ボタンをすぐに非表示にする
+      setInterruptedState(null);
+
+      // セッションのinterruptedTurnを統合回答生成中状態に更新
+      // クリアするのではなく、summaryState: 'generating'で更新することでリロード時に復元可能にする
+      if (currentSessionRef.current?.interruptedTurn) {
+        await updateAndSaveSession({
+          interruptedTurn: {
+            ...currentSessionRef.current.interruptedTurn,
+            summaryState: 'generating',
+            interruptedAt: new Date(),
+          },
+        });
+      }
 
       const previousTurns = getPreviousTurns(currentSessionRef.current);
       let collectedFinalAnswer = '';
@@ -394,17 +470,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         }
 
         const handlers: SSEEventHandlers = {
-          onProgress: (progressData) => {
-            if (progressData.isSummarizing) {
-              setProgress((prev) => ({ ...prev, isSummarizing: true }));
-            }
+          onProgress: () => {
+            // Progress is tracked via summaryState
           },
           onSummary: (finalAnswer, summaryPrompt) => {
             collectedFinalAnswer = finalAnswer;
             collectedSummaryPrompt = summaryPrompt || '';
             setCurrentFinalAnswer(finalAnswer);
             setCurrentSummaryPrompt(summaryPrompt || '');
-            setProgress((prev) => ({ ...prev, isSummarizing: false }));
             setIsGeneratingFollowUps(true);
           },
           onFollowups: (followups) => {
@@ -416,8 +489,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             setError(errorMsg);
           },
           onComplete: () => {
-            setIsGeneratingSummary(false);
-            setProgress((prev) => ({ ...prev, isSummarizing: false }));
+            setSummaryState('idle');
             setIsGeneratingFollowUps(false);
           },
         };
@@ -449,7 +521,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
-        setIsGeneratingSummary(false);
+        setSummaryState('idle');
       }
     },
     [currentMessages, currentTopic, currentSearchResults, messageVotes, clearCurrentTurnState]
@@ -500,7 +572,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         currentParticipantIndex: 0,
         totalParticipants: participants.length,
         currentParticipant: participants[0],
-        isSummarizing: false,
       });
 
       // 検索
@@ -604,9 +675,10 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setCurrentSummaryPrompt,
           setSuggestedFollowUps,
           setIsGeneratingFollowUps,
-          setAwaitingSummary,
+          setSummaryState,
           setIsLoading,
           setError,
+          setStreamingMessage,
           collectedMessagesRef,
           collectedFinalAnswerRef,
           collectedSummaryPromptRef,
@@ -726,7 +798,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         currentParticipantIndex: interruptedState.currentParticipantIndex,
         totalParticipants: interruptedState.participants.length,
         currentParticipant: interruptedState.participants[interruptedState.currentParticipantIndex],
-        isSummarizing: false,
       });
 
       const previousTurns = getPreviousTurns(session || currentSessionRef.current);
@@ -776,6 +847,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
               currentRound: interruptedState.currentRound,
               currentParticipantIndex: interruptedState.currentParticipantIndex,
             },
+            skipSummary: true,
           }),
         });
 
@@ -787,6 +859,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           context,
           currentSessionRef,
           setSessions,
+          setCurrentSession,
           setProgress,
           setCurrentMessages,
           setCompletedParticipants,
@@ -794,12 +867,15 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setCurrentSummaryPrompt,
           setSuggestedFollowUps,
           setIsGeneratingFollowUps,
+          setSummaryState,
           setIsLoading,
           setError,
+          setStreamingMessage,
           collectedMessagesRef,
           collectedFinalAnswerRef,
           collectedSummaryPromptRef,
           currentProgressStateRef,
+          includeReadyForSummary: true,
         });
 
         const wasInterrupted = await processSSEStream(
@@ -867,14 +943,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     isLoading,
     isSearching,
     isGeneratingFollowUps,
-    isGeneratingSummary,
-    awaitingSummary,
+    summaryState,
     progress,
     completedParticipants,
     suggestedFollowUps,
     error,
     messageVotes,
     discussionParticipants,
+    streamingMessage,
     setCurrentMessages,
     setCurrentFinalAnswer,
     setCurrentTopic,
@@ -883,6 +959,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setMessageVotes,
     handleVote,
     clearCurrentTurnState,
+    restoreDiscussionState,
     handleInterrupt,
     startDiscussion,
     resumeDiscussion,

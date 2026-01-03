@@ -66,13 +66,29 @@ export function SessionItem({
               <div className="text-sm text-white truncate flex-1" title={session.title}>
                 {session.title}
               </div>
-              {/* 中断中マーク（現在アクティブなセッションで議論中の場合は非表示） */}
+              {/* 状態マーク（現在アクティブなセッションで議論中の場合は非表示） */}
               {session.interruptedTurn && !(isSelected && disabled) && (
                 <span
-                  className="shrink-0 px-1.5 py-0.5 text-[10px] bg-orange-600/80 text-orange-100 rounded font-medium"
-                  title={`中断中: ${session.interruptedTurn.topic}`}
+                  className={`shrink-0 px-1.5 py-0.5 text-[10px] rounded font-medium ${
+                    session.interruptedTurn.summaryState === 'generating'
+                      ? 'bg-purple-600/80 text-purple-100'
+                      : session.interruptedTurn.summaryState === 'awaiting'
+                        ? 'bg-blue-600/80 text-blue-100'
+                        : 'bg-orange-600/80 text-orange-100'
+                  }`}
+                  title={
+                    session.interruptedTurn.summaryState === 'generating'
+                      ? `統合中: ${session.interruptedTurn.topic}`
+                      : session.interruptedTurn.summaryState === 'awaiting'
+                        ? `投票待ち: ${session.interruptedTurn.topic}`
+                        : `中断中: ${session.interruptedTurn.topic}`
+                  }
                 >
-                  中断中
+                  {session.interruptedTurn.summaryState === 'generating'
+                    ? '統合中'
+                    : session.interruptedTurn.summaryState === 'awaiting'
+                      ? '投票待ち'
+                      : '中断中'}
                 </span>
               )}
             </div>

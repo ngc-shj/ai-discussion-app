@@ -17,12 +17,11 @@ export function ParticipantChip({
 }: ParticipantChipProps) {
   const isPending = !isActive && !isCompleted;
 
-  // モデル名を短縮表示
-  const shortName = p.model.includes('/')
-    ? p.model.split('/').pop()
-    : p.model.length > 15
-      ? p.model.slice(0, 12) + '...'
-      : p.model;
+  // 表示名を短縮（MessageBubbleと統一するため、displayNameを使用）
+  // displayNameは「Ollama (llama3.2:latest)」のような形式
+  const shortName = p.displayName.length > 20
+    ? p.displayName.slice(0, 17) + '...'
+    : p.displayName;
 
   // ロール情報（中立以外の場合のみ表示）
   // displayRoleNameがない場合はフォールバック（プリセット→ROLE_PRESETS、カスタム→「カスタム」）

@@ -46,12 +46,10 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // 統合中の進捗を送信
+          // 統合中の進捗を送信（summaryStateで管理されるためprogressは空）
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             type: 'progress',
-            progress: {
-              isSummarizing: true,
-            },
+            progress: {},
           })}\n\n`));
 
           // 議論に成功した参加者を使用して統合回答を生成

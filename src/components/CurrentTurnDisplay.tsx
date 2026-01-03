@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { DiscussionMessage, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType } from '@/types';
+import { DiscussionMessage, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState } from '@/types';
+import { StreamingMessage } from '@/hooks';
 import { MessageBubble } from './MessageBubble';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FollowUpSuggestions } from './FollowUpSuggestions';
@@ -15,7 +16,7 @@ interface CurrentTurnDisplayProps {
   finalAnswer?: string;
   summaryPrompt?: string;
   isLoading: boolean;
-  isSummarizing: boolean;
+  summaryState?: SummaryState;
   searchResults?: SearchResult[];
   onFollowUp?: (topic: string, previousAnswer: string) => void;
   onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
@@ -24,9 +25,8 @@ interface CurrentTurnDisplayProps {
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   suggestedFollowUps?: FollowUpQuestion[];
   isGeneratingFollowUps?: boolean;
-  awaitingSummary?: boolean;
-  isGeneratingSummary?: boolean;
   onGenerateSummary?: () => void;
+  streamingMessage?: StreamingMessage | null;
 }
 
 export function CurrentTurnDisplay({
@@ -35,7 +35,7 @@ export function CurrentTurnDisplay({
   finalAnswer,
   summaryPrompt,
   isLoading,
-  isSummarizing,
+  summaryState,
   searchResults,
   onFollowUp,
   onDeepDive,
@@ -44,9 +44,8 @@ export function CurrentTurnDisplay({
   onVote,
   suggestedFollowUps,
   isGeneratingFollowUps,
-  awaitingSummary,
-  isGeneratingSummary,
   onGenerateSummary,
+  streamingMessage,
 }: CurrentTurnDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -134,7 +133,7 @@ export function CurrentTurnDisplay({
                   ({participantCount}<span className="hidden sm:inline">モデル</span> × {maxRound}<span className="hidden sm:inline">ラウンド</span>)
                 </span>
               )}
-              {isLoading && !isSummarizing && (
+              {isLoading && summaryState !== 'generating' && (
                 <div className="animate-spin w-3 h-3 border-2 border-gray-500 border-t-blue-400 rounded-full" />
               )}
             </button>
@@ -171,7 +170,21 @@ export function CurrentTurnDisplay({
                   onVote={onVote ? (vote) => onVote(message.id, vote) : undefined}
                 />
               ))}
-              {isLoading && messages.length === 0 && (
+              {streamingMessage && (
+                <MessageBubble
+                  key={streamingMessage.messageId}
+                  message={{
+                    id: streamingMessage.messageId,
+                    provider: streamingMessage.provider as import('@/types').AIProviderType,
+                    model: streamingMessage.model,
+                    content: streamingMessage.content,
+                    round: streamingMessage.round,
+                    timestamp: new Date(),
+                    isStreaming: true,
+                  }}
+                />
+              )}
+              {isLoading && messages.length === 0 && !streamingMessage && (
                 <div className="flex items-center gap-2 py-3 md:py-4">
                   <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-blue-400 rounded-full" />
                   <span className="text-gray-400 text-sm md:text-base">議論を開始中...</span>
@@ -184,7 +197,7 @@ export function CurrentTurnDisplay({
       )}
 
       {/* 統合回答待ち状態（投票を促すUI） */}
-      {awaitingSummary && !finalAnswer && !isSummarizing && (
+      {summaryState === 'awaiting' && !finalAnswer && (
         <div className="flex gap-2 md:gap-3">
           <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shrink-0">
             <span className="text-white text-base md:text-lg">✨</span>
@@ -208,22 +221,12 @@ export function CurrentTurnDisplay({
                   <button
                     type="button"
                     onClick={onGenerateSummary}
-                    disabled={isGeneratingSummary}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg transition-all shadow-lg"
                   >
-                    {isGeneratingSummary ? (
-                      <>
-                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                        <span>生成中...</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>統合回答を生成</span>
-                      </>
-                    )}
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>統合回答を生成</span>
                   </button>
                 </div>
               </div>
@@ -233,7 +236,7 @@ export function CurrentTurnDisplay({
       )}
 
       {/* 統合回答または統合中表示 */}
-      {(finalAnswer || isSummarizing || isGeneratingSummary) && (
+      {(finalAnswer || summaryState === 'generating') && (
         <div className="flex gap-2 md:gap-3">
           <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shrink-0">
             <span className="text-white text-base md:text-lg">✨</span>
@@ -242,7 +245,7 @@ export function CurrentTurnDisplay({
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
-                {summaryPrompt && !isSummarizing && (
+                {summaryPrompt && summaryState !== 'generating' && (
                   <button
                     type="button"
                     onClick={() => setShowSummaryPrompt(!showSummaryPrompt)}
@@ -268,7 +271,7 @@ export function CurrentTurnDisplay({
               </div>
             )}
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg text-gray-200 text-sm md:text-base relative">
-              {(isSummarizing || isGeneratingSummary) && !finalAnswer ? (
+              {summaryState === 'generating' && !finalAnswer ? (
                 <div className="flex items-center gap-2 p-2 md:p-3">
                   <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-purple-400 rounded-full" />
                   <span className="text-gray-400 text-sm md:text-base">議論を統合中...</span>
@@ -307,7 +310,7 @@ export function CurrentTurnDisplay({
               )}
             </div>
             {/* アクションボタン（統合完了後のみ表示） */}
-            {finalAnswer && !isSummarizing && !isLoading && (onDeepDive || onCounterargument) && (
+            {finalAnswer && summaryState !== 'generating' && !isLoading && (onDeepDive || onCounterargument) && (
               <div className="mt-2 flex justify-end gap-2 flex-wrap">
                 {onDeepDive && (
                   <button
@@ -339,7 +342,7 @@ export function CurrentTurnDisplay({
               />
             )}
             {/* フォローアップ質問候補 */}
-            {finalAnswer && !isSummarizing && onFollowUp && (
+            {finalAnswer && summaryState !== 'generating' && onFollowUp && (
               <FollowUpSuggestions
                 questions={suggestedFollowUps || []}
                 onSelect={(question) => onFollowUp(question, finalAnswer)}

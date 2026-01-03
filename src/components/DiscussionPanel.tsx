@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { DiscussionTurn, DiscussionMessage, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType } from '@/types';
+import { DiscussionTurn, DiscussionMessage, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState } from '@/types';
+import { StreamingMessage } from '@/hooks';
 import { TurnDisplay } from './TurnDisplay';
 import { CurrentTurnDisplay } from './CurrentTurnDisplay';
 
@@ -12,7 +13,6 @@ interface DiscussionPanelProps {
   currentFinalAnswer?: string;
   currentSummaryPrompt?: string;
   isLoading: boolean;
-  isSummarizing: boolean;
   searchResults?: SearchResult[];
   onFollowUp?: (topic: string, previousAnswer: string) => void;
   onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
@@ -22,9 +22,9 @@ interface DiscussionPanelProps {
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   suggestedFollowUps?: FollowUpQuestion[];
   isGeneratingFollowUps?: boolean;
-  awaitingSummary?: boolean;
-  isGeneratingSummary?: boolean;
+  summaryState?: SummaryState;
   onGenerateSummary?: () => void;
+  streamingMessage?: StreamingMessage | null;
 }
 
 export function DiscussionPanel({
@@ -34,7 +34,6 @@ export function DiscussionPanel({
   currentFinalAnswer,
   currentSummaryPrompt,
   isLoading,
-  isSummarizing,
   searchResults,
   onFollowUp,
   onDeepDive,
@@ -44,9 +43,9 @@ export function DiscussionPanel({
   onVote,
   suggestedFollowUps,
   isGeneratingFollowUps,
-  awaitingSummary,
-  isGeneratingSummary,
+  summaryState,
   onGenerateSummary,
+  streamingMessage,
 }: DiscussionPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -94,7 +93,7 @@ export function DiscussionPanel({
           finalAnswer={currentFinalAnswer}
           summaryPrompt={currentSummaryPrompt}
           isLoading={isLoading}
-          isSummarizing={isSummarizing}
+          summaryState={summaryState}
           searchResults={searchResults}
           onFollowUp={onFollowUp}
           onDeepDive={onDeepDive}
@@ -103,9 +102,8 @@ export function DiscussionPanel({
           onVote={onVote}
           suggestedFollowUps={suggestedFollowUps}
           isGeneratingFollowUps={isGeneratingFollowUps}
-          awaitingSummary={awaitingSummary}
-          isGeneratingSummary={isGeneratingSummary}
           onGenerateSummary={onGenerateSummary}
+          streamingMessage={streamingMessage}
         />
       )}
     </div>

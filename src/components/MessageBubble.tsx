@@ -41,12 +41,17 @@ export function MessageBubble({ message, vote, onVote }: MessageBubbleProps) {
               <div className="animate-spin w-4 h-4 border-2 border-gray-500 border-t-white rounded-full" />
               <span className="text-gray-400">考え中...</span>
             </div>
+          ) : message.isStreaming ? (
+            <div>
+              <MarkdownRenderer content={message.content} />
+              <span className="inline-block w-2 h-4 bg-blue-400 animate-pulse ml-0.5" />
+            </div>
           ) : (
             <MarkdownRenderer content={message.content} />
           )}
         </div>
         {/* プロンプト表示ボタン・投票ボタン */}
-        {!message.isLoading && (
+        {!message.isLoading && !message.isStreaming && (
           <div className="flex items-center gap-1 mt-1.5">
             {/* プロンプト表示トグル */}
             {message.prompt && (
@@ -75,7 +80,7 @@ export function MessageBubble({ message, vote, onVote }: MessageBubbleProps) {
           </div>
         )}
         {/* 投票ボタン */}
-        {onVote && !message.isLoading && (
+        {onVote && !message.isLoading && !message.isStreaming && (
           <div className="flex items-center gap-1 mt-1">
             <button
               type="button"

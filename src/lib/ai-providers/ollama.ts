@@ -1,5 +1,5 @@
 import { AIRequest, AIResponse } from '@/types';
-import { AIProvider, ModelInfo } from './types';
+import { AIProvider, ModelInfo, StreamChunkCallback } from './types';
 
 export class OllamaProvider implements AIProvider {
   readonly type = 'ollama' as const;
@@ -56,11 +56,15 @@ export class OllamaProvider implements AIProvider {
   }
 
   async generate(request: AIRequest): Promise<AIResponse> {
-    try {
-      // 3分のタイムアウトを設定（大きなモデルの場合時間がかかるため）
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180000);
+    // 内部的にgenerateStreamを使用（コールバックなし）
+    return this.generateStream(request, () => {});
+  }
 
+  async generateStream(
+    request: AIRequest,
+    onChunk: StreamChunkCallback
+  ): Promise<AIResponse> {
+    try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
         headers: {
@@ -69,31 +73,64 @@ export class OllamaProvider implements AIProvider {
         body: JSON.stringify({
           model: this.model,
           prompt: request.prompt,
-          stream: false,
+          stream: true,
         }),
-        signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Ollama API returned ${response.status}`);
       }
 
-      const data = await response.json();
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Response body is not readable');
+      }
+
+      const decoder = new TextDecoder();
+      let content = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        // 改行で分割し、完全な行のみ処理
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // 最後の不完全な行はバッファに残す
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const json = JSON.parse(line);
+            if (json.response) {
+              content += json.response;
+              onChunk(json.response); // リアルタイムコールバック
+            }
+          } catch {
+            // JSON パースエラーは無視（不完全な行の可能性）
+          }
+        }
+      }
+
+      // バッファに残った最後の行を処理
+      if (buffer.trim()) {
+        try {
+          const json = JSON.parse(buffer);
+          if (json.response) {
+            content += json.response;
+            onChunk(json.response);
+          }
+        } catch {
+          // 無視
+        }
+      }
 
       return {
-        content: data.response || '',
+        content,
         provider: this.type,
       };
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return {
-          content: '',
-          provider: this.type,
-          error: 'Ollama API timeout (180s exceeded)',
-        };
-      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         content: '',
