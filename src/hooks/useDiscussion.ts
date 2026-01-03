@@ -398,7 +398,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setCurrentTopic('');
     setCurrentSearchResults([]);
     setError(null);
-    setSuggestedFollowUps([]);
+    // suggestedFollowUpsはクリアしない（次のアクション用に保持する必要がある）
+    // 新しい議論開始時やセッション切り替え時に個別にクリアする
     setIsGeneratingFollowUps(false);
     setSummaryState('idle');
   }, []);
@@ -455,6 +456,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       const previousTurns = getPreviousTurns(currentSessionRef.current);
       let collectedFinalAnswer = '';
       let collectedSummaryPrompt = '';
+      let collectedFollowUps: FollowUpQuestion[] = [];
 
       try {
         const response = await fetch('/api/summarize', {
@@ -493,6 +495,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             setIsGeneratingFollowUps(true);
           },
           onFollowups: (followups) => {
+            collectedFollowUps = followups;
             setSuggestedFollowUps(followups);
             setIsGeneratingFollowUps(false);
           },
@@ -514,7 +517,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             currentMessages,
             collectedFinalAnswer,
             currentSearchResults.length > 0 ? currentSearchResults : undefined,
-            collectedSummaryPrompt || undefined
+            collectedSummaryPrompt || undefined,
+            collectedFollowUps.length > 0 ? collectedFollowUps : undefined
           );
           const latestSession = currentSessionRef.current;
 
@@ -941,6 +945,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           }
 
           clearCurrentTurnState();
+          setSuggestedFollowUps([]);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');

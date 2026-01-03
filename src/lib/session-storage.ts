@@ -202,7 +202,8 @@ export function createNewTurn(
   messages: DiscussionTurn['messages'],
   finalAnswer: string,
   searchResults?: SearchResult[],
-  summaryPrompt?: string
+  summaryPrompt?: string,
+  suggestedFollowUps?: DiscussionTurn['suggestedFollowUps']
 ): DiscussionTurn {
   return {
     id: `turn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -211,6 +212,7 @@ export function createNewTurn(
     finalAnswer,
     summaryPrompt,
     searchResults,
+    suggestedFollowUps,
     createdAt: new Date(),
   };
 }
