@@ -66,53 +66,71 @@ export function DiscussionOptionsPanel({
   const currentTermPreset = TERMINATION_PRESETS.find((t) => t.id === terminationConfig.condition);
 
   return (
-    <div className="mt-2 p-3 bg-gray-700/50 rounded-lg space-y-4">
-      {/* 1. Web検索 */}
-      <SearchConfigSection
-        disabled={disabled}
-        searchConfig={searchConfig}
-        onSearchConfigChange={onSearchConfigChange}
-      />
+    <div className="mt-2 space-y-3">
+      {/* 情報取得セクション */}
+      <div className="p-3 bg-green-900/20 border border-green-800/30 rounded-lg">
+        <div className="flex items-center gap-2 mb-3">
+          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span className="text-xs font-medium text-green-400">情報取得</span>
+        </div>
+        <SearchConfigSection
+          disabled={disabled}
+          searchConfig={searchConfig}
+          onSearchConfigChange={onSearchConfigChange}
+        />
+      </div>
 
-      {/* 2. 議論モード選択 */}
-      <ModeSection
-        disabled={disabled}
-        discussionMode={discussionMode}
-        onDiscussionModeChange={onDiscussionModeChange}
-        currentModePreset={currentModePreset}
-      />
+      {/* 議論設定セクション */}
+      <div className="p-3 bg-blue-900/20 border border-blue-800/30 rounded-lg space-y-4">
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          <span className="text-xs font-medium text-blue-400">議論設定</span>
+        </div>
 
-      {/* 3. 議論の深さ */}
-      <DepthSection
-        disabled={disabled}
-        discussionDepth={discussionDepth}
-        onDiscussionDepthChange={onDiscussionDepthChange}
-        currentDepthPreset={currentDepthPreset}
-      />
+        {/* 議論モード選択 */}
+        <ModeSection
+          disabled={disabled}
+          discussionMode={discussionMode}
+          onDiscussionModeChange={onDiscussionModeChange}
+          currentModePreset={currentModePreset}
+        />
 
-      {/* 4. 注目キーワード */}
-      <KeywordSection
-        disabled={disabled}
-        directionGuide={directionGuide}
-        keywordInput={keywordInput}
-        onKeywordInputChange={onKeywordInputChange}
-        onAddKeyword={onAddKeyword}
-        onRemoveKeyword={onRemoveKeyword}
-        onKeywordKeyDown={onKeywordKeyDown}
-      />
+        {/* 議論の深さ */}
+        <DepthSection
+          disabled={disabled}
+          discussionDepth={discussionDepth}
+          onDiscussionDepthChange={onDiscussionDepthChange}
+          currentDepthPreset={currentDepthPreset}
+        />
 
-      {/* 5. 終了条件 */}
-      <TerminationSection
-        disabled={disabled}
-        terminationConfig={terminationConfig}
-        onTerminationConfigChange={onTerminationConfigChange}
-        currentTermPreset={currentTermPreset}
-        termKeywordInput={termKeywordInput}
-        onTermKeywordInputChange={onTermKeywordInputChange}
-        onAddTermKeyword={onAddTermKeyword}
-        onRemoveTermKeyword={onRemoveTermKeyword}
-        onTermKeywordKeyDown={onTermKeywordKeyDown}
-      />
+        {/* 注目キーワード */}
+        <KeywordSection
+          disabled={disabled}
+          directionGuide={directionGuide}
+          keywordInput={keywordInput}
+          onKeywordInputChange={onKeywordInputChange}
+          onAddKeyword={onAddKeyword}
+          onRemoveKeyword={onRemoveKeyword}
+          onKeywordKeyDown={onKeywordKeyDown}
+        />
+
+        {/* 終了条件 */}
+        <TerminationSection
+          disabled={disabled}
+          terminationConfig={terminationConfig}
+          onTerminationConfigChange={onTerminationConfigChange}
+          currentTermPreset={currentTermPreset}
+          termKeywordInput={termKeywordInput}
+          onTermKeywordInputChange={onTermKeywordInputChange}
+          onAddTermKeyword={onAddTermKeyword}
+          onRemoveTermKeyword={onRemoveTermKeyword}
+          onTermKeywordKeyDown={onTermKeywordKeyDown}
+        />
+      </div>
     </div>
   );
 }
