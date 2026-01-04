@@ -5,6 +5,7 @@ import {
   DiscussionSession,
   DeepDiveType,
   DEEP_DIVE_PRESETS,
+  SettingsPreset,
 } from '@/types';
 import {
   DiscussionPanel,
@@ -13,8 +14,9 @@ import {
   ProgressIndicator,
   SessionSidebar,
   MobileHeader,
+  PresetManagerModal,
 } from '@/components';
-import { useDiscussionSettings, useSessionManager, useDiscussion } from '@/hooks';
+import { useDiscussionSettings, useSessionManager, useDiscussion, usePresetManager } from '@/hooks';
 
 export default function Home() {
   // 設定関連（カスタムフックを使用）
@@ -81,6 +83,16 @@ export default function Home() {
     discardInterrupted,
   } = useSessionManager();
 
+  // プリセット管理（カスタムフックを使用）
+  const {
+    presets,
+    savePreset,
+    updatePreset,
+    deletePreset,
+    duplicatePreset,
+    validatePreset,
+  } = usePresetManager();
+
   // サイドバー・設定パネルの開閉状態
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -89,6 +101,8 @@ export default function Home() {
   const [isSettingsCollapsed, setIsSettingsCollapsed] = useState(false);
   // フォローアップ用のプリセットトピック
   const [presetTopic, setPresetTopic] = useState<string>('');
+  // プリセットモーダルの開閉状態
+  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
 
   // 初期ロード完了フラグ
   const initialRestoreDoneRef = useRef(false);
@@ -269,6 +283,48 @@ export default function Home() {
     discardInterrupted();
   }, [discardInterrupted]);
 
+  // 現在の設定をプリセットとして保存
+  const handleSaveAsPreset = useCallback((name: string, description?: string) => {
+    savePreset({
+      name,
+      description,
+      participants,
+      discussionMode,
+      discussionDepth,
+      directionGuide,
+      terminationConfig,
+      searchConfig,
+      userProfile,
+    });
+  }, [savePreset, participants, discussionMode, discussionDepth, directionGuide, terminationConfig, searchConfig, userProfile]);
+
+  // プリセットを読み込み
+  const handleLoadPreset = useCallback((preset: SettingsPreset) => {
+    // 利用可能なモデルのみをフィルタリング
+    const validation = validatePreset(preset, availableModels);
+    let validParticipants = preset.participants;
+    if (!validation.isValid) {
+      validParticipants = preset.participants.filter((p) => {
+        const providerModels = availableModels[p.provider] || [];
+        return providerModels.some((m) => m.id === p.model);
+      });
+    }
+
+    // 全設定を適用
+    setParticipants(validParticipants);
+    setDiscussionMode(preset.discussionMode);
+    setDiscussionDepth(preset.discussionDepth);
+    setDirectionGuide(preset.directionGuide);
+    setTerminationConfig(preset.terminationConfig);
+    setSearchConfig(preset.searchConfig);
+    setUserProfile(preset.userProfile);
+  }, [validatePreset, availableModels, setParticipants, setDiscussionMode, setDiscussionDepth, setDirectionGuide, setTerminationConfig, setSearchConfig, setUserProfile]);
+
+  // プリセットを検証
+  const handleValidatePreset = useCallback((preset: SettingsPreset) => {
+    return validatePreset(preset, availableModels);
+  }, [validatePreset, availableModels]);
+
   // 統合回答を生成
   const handleGenerateSummary = useCallback(async () => {
     await generateSummary({
@@ -364,7 +420,9 @@ export default function Home() {
           onMenuClick={() => setIsSidebarOpen(true)}
           onNewSession={handleNewSession}
           onSettingsClick={() => setIsSettingsOpen(true)}
-          disabled={isLoading}
+          onPresetClick={() => setIsPresetModalOpen(true)}
+          presetCount={presets.length}
+          disabled={isLoading || isSearching}
         />
 
         {/* デスクトップ用ヘッダー */}
@@ -390,18 +448,34 @@ export default function Home() {
               </p>
             )}
           </div>
-          {/* 設定パネル折りたたみボタン */}
-          <button
-            type="button"
-            onClick={() => setIsSettingsCollapsed(!isSettingsCollapsed)}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-            title={isSettingsCollapsed ? '設定を開く' : '設定を閉じる'}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            {/* プリセット管理ボタン */}
+            <button
+              type="button"
+              onClick={() => setIsPresetModalOpen(true)}
+              disabled={isLoading || isSearching}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              title="全設定プリセット（参加者・議論オプションを保存/読込）"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              {presets.length > 0 && (
+                <span className="text-xs text-indigo-400">{presets.length}</span>
+              )}
+            </button>
+            {/* 参加者パネル折りたたみボタン */}
+            <button
+              type="button"
+              onClick={() => setIsSettingsCollapsed(!isSettingsCollapsed)}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+              title={isSettingsCollapsed ? '参加者パネルを開く' : '参加者パネルを閉じる'}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </button>
+          </div>
         </header>
 
         {/* エラー表示 */}
@@ -547,6 +621,19 @@ export default function Home() {
           onClose={() => setIsSettingsOpen(false)}
         />
       </div>
+
+      {/* プリセット管理モーダル */}
+      <PresetManagerModal
+        isOpen={isPresetModalOpen}
+        onClose={() => setIsPresetModalOpen(false)}
+        presets={presets}
+        onLoadPreset={handleLoadPreset}
+        onSaveCurrentAsPreset={handleSaveAsPreset}
+        onRenamePreset={(id, name) => updatePreset(id, { name })}
+        onDeletePreset={deletePreset}
+        onDuplicatePreset={duplicatePreset}
+        validatePreset={handleValidatePreset}
+      />
     </div>
   );
 }

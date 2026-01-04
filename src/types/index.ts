@@ -59,3 +59,13 @@ export { DEEP_DIVE_PRESETS } from './deepdive';
 // Fork types
 export type { ForkPreset } from './fork';
 export { FORK_PRESETS } from './fork';
+
+// Preset types
+export type {
+  SettingsPreset,
+  SettingsPresetInput,
+  SettingsPresetUpdate,
+  PresetValidationResult,
+  PresetWarning,
+} from './preset';
+export { generatePresetId } from './preset';

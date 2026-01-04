@@ -8,3 +8,5 @@ export type { DiscussionState, DiscussionActions, ProgressState, StreamingMessag
 export { useInputForm } from './useInputForm';
 export type { UseInputFormProps, UseInputFormReturn } from './useInputForm';
 export { useCustomRoles } from './useCustomRoles';
+export { usePresetManager } from './usePresetManager';
+export type { UsePresetManagerReturn } from './usePresetManager';
