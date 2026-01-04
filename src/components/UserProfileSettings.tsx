@@ -75,7 +75,7 @@ export function UserProfileSettings({ profile, onProfileChange, disabled }: User
               onChange={(e) => updateProfile({ name: e.target.value || undefined })}
               placeholder="例: 田中太郎"
               disabled={disabled}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -88,7 +88,7 @@ export function UserProfileSettings({ profile, onProfileChange, disabled }: User
               onChange={(e) => updateProfile({ occupation: e.target.value || undefined })}
               placeholder="例: ソフトウェアエンジニア、データサイエンティスト"
               disabled={disabled}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -149,7 +149,7 @@ export function UserProfileSettings({ profile, onProfileChange, disabled }: User
                 onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addInterest())}
                 placeholder="例: AI、Web開発、セキュリティ"
                 disabled={disabled}
-                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50"
+                className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <button
                 type="button"
@@ -193,7 +193,7 @@ export function UserProfileSettings({ profile, onProfileChange, disabled }: User
               placeholder="例: 実務経験10年、最近はAI/MLに注力中、技術的な詳細を好む"
               disabled={disabled}
               rows={2}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50 resize-none"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed resize-none"
             />
           </div>
 

@@ -99,48 +99,51 @@ export function AISelector({
       />
 
       {/* モデル表示切替 */}
-      <div className={`flex flex-wrap items-center gap-2 p-2 bg-gray-700/50 rounded-lg ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
+      <div className={`flex flex-wrap items-center gap-2 p-2 bg-gray-700/50 rounded-lg ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
         <span className="text-xs text-gray-400">表示:</span>
-        <label className="flex items-center gap-1 cursor-pointer">
+        <label className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
           <input
             type="radio"
             name="modelFilter"
             checked={modelFilter === 'latest-generation'}
             onChange={() => setModelFilter('latest-generation')}
+            disabled={disabled}
             className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600"
           />
           <span className="text-xs text-gray-300">最新世代</span>
         </label>
-        <label className="flex items-center gap-1 cursor-pointer">
+        <label className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
           <input
             type="radio"
             name="modelFilter"
             checked={modelFilter === 'latest-5'}
             onChange={() => setModelFilter('latest-5')}
+            disabled={disabled}
             className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600"
           />
           <span className="text-xs text-gray-300">最新{LATEST_MODEL_COUNT}件</span>
         </label>
-        <label className="flex items-center gap-1 cursor-pointer">
+        <label className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
           <input
             type="radio"
             name="modelFilter"
             checked={modelFilter === 'all'}
             onChange={() => setModelFilter('all')}
+            disabled={disabled}
             className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600"
           />
           <span className="text-xs text-gray-300">すべて</span>
         </label>
         <span className="text-gray-600">|</span>
         <label
-          className={`flex items-center gap-1 ${modelFilter === 'latest-generation' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+          className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed opacity-50' : modelFilter === 'latest-generation' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
           title={modelFilter === 'latest-generation' ? 'ローカルモデルの全サイズを表示' : '「最新世代」選択時のみ有効'}
         >
           <input
             type="checkbox"
             checked={showAllLocalSizes}
             onChange={(e) => setShowAllLocalSizes(e.target.checked)}
-            disabled={modelFilter !== 'latest-generation'}
+            disabled={disabled || modelFilter !== 'latest-generation'}
             className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600 rounded disabled:opacity-50"
           />
           <span className="text-xs text-gray-300">ローカル全サイズ</span>

@@ -372,6 +372,9 @@ export default function Home() {
     });
   }, [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, startDiscussion]);
 
+  // 無効化条件
+  const isSettingsDisabled = isLoading || isSearching || summaryState !== 'idle';
+
   return (
     <div className="flex h-screen bg-gray-900 text-white">
       {/* 左サイドバー: セッション一覧 - デスクトップ */}
@@ -422,7 +425,7 @@ export default function Home() {
           onSettingsClick={() => setIsSettingsOpen(true)}
           onPresetClick={() => setIsPresetModalOpen(true)}
           presetCount={presets.length}
-          disabled={isLoading || isSearching}
+          disabled={isSettingsDisabled}
         />
 
         {/* デスクトップ用ヘッダー */}
@@ -453,7 +456,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setIsPresetModalOpen(true)}
-              disabled={isLoading || isSearching}
+              disabled={isSettingsDisabled}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
               title="全設定プリセット（参加者・議論オプションを保存/読込）"
             >
@@ -575,7 +578,7 @@ export default function Home() {
         <div className="shrink-0">
           <InputForm
             onSubmit={handleStartDiscussion}
-            disabled={isLoading || isSearching}
+            disabled={isSettingsDisabled}
             presetTopic={presetTopic}
             onPresetTopicClear={handlePresetTopicClear}
             searchConfig={searchConfig}
@@ -602,7 +605,7 @@ export default function Home() {
             availability={availability}
             userProfile={userProfile}
             onUserProfileChange={setUserProfile}
-            disabled={isLoading || isSearching || summaryState !== 'idle'}
+            disabled={isSettingsDisabled}
           />
         </div>
       )}
@@ -616,7 +619,7 @@ export default function Home() {
           availability={availability}
           userProfile={userProfile}
           onUserProfileChange={setUserProfile}
-          disabled={isLoading || isSearching || summaryState !== 'idle'}
+          disabled={isSettingsDisabled}
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
         />

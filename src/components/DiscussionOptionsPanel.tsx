@@ -177,7 +177,7 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
               })}
               disabled={disabled}
               title="検索タイプを選択"
-              className="px-2 py-1 bg-gray-600 text-white text-xs rounded border border-gray-500 focus:outline-none focus:border-green-500"
+              className="px-2 py-1 bg-gray-600 text-white text-xs rounded border border-gray-500 focus:outline-none focus:border-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="web">Web検索</option>
               <option value="news">ニュース</option>
@@ -194,7 +194,7 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
               })}
               disabled={disabled}
               title={`検索結果数: ${searchConfig.maxResults}`}
-              className="flex-1 h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-green-500"
+              className={`flex-1 h-1.5 bg-gray-600 rounded-lg appearance-none accent-green-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
             />
           </div>
         </div>
@@ -266,7 +266,7 @@ function DepthSection({ disabled, discussionDepth, onDiscussionDepthChange, curr
         onChange={(e) => onDiscussionDepthChange(Number(e.target.value) as DiscussionDepth)}
         disabled={disabled}
         title={`議論の深さ: ${currentDepthPreset?.name}`}
-        className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+        className={`w-full h-2 bg-gray-600 rounded-lg appearance-none accent-blue-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
       />
       <div className="flex justify-between text-xs text-gray-500">
         <span>概要</span>
@@ -308,7 +308,7 @@ function KeywordSection({
           onKeyDown={onKeywordKeyDown}
           placeholder="キーワードを入力..."
           disabled={disabled}
-          className="flex-1 px-2 py-1.5 bg-gray-600 border border-gray-500 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+          className="flex-1 px-2 py-1.5 bg-gray-600 border border-gray-500 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
         />
         <button
           type="button"
@@ -410,7 +410,7 @@ function TerminationSection({
             onChange={(e) => onTerminationConfigChange({ ...terminationConfig, consensusThreshold: Number(e.target.value) })}
             disabled={disabled}
             title={`合意閾値: ${Math.round((terminationConfig.consensusThreshold || 0.7) * 100)}%`}
-            className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-orange-500"
+            className={`w-full h-2 bg-gray-600 rounded-lg appearance-none accent-orange-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
           />
         </div>
       )}
@@ -426,7 +426,7 @@ function TerminationSection({
               onKeyDown={onTermKeywordKeyDown}
               placeholder="終了キーワード..."
               disabled={disabled}
-              className="flex-1 px-2 py-1.5 bg-gray-600 border border-gray-500 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:border-orange-500"
+              className="flex-1 px-2 py-1.5 bg-gray-600 border border-gray-500 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
               type="button"
@@ -474,7 +474,7 @@ function TerminationSection({
           onChange={(e) => onTerminationConfigChange({ ...terminationConfig, maxRounds: Number(e.target.value) })}
           disabled={disabled}
           title={`最大ラウンド数: ${terminationConfig.maxRounds}`}
-          className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-gray-400"
+          className={`w-full h-2 bg-gray-600 rounded-lg appearance-none accent-gray-400 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
         />
       </div>
     </div>
