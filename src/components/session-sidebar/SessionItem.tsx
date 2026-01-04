@@ -109,9 +109,10 @@ export function SessionItem({
             aria-label="セッションメニュー"
             onClick={(e) => {
               e.stopPropagation();
-              onToggleMenu();
+              if (!disabled) onToggleMenu();
             }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-white rounded hover:bg-gray-600"
+            disabled={disabled}
+            className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-white rounded hover:bg-gray-600 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
@@ -121,7 +122,7 @@ export function SessionItem({
       )}
 
       {/* ドロップダウンメニュー */}
-      {isMenuOpen && (
+      {isMenuOpen && !disabled && (
         <div className="absolute right-2 top-8 z-10 bg-gray-700 rounded-lg shadow-lg border border-gray-600 py-1 min-w-[120px]">
           <button
             type="button"

@@ -402,6 +402,11 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     // 新しい議論開始時やセッション切り替え時に個別にクリアする
     setIsGeneratingFollowUps(false);
     setSummaryState('idle');
+    // isLoading/isSearchingもリセットして、プログレスバーを非表示にする
+    setIsLoading(false);
+    setIsSearching(false);
+    // 注: interruptRequestedRefはここでリセットしない
+    // SSEストリーム処理が中断を検出して状態を保存するまで維持する必要がある
   }, []);
 
   const restoreDiscussionState = useCallback((params: RestoreDiscussionStateParams) => {
