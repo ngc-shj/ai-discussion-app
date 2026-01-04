@@ -155,9 +155,52 @@ export default function Home() {
 
   // 新しいセッションを開始
   const handleNewSession = useCallback(() => {
+    // 議論中の場合は中断状態を保存してからクリア
+    // 注: isSearching は isLoading のサブステート（検索中は必ず isLoading も true）
+    if (isLoading && currentSession && currentTopic) {
+      // 中断フラグを立てる（SSEストリーム処理用）
+      handleInterrupt();
+      // 中断状態をセッションに即座に保存
+      // discussionParticipantsが空の場合はparticipantsを使用
+      const interruptedTurn = {
+        topic: currentTopic,
+        participants: discussionParticipants.length > 0 ? discussionParticipants : participants,
+        messages: currentMessages,
+        currentRound: progress.currentRound,
+        currentParticipantIndex: progress.currentParticipantIndex,
+        totalRounds: progress.totalRounds,
+        searchResults: currentSearchResults.length > 0 ? currentSearchResults : undefined,
+        userProfile,
+        discussionMode,
+        discussionDepth,
+        directionGuide,
+        terminationConfig,
+        interruptedAt: new Date(),
+        summaryState: 'idle' as const,
+      };
+      updateAndSaveSession({ interruptedTurn });
+    }
     setCurrentSession(null);
     clearCurrentTurnState();
-  }, [setCurrentSession, clearCurrentTurnState]);
+  }, [
+    isLoading,
+    currentSession,
+    currentTopic,
+    currentMessages,
+    currentSearchResults,
+    discussionParticipants,
+    participants,
+    progress,
+    userProfile,
+    discussionMode,
+    discussionDepth,
+    directionGuide,
+    terminationConfig,
+    handleInterrupt,
+    updateAndSaveSession,
+    setCurrentSession,
+    clearCurrentTurnState,
+  ]);
 
   // セッションを選択
   const handleSelectSession = useCallback((session: DiscussionSession) => {
@@ -387,7 +430,7 @@ export default function Home() {
             onNewSession={handleNewSession}
             onDeleteSession={handleDeleteSession}
             onRenameSession={handleRenameSession}
-            disabled={isLoading}
+            disabled={isSettingsDisabled}
             onCollapse={() => setIsSidebarCollapsed(true)}
           />
         </div>
@@ -408,7 +451,7 @@ export default function Home() {
           }}
           onDeleteSession={handleDeleteSession}
           onRenameSession={handleRenameSession}
-          disabled={isLoading}
+          disabled={isSettingsDisabled}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
         />

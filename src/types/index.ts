@@ -10,7 +10,6 @@ export { ROLE_PRESETS, generateParticipantId, generateCustomRoleId, isCustomRole
 export type {
   SummaryState,
   DiscussionMessage,
-  DiscussionState,
   PreviousTurnSummary,
   DiscussionRequest,
   SearchBasedDiscussionRequest,

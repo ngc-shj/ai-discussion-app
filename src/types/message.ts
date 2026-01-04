@@ -28,18 +28,6 @@ export interface DiscussionMessage {
   color?: string; // 参加者の色
 }
 
-// 議論の状態
-export interface DiscussionState {
-  status: 'idle' | 'discussing' | 'summarizing' | 'completed' | 'error';
-  topic: string;
-  messages: DiscussionMessage[];
-  currentRound: number;
-  totalRounds: number;
-  currentProvider: AIProviderType | null;
-  finalAnswer: string | null;
-  error: string | null;
-}
-
 // 過去のターンの要約（議論継続用）
 export interface PreviousTurnSummary {
   topic: string;

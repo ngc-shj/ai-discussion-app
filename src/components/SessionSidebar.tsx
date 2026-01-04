@@ -76,7 +76,6 @@ export function SessionSidebar({
         `}
       >
         <SidebarHeader
-          disabled={disabled}
           onNewSession={handleNewSessionClick}
           onClose={onClose}
           onCollapse={onCollapse}

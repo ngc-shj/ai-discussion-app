@@ -1,14 +1,12 @@
 'use client';
 
 interface SidebarHeaderProps {
-  disabled: boolean;
   onNewSession: () => void;
   onClose?: () => void;
   onCollapse?: () => void;
 }
 
 export function SidebarHeader({
-  disabled,
   onNewSession,
   onClose,
   onCollapse,
@@ -50,8 +48,7 @@ export function SidebarHeader({
       <button
         type="button"
         onClick={onNewSession}
-        disabled={disabled}
-        className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors text-sm font-medium"
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
