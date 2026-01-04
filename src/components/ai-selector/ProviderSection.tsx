@@ -1,12 +1,13 @@
 'use client';
 
-import { AIProviderType, ModelInfo, getOllamaModelColor } from '@/types';
+import { AIProviderType, ModelInfo, getLocalModelColor } from '@/types';
 import { ModelFilterType } from '@/hooks/useAISelector';
 
 interface ProviderInfo {
   id: AIProviderType;
   name: string;
   color: string;
+  isLocal?: boolean;
 }
 
 interface ProviderSectionProps {
@@ -36,8 +37,6 @@ export function ProviderSection({
   onAddParticipant,
   getParticipantCount,
 }: ProviderSectionProps) {
-  const isOllama = provider.id === 'ollama';
-
   return (
     <div
       className={`rounded-lg bg-gray-800 overflow-hidden ${
@@ -90,7 +89,7 @@ export function ProviderSection({
           {filteredModels.length > 0 ? (
             <>
               {filteredModels.map((model) => {
-                const modelColor = isOllama ? getOllamaModelColor(model.id) : provider.color;
+                const modelColor = provider.isLocal ? getLocalModelColor(model.id) : provider.color;
                 const displayName = model.name;
                 const count = getParticipantCount(model.id);
 

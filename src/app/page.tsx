@@ -602,7 +602,7 @@ export default function Home() {
             availability={availability}
             userProfile={userProfile}
             onUserProfileChange={setUserProfile}
-            disabled={isLoading || isSearching}
+            disabled={isLoading || isSearching || summaryState !== 'idle'}
           />
         </div>
       )}
@@ -616,7 +616,7 @@ export default function Home() {
           availability={availability}
           userProfile={userProfile}
           onUserProfileChange={setUserProfile}
-          disabled={isLoading || isSearching}
+          disabled={isLoading || isSearching || summaryState !== 'idle'}
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
         />

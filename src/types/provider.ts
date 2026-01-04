@@ -13,6 +13,7 @@ export interface AIProviderConfig {
   name: string;
   color: string;
   defaultModel: string;
+  isLocal?: boolean; // ローカル実行のプロバイダーかどうか
 }
 
 // プロバイダーのデフォルト設定
@@ -28,6 +29,7 @@ export const DEFAULT_PROVIDERS: AIProviderConfig[] = [
     name: 'Ollama',
     color: '#059669',
     defaultModel: 'gpt-oss:20b',
+    isLocal: true,
   },
   {
     id: 'openai',
@@ -43,8 +45,8 @@ export const DEFAULT_PROVIDERS: AIProviderConfig[] = [
   },
 ];
 
-// Ollamaモデル用の色を生成
-export function getOllamaModelColor(modelId: string): string {
+// ローカルモデル用の色を生成（モデルIDからハッシュで決定）
+export function getLocalModelColor(modelId: string): string {
   const colors = ['#059669', '#0D9488', '#0891B2', '#0284C7', '#2563EB', '#4F46E5', '#7C3AED', '#9333EA'];
   let hash = 0;
   for (let i = 0; i < modelId.length; i++) {

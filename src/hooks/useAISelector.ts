@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   AIProviderType,
   ModelInfo,
@@ -8,6 +8,7 @@ import {
   ParticipantRole,
   generateParticipantId,
   ROLE_PRESETS,
+  DEFAULT_PROVIDERS,
 } from '@/types';
 
 // 最新モデルの数（各プロバイダーごと）
@@ -15,6 +16,47 @@ export const LATEST_MODEL_COUNT = 5;
 
 // モデルフィルタの種類
 export type ModelFilterType = 'latest-generation' | 'latest-5' | 'all';
+
+// localStorage キー
+const STORAGE_KEY = 'ai-discussion-model-filter-settings';
+
+// 設定の型
+interface ModelFilterSettings {
+  modelFilter: ModelFilterType;
+  showAllLocalSizes: boolean;
+}
+
+// デフォルト設定
+const DEFAULT_SETTINGS: ModelFilterSettings = {
+  modelFilter: 'latest-generation',
+  showAllLocalSizes: true,
+};
+
+// 設定を読み込む
+function loadSettings(): ModelFilterSettings {
+  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(stored);
+    return {
+      modelFilter: parsed.modelFilter ?? DEFAULT_SETTINGS.modelFilter,
+      showAllLocalSizes: parsed.showAllLocalSizes ?? DEFAULT_SETTINGS.showAllLocalSizes,
+    };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+// 設定を保存する
+function saveSettings(settings: ModelFilterSettings): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // 保存失敗は無視
+  }
+}
 
 // --- モデル分類定義 ---
 // GPT系のtier（優先度順）: o はoシリーズ（推論特化）、pro は高性能版
@@ -37,6 +79,7 @@ function extractModelFamily(modelId: string): string {
 
   // Ollama/ローカルモデル: コロンがある場合はその前の部分をファミリーとして使用
   // 例: deepseek-r1:8b -> deepseek-r1, llama3.2:7b -> llama3.2
+  // ※ showAllLocalSizesがONの場合はgetFilteredModelsでスキップされる
   if (id.includes(':')) {
     return id.split(':')[0];
   }
@@ -235,6 +278,15 @@ function filterLatestGeneration(models: ModelInfo[]): ModelInfo[] {
   return result.map(([, model]) => model);
 }
 
+// ファミリーでソートのみ（グループ化はしない）
+function sortByFamily(models: ModelInfo[]): ModelInfo[] {
+  return [...models].sort((a, b) => {
+    const familyA = extractModelFamily(a.id);
+    const familyB = extractModelFamily(b.id);
+    return getFamilySortKey(familyA).localeCompare(getFamilySortKey(familyB));
+  });
+}
+
 export interface UseAISelectorProps {
   participants: DiscussionParticipant[];
   onParticipantsChange: (participants: DiscussionParticipant[]) => void;
@@ -244,10 +296,12 @@ export interface UseAISelectorReturn {
   // State
   expandedProviders: Record<AIProviderType, boolean>;
   modelFilter: ModelFilterType;
+  showAllLocalSizes: boolean;
 
   // Actions
   toggleExpanded: (providerId: AIProviderType) => void;
   setModelFilter: (value: ModelFilterType) => void;
+  setShowAllLocalSizes: (value: boolean) => void;
   addParticipant: (
     provider: AIProviderType,
     model: string,
@@ -260,7 +314,7 @@ export interface UseAISelectorReturn {
 
   // Utilities
   getParticipantCountForModel: (provider: AIProviderType, model: string) => number;
-  getFilteredModels: (models: ModelInfo[]) => ModelInfo[];
+  getFilteredModels: (models: ModelInfo[], provider: AIProviderType) => ModelInfo[];
   getSelectedCountForProvider: (providerId: AIProviderType) => number;
 }
 
@@ -274,7 +328,33 @@ export function useAISelector({
     openai: true,
     gemini: true,
   });
-  const [modelFilter, setModelFilter] = useState<ModelFilterType>('latest-generation');
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [modelFilter, setModelFilterState] = useState<ModelFilterType>(DEFAULT_SETTINGS.modelFilter);
+  const [showAllLocalSizes, setShowAllLocalSizesState] = useState<boolean>(DEFAULT_SETTINGS.showAllLocalSizes);
+
+  // 初期ロード
+  useEffect(() => {
+    const settings = loadSettings();
+    setModelFilterState(settings.modelFilter);
+    setShowAllLocalSizesState(settings.showAllLocalSizes);
+    setIsLoaded(true);
+  }, []);
+
+  // 設定変更時に保存
+  useEffect(() => {
+    if (isLoaded) {
+      saveSettings({ modelFilter, showAllLocalSizes });
+    }
+  }, [modelFilter, showAllLocalSizes, isLoaded]);
+
+  // ラッパー関数
+  const setModelFilter = useCallback((value: ModelFilterType) => {
+    setModelFilterState(value);
+  }, []);
+
+  const setShowAllLocalSizes = useCallback((value: boolean) => {
+    setShowAllLocalSizesState(value);
+  }, []);
 
   const toggleExpanded = useCallback((providerId: AIProviderType) => {
     setExpandedProviders((prev) => ({
@@ -334,9 +414,16 @@ export function useAISelector({
   );
 
   const getFilteredModels = useCallback(
-    (models: ModelInfo[]) => {
+    (models: ModelInfo[], provider: AIProviderType) => {
+      const providerConfig = DEFAULT_PROVIDERS.find((p) => p.id === provider);
+      const isLocalProvider = providerConfig?.isLocal ?? false;
+
       switch (modelFilter) {
         case 'latest-generation':
+          // ローカルプロバイダーで「全サイズ表示」がONの場合はグループ化をスキップ（ソートのみ）
+          if (isLocalProvider && showAllLocalSizes) {
+            return sortByFamily(models);
+          }
           return filterLatestGeneration(models);
         case 'latest-5':
           return models.slice(0, LATEST_MODEL_COUNT);
@@ -345,7 +432,7 @@ export function useAISelector({
           return models;
       }
     },
-    [modelFilter]
+    [modelFilter, showAllLocalSizes]
   );
 
   const getSelectedCountForProvider = useCallback(
@@ -358,8 +445,10 @@ export function useAISelector({
   return {
     expandedProviders,
     modelFilter,
+    showAllLocalSizes,
     toggleExpanded,
     setModelFilter,
+    setShowAllLocalSizes,
     addParticipant,
     removeParticipant,
     updateParticipantRole,

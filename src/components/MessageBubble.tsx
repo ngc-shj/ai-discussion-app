@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { DiscussionMessage, DiscussionParticipant, DEFAULT_PROVIDERS, getOllamaModelColor, formatParticipantDisplayName } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, DEFAULT_PROVIDERS, getLocalModelColor, formatParticipantDisplayName } from '@/types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 export interface MessageBubbleProps {
@@ -14,7 +14,6 @@ export interface MessageBubbleProps {
 export function MessageBubble({ message, participants, vote, onVote }: MessageBubbleProps) {
   const [showPrompt, setShowPrompt] = useState(false);
   const provider = DEFAULT_PROVIDERS.find((p) => p.id === message.provider);
-  const isOllama = message.provider === 'ollama';
 
   // 参加者を取得（実行中は participants から、履歴表示時はスナップショットを使用）
   const participant = participants?.find(p => p.id === message.participantId);
@@ -22,7 +21,7 @@ export function MessageBubble({ message, participants, vote, onVote }: MessageBu
   // 色: 参加者から取得 → メッセージのスナップショット → フォールバック
   const color = participant?.color
     || message.color
-    || (isOllama && message.model ? getOllamaModelColor(message.model) : (provider?.color || '#6B7280'));
+    || (provider?.isLocal && message.model ? getLocalModelColor(message.model) : (provider?.color || '#6B7280'));
 
   // 表示名: 参加者から取得 → メッセージのスナップショット → フォールバック
   const baseName = provider?.name || message.provider;

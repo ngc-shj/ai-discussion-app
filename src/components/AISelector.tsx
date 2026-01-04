@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS, ParticipantRole, isCustomRoleId, ROLE_PRESETS } from '@/types';
-import { useAISelector, LATEST_MODEL_COUNT, ModelFilterType } from '@/hooks/useAISelector';
+import { useAISelector, LATEST_MODEL_COUNT } from '@/hooks/useAISelector';
 import { useCustomRoles } from '@/hooks/useCustomRoles';
 import { ParticipantList, ProviderSection } from './ai-selector';
 import { RoleEditor } from './RoleEditor';
@@ -27,8 +27,10 @@ export function AISelector({
   const {
     expandedProviders,
     modelFilter,
+    showAllLocalSizes,
     toggleExpanded,
     setModelFilter,
+    setShowAllLocalSizes,
     addParticipant,
     removeParticipant,
     getParticipantCountForModel,
@@ -97,7 +99,7 @@ export function AISelector({
       />
 
       {/* モデル表示切替 */}
-      <div className="flex flex-wrap items-center gap-2 p-2 bg-gray-700/50 rounded-lg">
+      <div className={`flex flex-wrap items-center gap-2 p-2 bg-gray-700/50 rounded-lg ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
         <span className="text-xs text-gray-400">表示:</span>
         <label className="flex items-center gap-1 cursor-pointer">
           <input
@@ -129,13 +131,27 @@ export function AISelector({
           />
           <span className="text-xs text-gray-300">すべて</span>
         </label>
+        <span className="text-gray-600">|</span>
+        <label
+          className={`flex items-center gap-1 ${modelFilter === 'latest-generation' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+          title={modelFilter === 'latest-generation' ? 'ローカルモデルの全サイズを表示' : '「最新世代」選択時のみ有効'}
+        >
+          <input
+            type="checkbox"
+            checked={showAllLocalSizes}
+            onChange={(e) => setShowAllLocalSizes(e.target.checked)}
+            disabled={modelFilter !== 'latest-generation'}
+            className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600 rounded disabled:opacity-50"
+          />
+          <span className="text-xs text-gray-300">ローカル全サイズ</span>
+        </label>
       </div>
 
       <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
         {DEFAULT_PROVIDERS.map((provider) => {
           const isAvailable = availability[provider.id];
           const allModels = availableModels[provider.id] || [];
-          const filteredModels = getFilteredModels(allModels);
+          const filteredModels = getFilteredModels(allModels, provider.id);
 
           return (
             <ProviderSection

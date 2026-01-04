@@ -1,6 +1,6 @@
 // Provider types
 export type { AIProviderType, ModelInfo, AIProviderConfig, AIRequest, AIResponse } from './provider';
-export { DEFAULT_PROVIDERS, getOllamaModelColor } from './provider';
+export { DEFAULT_PROVIDERS, getLocalModelColor } from './provider';
 
 // Participant types
 export type { PresetRoleId, ParticipantRole, RolePreset, CustomRole, DiscussionParticipant } from './participant';

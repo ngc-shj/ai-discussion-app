@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AIProviderType, DiscussionParticipant, DEFAULT_PROVIDERS, getOllamaModelColor, formatParticipantDisplayName } from '@/types';
+import { AIProviderType, DiscussionParticipant, DEFAULT_PROVIDERS, getLocalModelColor, formatParticipantDisplayName } from '@/types';
 import { ParticipantChip, SummaryChip, ProgressStatus, ProgressInfo, InterruptButton } from './progress-indicator';
 
 // 各参加者の実行状態
@@ -59,11 +59,10 @@ export function ProgressIndicator({
   };
 
   const provider = DEFAULT_PROVIDERS.find((p) => p.id === currentProvider);
-  const isOllama = currentProvider === 'ollama';
   const providerName = currentParticipant
     ? formatParticipantDisplayName(currentParticipant)
     : (provider?.name || currentProvider || '');
-  const providerColor = currentParticipant?.color || (isOllama && currentParticipant?.model ? getOllamaModelColor(currentParticipant.model) : provider?.color) || '#6B7280';
+  const providerColor = currentParticipant?.color || (provider?.isLocal && currentParticipant?.model ? getLocalModelColor(currentParticipant.model) : provider?.color) || '#6B7280';
 
   // 全体の進捗計算
   const totalSteps = totalRounds * totalProviders + 1; // +1 for summary
