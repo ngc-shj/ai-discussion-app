@@ -64,6 +64,16 @@ function extractModelFamily(modelId: string): string {
     return 'sora';
   }
 
+  // Nano Banana系: Gemini画像生成モデルのコードネーム
+  // nano-banana-pro-preview -> gemini-pro-image
+  // nano-banana -> gemini-flash-image (デフォルト)
+  if (normalized.startsWith('nano-banana')) {
+    if (normalized.includes('pro')) {
+      return 'gemini-pro-image';
+    }
+    return 'gemini-flash-image';
+  }
+
   // GPT系: tier と機能の組み合わせ
   if (normalized.startsWith('gpt-')) {
     // tier を抽出
