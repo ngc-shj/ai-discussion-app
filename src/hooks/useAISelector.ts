@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   AIProviderType,
   ModelInfo,
@@ -16,6 +16,47 @@ export const LATEST_MODEL_COUNT = 5;
 
 // モデルフィルタの種類
 export type ModelFilterType = 'latest-generation' | 'latest-5' | 'all';
+
+// localStorage キー
+const STORAGE_KEY = 'ai-discussion-model-filter-settings';
+
+// 設定の型
+interface ModelFilterSettings {
+  modelFilter: ModelFilterType;
+  showAllLocalSizes: boolean;
+}
+
+// デフォルト設定
+const DEFAULT_SETTINGS: ModelFilterSettings = {
+  modelFilter: 'latest-generation',
+  showAllLocalSizes: true,
+};
+
+// 設定を読み込む
+function loadSettings(): ModelFilterSettings {
+  if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(stored);
+    return {
+      modelFilter: parsed.modelFilter ?? DEFAULT_SETTINGS.modelFilter,
+      showAllLocalSizes: parsed.showAllLocalSizes ?? DEFAULT_SETTINGS.showAllLocalSizes,
+    };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+// 設定を保存する
+function saveSettings(settings: ModelFilterSettings): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // 保存失敗は無視
+  }
+}
 
 // --- モデル分類定義 ---
 // GPT系のtier（優先度順）: o はoシリーズ（推論特化）、pro は高性能版
@@ -287,8 +328,33 @@ export function useAISelector({
     openai: true,
     gemini: true,
   });
-  const [modelFilter, setModelFilter] = useState<ModelFilterType>('latest-generation');
-  const [showAllLocalSizes, setShowAllLocalSizes] = useState<boolean>(true);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [modelFilter, setModelFilterState] = useState<ModelFilterType>(DEFAULT_SETTINGS.modelFilter);
+  const [showAllLocalSizes, setShowAllLocalSizesState] = useState<boolean>(DEFAULT_SETTINGS.showAllLocalSizes);
+
+  // 初期ロード
+  useEffect(() => {
+    const settings = loadSettings();
+    setModelFilterState(settings.modelFilter);
+    setShowAllLocalSizesState(settings.showAllLocalSizes);
+    setIsLoaded(true);
+  }, []);
+
+  // 設定変更時に保存
+  useEffect(() => {
+    if (isLoaded) {
+      saveSettings({ modelFilter, showAllLocalSizes });
+    }
+  }, [modelFilter, showAllLocalSizes, isLoaded]);
+
+  // ラッパー関数
+  const setModelFilter = useCallback((value: ModelFilterType) => {
+    setModelFilterState(value);
+  }, []);
+
+  const setShowAllLocalSizes = useCallback((value: boolean) => {
+    setShowAllLocalSizesState(value);
+  }, []);
 
   const toggleExpanded = useCallback((providerId: AIProviderType) => {
     setExpandedProviders((prev) => ({
