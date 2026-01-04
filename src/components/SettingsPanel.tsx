@@ -67,19 +67,24 @@ export function SettingsPanel({
 
         <div className="flex-1 overflow-y-auto flex flex-col space-y-4">
           {/* プロファイル設定 */}
-          <UserProfileSettings
-            profile={userProfile}
-            onProfileChange={onUserProfileChange}
-            disabled={disabled}
-          />
+          <div className="bg-gray-700/50 rounded-lg p-3 border border-gray-600">
+            <UserProfileSettings
+              profile={userProfile}
+              onProfileChange={onUserProfileChange}
+              disabled={disabled}
+            />
+          </div>
 
-          <AISelector
-            participants={participants}
-            onParticipantsChange={onParticipantsChange}
-            availableModels={availableModels}
-            availability={availability}
-            disabled={disabled}
-          />
+          {/* AI参加者 */}
+          <div className="bg-indigo-900/20 rounded-lg p-3 border border-indigo-800/30">
+            <AISelector
+              participants={participants}
+              onParticipantsChange={onParticipantsChange}
+              availableModels={availableModels}
+              availability={availability}
+              disabled={disabled}
+            />
+          </div>
 
           <div className="text-sm text-gray-400 pt-2 border-t border-gray-700">
             <p className="mb-2">
