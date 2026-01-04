@@ -99,7 +99,7 @@ export function AISelector({
       />
 
       {/* モデル表示切替 */}
-      <div className="flex flex-wrap items-center gap-2 p-2 bg-gray-700/50 rounded-lg">
+      <div className={`flex flex-wrap items-center gap-2 p-2 bg-gray-700/50 rounded-lg ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
         <span className="text-xs text-gray-400">表示:</span>
         <label className="flex items-center gap-1 cursor-pointer">
           <input
