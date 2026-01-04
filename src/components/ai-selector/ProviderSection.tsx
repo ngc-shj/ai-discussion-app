@@ -1,7 +1,7 @@
 'use client';
 
 import { AIProviderType, ModelInfo, getOllamaModelColor } from '@/types';
-import { LATEST_MODEL_COUNT } from '@/hooks/useAISelector';
+import { ModelFilterType } from '@/hooks/useAISelector';
 
 interface ProviderInfo {
   id: AIProviderType;
@@ -16,7 +16,7 @@ interface ProviderSectionProps {
   allModels: ModelInfo[];
   filteredModels: ModelInfo[];
   selectedCount: number;
-  showAllModels: boolean;
+  modelFilter: ModelFilterType;
   disabled?: boolean;
   onToggleExpanded: () => void;
   onAddParticipant: (modelId: string, displayName: string, color: string) => void;
@@ -30,7 +30,7 @@ export function ProviderSection({
   allModels,
   filteredModels,
   selectedCount,
-  showAllModels,
+  modelFilter,
   disabled,
   onToggleExpanded,
   onAddParticipant,
@@ -124,9 +124,9 @@ export function ProviderSection({
                   </div>
                 );
               })}
-              {!showAllModels && allModels.length > LATEST_MODEL_COUNT && (
+              {modelFilter !== 'all' && allModels.length > filteredModels.length && (
                 <div className="text-xs text-gray-500 pl-2 pt-1">
-                  他 {allModels.length - LATEST_MODEL_COUNT} モデル（「すべて」で表示）
+                  他 {allModels.length - filteredModels.length} モデル（「すべて」で表示）
                 </div>
               )}
             </>
