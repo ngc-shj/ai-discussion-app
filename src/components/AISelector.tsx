@@ -93,6 +93,7 @@ export function AISelector({
         disabled={disabled}
         onUpdateRole={handleUpdateRole}
         onRemove={removeParticipant}
+        onReorder={onParticipantsChange}
       />
 
       {/* モデル表示切替 */}

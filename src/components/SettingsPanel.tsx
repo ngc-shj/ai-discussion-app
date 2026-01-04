@@ -45,7 +45,7 @@ export function SettingsPanel({
       <div
         className={`
           ${onClose ? 'fixed right-0 z-50' : 'relative'}
-          w-80 max-w-[85vw] bg-gray-800 p-4 border-l border-gray-700 flex flex-col h-full
+          w-96 max-w-[85vw] bg-gray-800 p-4 border-l border-gray-700 flex flex-col h-full
         `}
       >
         {/* ヘッダー */}
