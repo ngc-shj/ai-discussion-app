@@ -26,9 +26,16 @@
 - **Critique**: 批判的な分析と評価
 - **Counterargument**: 反対意見の生成
 
+### カスタマイズ機能
+
+- **設定プリセット**: 議論設定を保存・読み込みして素早く再利用
+- **ユーザープロファイル**: 技術レベル、回答スタイル、関心領域を設定
+- **カスタムロール**: 参加者にカスタマイズしたプロンプトでロールを定義
+- **議論の深さ**: 5段階の深さ設定（概要から徹底分析まで）
+- **方向性ガイド**: キーワードや追加指示で議論の方向性をガイド
+
 ### 高度な機能
 
-- **カスタムロール**: 参加者にカスタマイズしたプロンプトでロールを定義
 - **フォローアップ提案**: 議論後にAIが生成する追加質問
 - **深掘り分析**: 特定トピックの詳細な分析
 - **議論のフォーク**: 別の方向性を探るための議論の分岐
@@ -217,7 +224,7 @@ ai-discussion-app/
 │   │       ├── providers/     # プロバイダー可用性チェック
 │   │       ├── search/        # SearXNG検索エンドポイント
 │   │       └── summarize/     # 統合回答生成
-│   ├── components/            # React UIコンポーネント (~20)
+│   ├── components/            # React UIコンポーネント (~30)
 │   │   ├── DiscussionPanel.tsx
 │   │   ├── SettingsPanel.tsx
 │   │   ├── InputForm.tsx
@@ -227,24 +234,29 @@ ai-discussion-app/
 │   │   ├── FollowUpSuggestions.tsx
 │   │   ├── DeepDiveModal.tsx
 │   │   ├── ForkModal.tsx
+│   │   ├── PresetManagerModal.tsx
+│   │   ├── UserProfileSettings.tsx
 │   │   └── ...
-│   ├── hooks/                 # カスタムReactフック
+│   ├── hooks/                 # カスタムReactフック (~10)
 │   │   ├── useDiscussion.ts
 │   │   ├── useDiscussionSettings.ts
 │   │   ├── useSessionManager.ts
+│   │   ├── usePresetManager.ts
 │   │   └── ...
 │   ├── lib/
 │   │   ├── ai-providers/      # AIプロバイダー実装
 │   │   ├── discussion-engine/ # 議論オーケストレーション
 │   │   ├── session-storage.ts
 │   │   └── sse-utils.ts
-│   └── types/                 # TypeScript型定義
+│   └── types/                 # TypeScript型定義 (~10)
 │       ├── index.ts
 │       ├── provider.ts
 │       ├── participant.ts
 │       ├── message.ts
 │       ├── config.ts
-│       └── session.ts
+│       ├── session.ts
+│       ├── preset.ts
+│       └── ...
 ├── .env.local.example
 └── package.json
 ```
