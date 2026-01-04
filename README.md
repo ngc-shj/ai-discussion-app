@@ -26,9 +26,16 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 - **Critique**: Critical analysis and evaluation
 - **Counterargument**: Generate opposing perspectives
 
+### Customization Features
+
+- **Settings Presets**: Save and load discussion settings for quick reuse
+- **User Profile**: Configure technical level, response style, and interests
+- **Custom Roles**: Define custom roles with personalized prompts for participants
+- **Discussion Depth**: 5 levels from overview to thorough analysis
+- **Direction Guide**: Guide discussions with keywords and additional instructions
+
 ### Advanced Features
 
-- **Custom Roles**: Define custom roles with personalized prompts for participants
 - **Follow-up Suggestions**: AI-generated follow-up questions after discussions
 - **Deep Dive Analysis**: In-depth analysis of specific topics
 - **Discussion Forking**: Branch discussions to explore alternative directions
@@ -48,9 +55,10 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 ## Screenshots
 
 ### Discussion View
+
 The main discussion panel showing AI conversations with model status indicators:
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │  [gemma2:2b ✓] [qwen3:4b ●] [統合]   ← Model chips │
 │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ← Progress    │
@@ -203,7 +211,7 @@ When enabled, the app searches for relevant information before the discussion st
 
 ## Project Structure
 
-```
+```text
 ai-discussion-app/
 ├── src/
 │   ├── app/
@@ -214,7 +222,7 @@ ai-discussion-app/
 │   │       ├── providers/     # Provider availability check
 │   │       ├── search/        # SearXNG search endpoint
 │   │       └── summarize/     # Integrated answer generation
-│   ├── components/            # React UI components (~20)
+│   ├── components/            # React UI components (~30)
 │   │   ├── DiscussionPanel.tsx
 │   │   ├── SettingsPanel.tsx
 │   │   ├── InputForm.tsx
@@ -224,24 +232,29 @@ ai-discussion-app/
 │   │   ├── FollowUpSuggestions.tsx
 │   │   ├── DeepDiveModal.tsx
 │   │   ├── ForkModal.tsx
+│   │   ├── PresetManagerModal.tsx
+│   │   ├── UserProfileSettings.tsx
 │   │   └── ...
-│   ├── hooks/                 # Custom React hooks
+│   ├── hooks/                 # Custom React hooks (~10)
 │   │   ├── useDiscussion.ts
 │   │   ├── useDiscussionSettings.ts
 │   │   ├── useSessionManager.ts
+│   │   ├── usePresetManager.ts
 │   │   └── ...
 │   ├── lib/
 │   │   ├── ai-providers/      # AI provider implementations
 │   │   ├── discussion-engine/ # Discussion orchestration
 │   │   ├── session-storage.ts
 │   │   └── sse-utils.ts
-│   └── types/                 # TypeScript type definitions
+│   └── types/                 # TypeScript type definitions (~10)
 │       ├── index.ts
 │       ├── provider.ts
 │       ├── participant.ts
 │       ├── message.ts
 │       ├── config.ts
-│       └── session.ts
+│       ├── session.ts
+│       ├── preset.ts
+│       └── ...
 ├── .env.local.example
 └── package.json
 ```
