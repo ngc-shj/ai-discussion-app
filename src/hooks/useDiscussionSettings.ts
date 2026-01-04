@@ -12,7 +12,7 @@ import {
   DirectionGuide,
   TerminationConfig,
   DEFAULT_PROVIDERS,
-  getOllamaModelColor,
+  getLocalModelColor,
   generateParticipantId,
 } from '@/types';
 
@@ -153,13 +153,12 @@ export function useDiscussionSettings(): DiscussionSettingsState & DiscussionSet
               const provider = DEFAULT_PROVIDERS.find((p) => p.id === providerId);
               if (provider) {
                 const model = models[0];
-                const isOllama = providerId === 'ollama';
                 initialParticipants.push({
                   id: generateParticipantId(),
                   provider: providerId,
                   model: model.id,
                   displayName: model.name,
-                  color: isOllama ? getOllamaModelColor(model.id) : provider.color,
+                  color: provider.isLocal ? getLocalModelColor(model.id) : provider.color,
                 });
               }
             }
