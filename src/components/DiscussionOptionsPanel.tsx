@@ -146,6 +146,16 @@ interface SearchConfigSectionProps {
 }
 
 function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: SearchConfigSectionProps) {
+  // timing のデフォルト値を確保
+  const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
+
+  const handleTimingChange = (key: 'onStart' | 'beforeSummary' | 'onDemand', value: boolean) => {
+    onSearchConfigChange({
+      ...searchConfig,
+      timing: { ...timing, [key]: value }
+    });
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -167,7 +177,8 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
         </button>
       </div>
       {searchConfig.enabled && (
-        <div className="space-y-2 pl-2 border-l-2 border-green-600/30">
+        <div className="space-y-3 pl-2 border-l-2 border-green-600/30">
+          {/* 検索タイプと結果数 */}
           <div className="flex items-center gap-2">
             <select
               value={searchConfig.searchType}
@@ -196,6 +207,44 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
               title={`検索結果数: ${searchConfig.maxResults}`}
               className={`flex-1 h-1.5 bg-gray-600 rounded-lg appearance-none accent-green-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
             />
+          </div>
+
+          {/* 検索タイミング */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-gray-400">検索タイミング</label>
+            <div className="space-y-1">
+              <label className={`flex items-center gap-2 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                <input
+                  type="checkbox"
+                  checked={timing.onStart}
+                  onChange={(e) => handleTimingChange('onStart', e.target.checked)}
+                  disabled={disabled}
+                  className="w-3.5 h-3.5 rounded border-gray-500 bg-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-0 disabled:opacity-50"
+                />
+                <span className="text-xs text-gray-300">開始時に検索</span>
+              </label>
+              <label className={`flex items-center gap-2 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                <input
+                  type="checkbox"
+                  checked={timing.beforeSummary}
+                  onChange={(e) => handleTimingChange('beforeSummary', e.target.checked)}
+                  disabled={disabled}
+                  className="w-3.5 h-3.5 rounded border-gray-500 bg-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-0 disabled:opacity-50"
+                />
+                <span className="text-xs text-gray-300">統合回答前に検索</span>
+              </label>
+              <label className={`flex items-center gap-2 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                <input
+                  type="checkbox"
+                  checked={timing.onDemand}
+                  onChange={(e) => handleTimingChange('onDemand', e.target.checked)}
+                  disabled={disabled}
+                  className="w-3.5 h-3.5 rounded border-gray-500 bg-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-0 disabled:opacity-50"
+                />
+                <span className="text-xs text-gray-300">AIが要求した時に検索</span>
+                <span className="text-xs text-gray-500">([[SEARCH:...]])</span>
+              </label>
+            </div>
           </div>
         </div>
       )}
