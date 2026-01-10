@@ -50,6 +50,7 @@ export default function Home() {
     isLoading,
     isSearching,
     isGeneratingFollowUps,
+    isProcessing,
     summaryState,
     progress,
     completedParticipants,
@@ -427,10 +428,9 @@ export default function Home() {
     });
   }, [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, startDiscussion]);
 
-  // 無効化条件
-  const isSettingsDisabled = isLoading || isSearching || summaryState === 'generating';
-  // セッション選択の無効化条件（実行中のみ無効にし、投票待ちなどでは選択可能）
-  const isSessionSelectionDisabled = isLoading;
+  // 無効化条件（useDiscussionから取得）
+  const isSettingsDisabled = isProcessing;
+  const isSessionSelectionDisabled = isProcessing;
 
   return (
     <div className="flex h-screen bg-gray-900 text-white">

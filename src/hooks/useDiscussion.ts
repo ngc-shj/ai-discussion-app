@@ -59,6 +59,7 @@ export interface DiscussionState {
   isLoading: boolean;
   isSearching: boolean;
   isGeneratingFollowUps: boolean;
+  isProcessing: boolean;
   summaryState: SummaryState;
   progress: ProgressState;
   completedParticipants: Set<string>;
@@ -1016,6 +1017,9 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     [messageVotes, clearCurrentTurnState]
   );
 
+  // 処理中フラグ（議論実行中、検索中、統合回答生成中、フォローアップ生成中）
+  const isProcessing = isLoading || isSearching || summaryState === 'generating' || isGeneratingFollowUps;
+
   return {
     currentMessages,
     currentFinalAnswer,
@@ -1025,6 +1029,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     isLoading,
     isSearching,
     isGeneratingFollowUps,
+    isProcessing,
     summaryState,
     progress,
     completedParticipants,
