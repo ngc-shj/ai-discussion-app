@@ -177,6 +177,8 @@ interface CreateSSEHandlersParams {
   setIsGeneratingFollowUps: React.Dispatch<React.SetStateAction<boolean>>;
   setSummaryState?: React.Dispatch<React.SetStateAction<SummaryState>>;
   setIsLoading?: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsSearching?: React.Dispatch<React.SetStateAction<boolean>>;
+  setCurrentSearchResults?: React.Dispatch<React.SetStateAction<SearchResult[]>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setStreamingMessage?: React.Dispatch<React.SetStateAction<StreamingMessage | null>>;
   collectedMessagesRef: { current: DiscussionMessage[] };
@@ -201,6 +203,8 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     setIsGeneratingFollowUps,
     setSummaryState,
     setIsLoading,
+    setIsSearching,
+    setCurrentSearchResults,
     setError,
     setStreamingMessage,
     collectedMessagesRef,
@@ -353,6 +357,13 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       // 注意: ここでsummaryStateを'idle'にしない
       // startDiscussionの場合: onReadyForSummaryで'awaiting'に設定されるので、それを維持する
       // generateSummaryの場合: onSummaryで'idle'に設定されるので、ここでは不要
+    },
+    onSearching: () => {
+      setIsSearching?.(true);
+    },
+    onSearchResults: (searchResults) => {
+      setIsSearching?.(false);
+      setCurrentSearchResults?.(searchResults);
     },
   };
 }
@@ -740,6 +751,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setIsGeneratingFollowUps,
           setSummaryState,
           setIsLoading,
+          setIsSearching,
+          setCurrentSearchResults,
           setError,
           setStreamingMessage,
           collectedMessagesRef,
@@ -934,6 +947,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setIsGeneratingFollowUps,
           setSummaryState,
           setIsLoading,
+          setIsSearching,
+          setCurrentSearchResults,
           setError,
           setStreamingMessage,
           collectedMessagesRef,

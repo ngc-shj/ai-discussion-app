@@ -67,6 +67,16 @@ export interface SSECompleteEvent {
   type: 'complete';
 }
 
+export interface SSESearchingEvent {
+  type: 'searching';
+  searchResults?: SearchResult[];
+}
+
+export interface SSESearchResultsEvent {
+  type: 'search_results';
+  searchResults: SearchResult[];
+}
+
 export type SSEEvent =
   | SSEProgressEvent
   | SSEMessageEvent
@@ -75,7 +85,9 @@ export type SSEEvent =
   | SSEFollowupsEvent
   | SSEErrorEvent
   | SSEReadyForSummaryEvent
-  | SSECompleteEvent;
+  | SSECompleteEvent
+  | SSESearchingEvent
+  | SSESearchResultsEvent;
 
 // イベントハンドラのインターフェース
 export interface SSEEventHandlers {
@@ -87,6 +99,8 @@ export interface SSEEventHandlers {
   onError?: (error: string) => void;
   onReadyForSummary?: () => void;
   onComplete?: () => void;
+  onSearching?: (searchResults?: SearchResult[]) => void;
+  onSearchResults?: (searchResults: SearchResult[]) => void;
 }
 
 /**
@@ -123,6 +137,12 @@ export function parseSSELine(line: string, handlers: SSEEventHandlers): void {
         break;
       case 'complete':
         handlers.onComplete?.();
+        break;
+      case 'searching':
+        handlers.onSearching?.(event.searchResults);
+        break;
+      case 'search_results':
+        handlers.onSearchResults?.(event.searchResults);
         break;
     }
   } catch {
