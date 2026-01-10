@@ -10,6 +10,8 @@ interface SessionItemProps {
   editTitle: string;
   isMenuOpen: boolean;
   disabled: boolean;
+  isMultiSelectMode?: boolean;
+  isChecked?: boolean;
   onSelect: () => void;
   onEditTitleChange: (title: string) => void;
   onSaveEdit: () => void;
@@ -17,6 +19,7 @@ interface SessionItemProps {
   onStartEdit: () => void;
   onDelete: () => void;
   onToggleMenu: () => void;
+  onToggleCheck?: () => void;
 }
 
 export function SessionItem({
@@ -26,6 +29,8 @@ export function SessionItem({
   editTitle,
   isMenuOpen,
   disabled,
+  isMultiSelectMode = false,
+  isChecked = false,
   onSelect,
   onEditTitleChange,
   onSaveEdit,
@@ -33,6 +38,7 @@ export function SessionItem({
   onStartEdit,
   onDelete,
   onToggleMenu,
+  onToggleCheck,
 }: SessionItemProps) {
   return (
     <div
@@ -58,9 +64,36 @@ export function SessionItem({
         </div>
       ) : (
         <div className="flex items-start justify-between p-2">
+          {/* 複数選択モード時のチェックボックス */}
+          {isMultiSelectMode && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCheck?.();
+              }}
+              className="shrink-0 mr-2 mt-0.5"
+              aria-label={isChecked ? 'セッションの選択を解除' : 'セッションを選択'}
+            >
+              <div
+                className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                  isChecked
+                    ? 'bg-blue-500 border-blue-500'
+                    : 'border-gray-500 hover:border-gray-400'
+                }`}
+              >
+                {isChecked && (
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+            </button>
+          )}
+
           <div
             className={`flex-1 min-w-0 pr-2 cursor-pointer ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
-            onClick={onSelect}
+            onClick={isMultiSelectMode ? onToggleCheck : onSelect}
           >
             <div className="flex items-center gap-1.5">
               <div className="text-sm text-white truncate flex-1" title={session.title}>
@@ -103,21 +136,23 @@ export function SessionItem({
             </div>
           </div>
 
-          {/* メニューボタン */}
-          <button
-            type="button"
-            aria-label="セッションメニュー"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!disabled) onToggleMenu();
-            }}
-            disabled={disabled}
-            className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-white rounded hover:bg-gray-600 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-            </svg>
-          </button>
+          {/* メニューボタン（複数選択モード時は非表示） */}
+          {!isMultiSelectMode && (
+            <button
+              type="button"
+              aria-label="セッションメニュー"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!disabled) onToggleMenu();
+              }}
+              disabled={disabled}
+              className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-white rounded hover:bg-gray-600 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+              </svg>
+            </button>
+          )}
         </div>
       )}
 

@@ -35,6 +35,7 @@ export interface SessionManagerActions {
   selectSession: (session: DiscussionSession) => void;
   newSession: () => void;
   deleteSession: (id: string) => Promise<void>;
+  bulkDeleteSessions: (ids: string[]) => Promise<void>;
   renameSession: (id: string, newTitle: string) => Promise<void>;
   createSession: (title: string, participants: DiscussionParticipant[], rounds: number) => Promise<DiscussionSession>;
   updateSession: (session: DiscussionSession) => Promise<void>;
@@ -159,6 +160,21 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
     }
   }, [currentSession, newSession]);
 
+  // 複数セッションを一括削除
+  const bulkDeleteSessions = useCallback(async (ids: string[]) => {
+    try {
+      // 並列で削除
+      await Promise.all(ids.map(id => deleteSessionFromDB(id)));
+      setSessions((prev) => prev.filter((s) => !ids.includes(s.id)));
+      // 現在選択中のセッションが削除対象に含まれていれば新規セッション状態に
+      if (currentSession && ids.includes(currentSession.id)) {
+        newSession();
+      }
+    } catch (err) {
+      console.error('Failed to bulk delete sessions:', err);
+    }
+  }, [currentSession, newSession]);
+
   // セッション名を変更
   const renameSession = useCallback(async (id: string, newTitle: string) => {
     try {
@@ -254,6 +270,7 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
     selectSession,
     newSession,
     deleteSession,
+    bulkDeleteSessions,
     renameSession,
     createSession,
     updateSession,

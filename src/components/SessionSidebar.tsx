@@ -10,6 +10,7 @@ interface SessionSidebarProps {
   onSelectSession: (session: DiscussionSession) => void;
   onNewSession: () => void;
   onDeleteSession: (id: string) => void;
+  onBulkDeleteSessions: (ids: string[]) => void;
   onRenameSession: (id: string, newTitle: string) => void;
   disabled: boolean;
   isOpen?: boolean;
@@ -23,6 +24,7 @@ export function SessionSidebar({
   onSelectSession,
   onNewSession,
   onDeleteSession,
+  onBulkDeleteSessions,
   onRenameSession,
   disabled,
   isOpen = true,
@@ -33,6 +35,8 @@ export function SessionSidebar({
     editingId,
     editTitle,
     menuOpenId,
+    isMultiSelectMode,
+    selectedSessionIds,
     setEditTitle,
     handleStartEdit,
     handleSaveEdit,
@@ -40,7 +44,12 @@ export function SessionSidebar({
     handleDelete,
     toggleMenu,
     closeMenu,
-  } = useSessionSidebar({ onRenameSession, onDeleteSession });
+    enterMultiSelectMode,
+    exitMultiSelectMode,
+    toggleSessionSelection,
+    selectAllSessions,
+    handleBulkDelete,
+  } = useSessionSidebar({ onRenameSession, onDeleteSession, onBulkDeleteSessions, sessions });
 
   const handleSelectSession = (session: DiscussionSession) => {
     if (!disabled) {
@@ -79,6 +88,14 @@ export function SessionSidebar({
           onNewSession={handleNewSessionClick}
           onClose={onClose}
           onCollapse={onCollapse}
+          isMultiSelectMode={isMultiSelectMode}
+          selectedCount={selectedSessionIds.size}
+          totalCount={sessions.length}
+          disabled={disabled}
+          onEnterMultiSelect={enterMultiSelectMode}
+          onExitMultiSelect={exitMultiSelectMode}
+          onSelectAll={selectAllSessions}
+          onBulkDelete={handleBulkDelete}
         />
 
         {/* セッション一覧 */}
@@ -98,6 +115,8 @@ export function SessionSidebar({
                   editTitle={editTitle}
                   isMenuOpen={menuOpenId === session.id}
                   disabled={disabled}
+                  isMultiSelectMode={isMultiSelectMode}
+                  isChecked={selectedSessionIds.has(session.id)}
                   onSelect={() => handleSelectSession(session)}
                   onEditTitleChange={setEditTitle}
                   onSaveEdit={() => handleSaveEdit(session.id)}
@@ -105,6 +124,7 @@ export function SessionSidebar({
                   onStartEdit={() => handleStartEdit(session)}
                   onDelete={() => handleDelete(session.id)}
                   onToggleMenu={() => toggleMenu(session.id)}
+                  onToggleCheck={() => toggleSessionSelection(session.id)}
                 />
               ))}
             </div>

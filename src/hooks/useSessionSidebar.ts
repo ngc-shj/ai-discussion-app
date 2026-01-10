@@ -6,6 +6,8 @@ import { DiscussionSession } from '@/types';
 export interface UseSessionSidebarProps {
   onRenameSession: (id: string, newTitle: string) => void;
   onDeleteSession: (id: string) => void;
+  onBulkDeleteSessions?: (ids: string[]) => void;
+  sessions?: DiscussionSession[];
 }
 
 export interface UseSessionSidebarReturn {
@@ -13,6 +15,8 @@ export interface UseSessionSidebarReturn {
   editingId: string | null;
   editTitle: string;
   menuOpenId: string | null;
+  isMultiSelectMode: boolean;
+  selectedSessionIds: Set<string>;
 
   // Actions
   setEditTitle: (title: string) => void;
@@ -22,6 +26,11 @@ export interface UseSessionSidebarReturn {
   handleDelete: (id: string) => void;
   toggleMenu: (id: string) => void;
   closeMenu: () => void;
+  enterMultiSelectMode: () => void;
+  exitMultiSelectMode: () => void;
+  toggleSessionSelection: (id: string) => void;
+  selectAllSessions: () => void;
+  handleBulkDelete: () => void;
 }
 
 /**
@@ -46,10 +55,14 @@ export function formatDate(date: Date): string {
 export function useSessionSidebar({
   onRenameSession,
   onDeleteSession,
+  onBulkDeleteSessions,
+  sessions = [],
 }: UseSessionSidebarProps): UseSessionSidebarReturn {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
 
   const handleStartEdit = useCallback((session: DiscussionSession) => {
     setEditingId(session.id);
@@ -91,10 +104,54 @@ export function useSessionSidebar({
     setMenuOpenId(null);
   }, []);
 
+  // 複数選択モードを開始
+  const enterMultiSelectMode = useCallback(() => {
+    setIsMultiSelectMode(true);
+    setSelectedSessionIds(new Set());
+    setMenuOpenId(null);
+  }, []);
+
+  // 複数選択モードを終了
+  const exitMultiSelectMode = useCallback(() => {
+    setIsMultiSelectMode(false);
+    setSelectedSessionIds(new Set());
+  }, []);
+
+  // セッションの選択をトグル
+  const toggleSessionSelection = useCallback((id: string) => {
+    setSelectedSessionIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // 全セッションを選択
+  const selectAllSessions = useCallback(() => {
+    setSelectedSessionIds(new Set(sessions.map((s) => s.id)));
+  }, [sessions]);
+
+  // 選択したセッションを一括削除
+  const handleBulkDelete = useCallback(() => {
+    if (selectedSessionIds.size === 0) return;
+
+    const count = selectedSessionIds.size;
+    if (confirm(`${count}件のセッションを削除しますか？`)) {
+      onBulkDeleteSessions?.(Array.from(selectedSessionIds));
+      exitMultiSelectMode();
+    }
+  }, [selectedSessionIds, onBulkDeleteSessions, exitMultiSelectMode]);
+
   return {
     editingId,
     editTitle,
     menuOpenId,
+    isMultiSelectMode,
+    selectedSessionIds,
     setEditTitle,
     handleStartEdit,
     handleSaveEdit,
@@ -102,5 +159,10 @@ export function useSessionSidebar({
     handleDelete,
     toggleMenu,
     closeMenu,
+    enterMultiSelectMode,
+    exitMultiSelectMode,
+    toggleSessionSelection,
+    selectAllSessions,
+    handleBulkDelete,
   };
 }
