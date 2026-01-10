@@ -35,7 +35,7 @@ export function SearchResultsDisplay({ results }: SearchResultsDisplayProps) {
       </button>
 
       {isExpanded && (
-        <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-cyan-700/50 space-y-2 max-h-48 md:max-h-64 overflow-y-auto">
+        <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-cyan-700/50 space-y-2">
           {results.map((result, index) => (
             <div
               key={`${result.url}-${index}`}
