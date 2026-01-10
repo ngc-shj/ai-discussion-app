@@ -81,11 +81,12 @@ export async function* runDiscussion(
         currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
         // 検索結果をコールバックで通知
         request.onSearchResult?.(currentSearchResults);
-        yield {
-          type: 'searching',
-          searchResults: currentSearchResults,
-        };
       }
+      // 検索完了を通知
+      yield {
+        type: 'search_results',
+        searchResults: currentSearchResults,
+      };
     }
 
     for (let pIndex = pStartIndex; pIndex < participants.length && !terminated; pIndex++) {

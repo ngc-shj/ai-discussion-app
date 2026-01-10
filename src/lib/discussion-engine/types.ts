@@ -17,7 +17,7 @@ import {
  * 議論の進捗情報
  */
 export interface DiscussionProgress {
-  type: 'message' | 'message_chunk' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'terminated' | 'followups' | 'ready_for_summary';
+  type: 'message' | 'message_chunk' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'search_results' | 'terminated' | 'followups' | 'ready_for_summary';
   message?: DiscussionMessage;
   messageId?: string;
   chunk?: string;
