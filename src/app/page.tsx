@@ -78,6 +78,7 @@ export default function Home() {
     setCurrentSession,
     setInterruptedState,
     deleteSession: sessionManagerDeleteSession,
+    bulkDeleteSessions: sessionManagerBulkDeleteSessions,
     renameSession: sessionManagerRenameSession,
     updateAndSaveSession,
     discardInterrupted,
@@ -278,6 +279,14 @@ export default function Home() {
     }
   }, [currentSession, sessionManagerDeleteSession, clearCurrentTurnState]);
 
+  // セッションを一括削除
+  const handleBulkDeleteSessions = useCallback(async (ids: string[]) => {
+    await sessionManagerBulkDeleteSessions(ids);
+    if (currentSession && ids.includes(currentSession.id)) {
+      clearCurrentTurnState();
+    }
+  }, [currentSession, sessionManagerBulkDeleteSessions, clearCurrentTurnState]);
+
   // セッションの名前を変更
   const handleRenameSession = useCallback(async (id: string, newTitle: string) => {
     await sessionManagerRenameSession(id, newTitle);
@@ -434,6 +443,7 @@ export default function Home() {
             onSelectSession={handleSelectSession}
             onNewSession={handleNewSession}
             onDeleteSession={handleDeleteSession}
+            onBulkDeleteSessions={handleBulkDeleteSessions}
             onRenameSession={handleRenameSession}
             disabled={isSessionSelectionDisabled}
             onCollapse={() => setIsSidebarCollapsed(true)}
@@ -455,6 +465,7 @@ export default function Home() {
             setIsSidebarOpen(false);
           }}
           onDeleteSession={handleDeleteSession}
+          onBulkDeleteSessions={handleBulkDeleteSessions}
           onRenameSession={handleRenameSession}
           disabled={isSessionSelectionDisabled}
           isOpen={isSidebarOpen}
