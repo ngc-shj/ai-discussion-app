@@ -66,7 +66,7 @@ export function FinalAnswer({ answer, isLoading }: FinalAnswerProps) {
           <span>議論を統合中...</span>
         </div>
       ) : (
-        <div className="max-h-64 md:max-h-96 overflow-y-auto text-gray-200 text-sm md:text-base">
+        <div className="text-gray-200 text-sm md:text-base">
           <MarkdownRenderer content={answer} />
         </div>
       )}
