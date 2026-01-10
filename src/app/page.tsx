@@ -615,10 +615,13 @@ export default function Home() {
           currentParticipant={progress.currentParticipant}
           totalProviders={progress.totalParticipants}
           currentProviderIndex={progress.currentParticipantIndex}
-          isSummarizing={summaryState === 'generating'}
+          isSummarizing={summaryState === 'generating' && !streamingMessage}
+          isSummaryStreaming={summaryState === 'generating' && !!streamingMessage}
           isSearching={isSearching}
           isStreaming={!!streamingMessage}
-          participants={isLoading ? discussionParticipants : participants}
+          isGeneratingFollowUps={isGeneratingFollowUps}
+          summaryState={summaryState}
+          participants={isLoading || summaryState !== 'idle' ? discussionParticipants : participants}
           completedParticipants={completedParticipants}
           onInterrupt={handleInterrupt}
         />

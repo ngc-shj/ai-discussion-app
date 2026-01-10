@@ -3,6 +3,8 @@
 interface ProgressStatusProps {
   isSearching: boolean;
   isSummarizing: boolean;
+  isSummaryStreaming?: boolean;
+  isGeneratingFollowUps?: boolean;
   providerName: string;
   providerColor: string;
   currentRound: number;
@@ -15,6 +17,8 @@ interface ProgressStatusProps {
 export function ProgressStatus({
   isSearching,
   isSummarizing,
+  isSummaryStreaming = false,
+  isGeneratingFollowUps = false,
   providerName,
   providerColor,
   elapsedTime,
@@ -30,6 +34,20 @@ export function ProgressStatus({
             </svg>
             Web検索中...
             {elapsedTime && <span className="ml-1 text-cyan-300/70">{elapsedTime}</span>}
+          </span>
+        </>
+      ) : isGeneratingFollowUps ? (
+        <>
+          <div className="animate-spin w-3.5 h-3.5 md:w-4 md:h-4 border-2 border-green-400 border-t-transparent rounded-full shrink-0" />
+          <span className="text-green-400 font-medium truncate">
+            フォローアップ質問を生成中...
+          </span>
+        </>
+      ) : isSummaryStreaming ? (
+        <>
+          <div className="w-3.5 h-3.5 md:w-4 md:h-4 bg-purple-400 rounded-full animate-pulse shrink-0" />
+          <span className="text-purple-400 font-medium truncate">
+            統合回答を出力中...
           </span>
         </>
       ) : isSummarizing ? (
@@ -63,6 +81,8 @@ export function ProgressStatus({
 interface ProgressInfoProps {
   isSearching: boolean;
   isSummarizing: boolean;
+  isSummaryStreaming?: boolean;
+  isGeneratingFollowUps?: boolean;
   currentRound: number;
   totalRounds: number;
   currentProviderIndex: number;
@@ -72,6 +92,8 @@ interface ProgressInfoProps {
 export function ProgressInfo({
   isSearching,
   isSummarizing,
+  isSummaryStreaming = false,
+  isGeneratingFollowUps = false,
   currentRound,
   totalRounds,
   currentProviderIndex,
@@ -81,6 +103,10 @@ export function ProgressInfo({
     <div className="text-gray-400">
       {isSearching ? (
         <span className="hidden sm:inline">最新情報を取得中</span>
+      ) : isGeneratingFollowUps ? (
+        <span className="hidden sm:inline">提案を準備中</span>
+      ) : isSummaryStreaming ? (
+        <span className="hidden sm:inline">統合回答を出力中</span>
       ) : isSummarizing ? (
         <span className="hidden sm:inline">最終ステップ</span>
       ) : (

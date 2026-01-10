@@ -78,23 +78,45 @@ export function ParticipantChip({
 
 interface SummaryChipProps {
   isSummarizing: boolean;
+  isSummaryStreaming?: boolean;
+  isCompleted?: boolean;
 }
 
-export function SummaryChip({ isSummarizing }: SummaryChipProps) {
+export function SummaryChip({ isSummarizing, isSummaryStreaming = false, isCompleted = false }: SummaryChipProps) {
+  const isActive = isSummarizing || isSummaryStreaming;
+
+  let title = '統合回答 (待機中)';
+  if (isActive) title = '統合回答を生成中';
+  if (isCompleted) title = '統合回答 (完了)';
+
   return (
     <div
       className={`
         flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border
         transition-all duration-300
-        ${isSummarizing
+        ${isActive
           ? 'border-purple-400 bg-purple-400/20 ring-2 ring-purple-400 ring-offset-1 ring-offset-gray-800 scale-105'
-          : 'border-gray-600 bg-gray-700/50 opacity-40'
+          : isCompleted
+            ? 'border-purple-400 bg-purple-400/20 opacity-60'
+            : 'border-gray-600 bg-gray-700/50 opacity-40'
         }
       `}
-      title={isSummarizing ? '統合回答を生成中' : '統合回答 (待機中)'}
+      title={title}
     >
-      <div className={`w-2.5 h-2.5 rounded-full ${isSummarizing ? 'bg-purple-400 animate-pulse' : 'bg-gray-500'}`} />
-      <span className={isSummarizing ? 'text-purple-400 font-medium' : 'text-gray-500'}>統合</span>
+      <div className="relative">
+        <div className={`w-2.5 h-2.5 rounded-full ${isActive ? 'bg-purple-400 animate-pulse' : isCompleted ? 'bg-purple-400' : 'bg-gray-500'}`} />
+        {isCompleted && (
+          <svg
+            className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 text-green-400"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        )}
+      </div>
+      <span className={isActive ? 'text-purple-400 font-medium' : isCompleted ? 'text-purple-400' : 'text-gray-500'}>統合</span>
     </div>
   );
 }
+
