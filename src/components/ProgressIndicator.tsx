@@ -159,6 +159,7 @@ export function ProgressIndicator({
           isSummarizing={isSummarizing}
           isSummaryStreaming={isSummaryStreaming}
           isGeneratingFollowUps={isGeneratingFollowUps}
+          isStreaming={isStreaming}
           providerName={providerName}
           providerColor={providerColor}
           currentRound={currentRound}

@@ -5,6 +5,7 @@ interface ProgressStatusProps {
   isSummarizing: boolean;
   isSummaryStreaming?: boolean;
   isGeneratingFollowUps?: boolean;
+  isStreaming?: boolean;
   providerName: string;
   providerColor: string;
   currentRound: number;
@@ -19,6 +20,7 @@ export function ProgressStatus({
   isSummarizing,
   isSummaryStreaming = false,
   isGeneratingFollowUps = false,
+  isStreaming = false,
   providerName,
   providerColor,
   elapsedTime,
@@ -56,6 +58,20 @@ export function ProgressStatus({
           <span className="text-purple-400 font-medium truncate">
             統合回答を生成中...
             {elapsedTime && <span className="ml-1 text-purple-300/70">{elapsedTime}</span>}
+          </span>
+        </>
+      ) : isStreaming ? (
+        <>
+          <div
+            className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-full animate-pulse shrink-0"
+            style={{ backgroundColor: providerColor }}
+          />
+          <span className="text-gray-300 truncate">
+            <span className="font-medium" style={{ color: providerColor }}>
+              {providerName}
+            </span>
+            <span className="hidden sm:inline">{' が生成中...'}</span>
+            <span className="sm:hidden">...</span>
           </span>
         </>
       ) : (
