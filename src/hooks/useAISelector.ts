@@ -258,16 +258,47 @@ function getFamilySortKey(family: string): string {
   return 'Z' + family;
 }
 
+// モデルIDからサイズ（パラメータ数）を抽出する関数
+// 例: "deepseek-r1:70b" -> 70, "gpt-oss:120b" -> 120, "llama3.2:3b" -> 3
+function extractModelSize(modelId: string): number {
+  const id = modelId.toLowerCase();
+  // コロン以降のサイズ部分を抽出（例: ":70b", ":8b", ":120b"）
+  const sizeMatch = id.match(/:(\d+(?:\.\d+)?)(b|m|k)?$/i);
+  if (sizeMatch) {
+    const value = parseFloat(sizeMatch[1]);
+    const unit = sizeMatch[2]?.toLowerCase();
+    // 単位で正規化（b=billion, m=million, k=thousand）
+    switch (unit) {
+      case 'b': return value * 1000;
+      case 'm': return value;
+      case 'k': return value / 1000;
+      default: return value;
+    }
+  }
+  return 0; // サイズ情報がない場合は0
+}
+
 // 最新世代のみをフィルタリング
 function filterLatestGeneration(models: ModelInfo[]): ModelInfo[] {
   const familyMap = new Map<string, ModelInfo>();
 
-  // 各モデルをファミリーごとにグループ化し、最初のもの（最新）を保持
-  // ※ APIからのモデルは既に新しい順にソートされている前提
+  // 各モデルをファミリーごとにグループ化
   for (const model of models) {
     const family = extractModelFamily(model.id);
-    if (!familyMap.has(family)) {
+    const existing = familyMap.get(family);
+
+    if (!existing) {
+      // 初めてのファミリー
       familyMap.set(family, model);
+    } else {
+      // 既存のモデルとサイズを比較し、大きい方を保持
+      // ※ ローカルモデル（コロン付き）の場合は最大サイズを選ぶ
+      // ※ クラウドモデルの場合は最初のもの（最新）を保持
+      const existingSize = extractModelSize(existing.id);
+      const newSize = extractModelSize(model.id);
+      if (newSize > existingSize) {
+        familyMap.set(family, model);
+      }
     }
   }
 
