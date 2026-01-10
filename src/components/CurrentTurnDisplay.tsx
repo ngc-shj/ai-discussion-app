@@ -170,7 +170,7 @@ export function CurrentTurnDisplay({
           </div>
 
           {isExpanded && (
-            <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-gray-700 max-h-48 md:max-h-64 overflow-y-auto">
+            <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-gray-700">
               {messages.map((message) => (
                 <MessageBubble
                   key={message.id}

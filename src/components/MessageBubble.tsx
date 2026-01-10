@@ -13,6 +13,7 @@ export interface MessageBubbleProps {
 
 export function MessageBubble({ message, participants, vote, onVote }: MessageBubbleProps) {
   const [showPrompt, setShowPrompt] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const provider = DEFAULT_PROVIDERS.find((p) => p.id === message.provider);
 
   // 参加者を取得（実行中は participants から、履歴表示時はスナップショットを使用）
@@ -30,6 +31,9 @@ export function MessageBubble({ message, participants, vote, onVote }: MessageBu
     ? formatParticipantDisplayName(participant)
     : (message.displayName || fallbackDisplayName);
 
+  // プレビューテキスト（折りたたみ時に表示）
+  const previewText = message.content.slice(0, 100).replace(/\n/g, ' ') + (message.content.length > 100 ? '...' : '');
+
   return (
     <div className="flex gap-2 md:gap-3 mb-3 md:mb-4">
       <div
@@ -39,15 +43,31 @@ export function MessageBubble({ message, participants, vote, onVote }: MessageBu
         {baseName.charAt(0)}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1 flex-wrap">
+        <button
+          type="button"
+          onClick={() => !message.isLoading && !message.isStreaming && setIsCollapsed(!isCollapsed)}
+          className="flex items-center gap-2 mb-1 flex-wrap w-full text-left group"
+          disabled={message.isLoading || message.isStreaming}
+        >
           <span className="font-semibold truncate text-sm md:text-base" style={{ color }} title={displayName}>
             {displayName}
           </span>
           <span className="text-xs text-gray-400 shrink-0">
             Round {message.round}
           </span>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-2 md:p-3 text-gray-200 text-sm md:text-base">
+          {/* 折りたたみインジケーター */}
+          {!message.isLoading && !message.isStreaming && (
+            <svg
+              className={`w-4 h-4 text-gray-500 transition-transform ${isCollapsed ? '' : 'rotate-180'}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          )}
+        </button>
+        <div className={`bg-gray-800 rounded-lg p-2 md:p-3 text-gray-200 text-sm md:text-base ${isCollapsed ? 'cursor-pointer' : ''}`} onClick={() => isCollapsed && setIsCollapsed(false)}>
           {message.isLoading ? (
             <div className="flex items-center gap-2">
               <div className="animate-spin w-4 h-4 border-2 border-gray-500 border-t-white rounded-full" />
@@ -58,12 +78,17 @@ export function MessageBubble({ message, participants, vote, onVote }: MessageBu
               <MarkdownRenderer content={message.content} />
               <span className="inline-block w-2 h-4 bg-blue-400 animate-pulse ml-0.5" />
             </div>
+          ) : isCollapsed ? (
+            <div className="text-gray-400 text-sm truncate">
+              {previewText}
+              <span className="ml-2 text-blue-400 text-xs">クリックで展開</span>
+            </div>
           ) : (
             <MarkdownRenderer content={message.content} />
           )}
         </div>
-        {/* プロンプト表示ボタン・投票ボタン */}
-        {!message.isLoading && !message.isStreaming && (
+        {/* プロンプト表示ボタン・投票ボタン（折りたたみ時は非表示） */}
+        {!message.isLoading && !message.isStreaming && !isCollapsed && (
           <div className="flex items-center gap-1 mt-1.5">
             {/* プロンプト表示トグル */}
             {message.prompt && (
