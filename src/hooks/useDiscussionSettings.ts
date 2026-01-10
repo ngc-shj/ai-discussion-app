@@ -183,7 +183,16 @@ export function useDiscussionSettings(): DiscussionSettingsState & DiscussionSet
     const savedSearch = localStorage.getItem(STORAGE_KEYS.SEARCH);
     if (savedSearch) {
       try {
-        setSearchConfigState({ ...DEFAULT_SEARCH_CONFIG, ...JSON.parse(savedSearch) });
+        const parsed = JSON.parse(savedSearch);
+        // timingオブジェクトを深くマージ（古い形式の設定をサポート）
+        setSearchConfigState({
+          ...DEFAULT_SEARCH_CONFIG,
+          ...parsed,
+          timing: {
+            ...DEFAULT_SEARCH_CONFIG.timing,
+            ...(parsed.timing || {}),
+          },
+        });
       } catch { /* ignore */ }
     }
 
