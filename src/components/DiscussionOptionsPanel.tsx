@@ -147,9 +147,9 @@ interface SearchConfigSectionProps {
 
 function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: SearchConfigSectionProps) {
   // timing のデフォルト値を確保
-  const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
+  const timing = searchConfig.timing || { onStart: true, eachRound: false, beforeSummary: false, onDemand: false };
 
-  const handleTimingChange = (key: 'onStart' | 'beforeSummary' | 'onDemand', value: boolean) => {
+  const handleTimingChange = (key: 'onStart' | 'eachRound' | 'beforeSummary' | 'onDemand', value: boolean) => {
     onSearchConfigChange({
       ...searchConfig,
       timing: { ...timing, [key]: value }
@@ -222,6 +222,16 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
                   className="w-3.5 h-3.5 rounded border-gray-500 bg-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-0 disabled:opacity-50"
                 />
                 <span className="text-xs text-gray-300">開始時に検索</span>
+              </label>
+              <label className={`flex items-center gap-2 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                <input
+                  type="checkbox"
+                  checked={timing.eachRound}
+                  onChange={(e) => handleTimingChange('eachRound', e.target.checked)}
+                  disabled={disabled}
+                  className="w-3.5 h-3.5 rounded border-gray-500 bg-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-0 disabled:opacity-50"
+                />
+                <span className="text-xs text-gray-300">ラウンドごとに検索</span>
               </label>
               <label className={`flex items-center gap-2 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                 <input

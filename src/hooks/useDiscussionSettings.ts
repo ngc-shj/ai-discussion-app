@@ -44,6 +44,7 @@ const DEFAULT_SEARCH_CONFIG: SearchConfig = {
   language: 'ja',
   timing: {
     onStart: true,
+    eachRound: false,
     beforeSummary: false,
     onDemand: false,
   },

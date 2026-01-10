@@ -3,6 +3,7 @@ import {
   DiscussionParticipant,
   PreviousTurnSummary,
   SearchResult,
+  SearchConfig,
   UserProfile,
   DiscussionMode,
   DiscussionDepth,
@@ -55,6 +56,7 @@ export interface DiscussionRequest {
   rounds: number;
   previousTurns?: PreviousTurnSummary[];
   searchResults?: SearchResult[];
+  searchConfig?: SearchConfig; // 検索設定（eachRound検索に使用）
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
   discussionDepth?: DiscussionDepth;
@@ -64,7 +66,13 @@ export interface DiscussionRequest {
   messageVotes?: MessageVote[]; // ユーザーの投票（統合回答に反映）
   skipSummary?: boolean; // 統合回答生成をスキップ（ユーザーが投票後に手動で生成）
   onMessageChunk?: OnMessageChunkCallback; // ストリーミングチャンクのコールバック
+  onSearchResult?: OnSearchResultCallback; // 検索結果のコールバック
 }
+
+/**
+ * 検索結果のコールバック型
+ */
+export type OnSearchResultCallback = (results: SearchResult[]) => void;
 
 /**
  * ストリーミングチャンクのコールバック型

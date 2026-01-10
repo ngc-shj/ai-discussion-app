@@ -1,6 +1,6 @@
 import { AIProviderType } from './provider';
 import { DiscussionParticipant } from './participant';
-import { SearchResult, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig } from './config';
+import { SearchResult, SearchConfig, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig } from './config';
 import { FollowUpQuestion } from './followup';
 
 // 統合回答の状態
@@ -106,6 +106,7 @@ export interface InterruptedDiscussionState {
   currentParticipantIndex: number;
   totalRounds: number;
   searchResults?: SearchResult[];
+  searchConfig?: SearchConfig;
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
   discussionDepth?: DiscussionDepth;

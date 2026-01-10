@@ -8,6 +8,7 @@ import {
   InterruptedDiscussionState,
   PreviousTurnSummary,
   SearchResult,
+  SearchConfig,
   UserProfile,
   DiscussionMode,
   DiscussionDepth,
@@ -207,6 +208,7 @@ export interface CreateInterruptedStateParams {
   currentParticipantIndex: number;
   totalRounds: number;
   searchResults?: SearchResult[];
+  searchConfig?: SearchConfig;
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
   discussionDepth?: DiscussionDepth;
@@ -230,6 +232,7 @@ export function createInterruptedState(
     currentParticipantIndex: params.currentParticipantIndex,
     totalRounds: params.totalRounds,
     searchResults: params.searchResults,
+    searchConfig: params.searchConfig,
     userProfile: params.userProfile,
     discussionMode: params.discussionMode,
     discussionDepth: params.discussionDepth,

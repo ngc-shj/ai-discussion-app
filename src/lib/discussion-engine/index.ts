@@ -1,7 +1,8 @@
-import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile, formatParticipantDisplayName } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile, SearchResult, formatParticipantDisplayName } from '@/types';
 import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from '../ai-providers';
 import { DiscussionProgress, DiscussionRequest, getProviderDisplayName } from './types';
 import { checkConsensus, checkTerminationKeywords } from './termination';
+import { performSearch, mergeSearchResults } from '../search';
 
 // Re-export types
 export type { DiscussionProgress, ResumeFromState, DiscussionRequest } from './types';
@@ -19,7 +20,8 @@ export async function* runDiscussion(
     participants,
     rounds,
     previousTurns,
-    searchResults,
+    searchResults: initialSearchResults,
+    searchConfig,
     userProfile,
     discussionMode,
     discussionDepth,
@@ -29,6 +31,9 @@ export async function* runDiscussion(
     messageVotes,
     skipSummary,
   } = request;
+
+  // 検索結果を動的に更新できるように変数化
+  let currentSearchResults: SearchResult[] = initialSearchResults ? [...initialSearchResults] : [];
 
   // 再開時は既存のメッセージから開始
   const messages: DiscussionMessage[] = resumeFrom?.messages ? [...resumeFrom.messages] : [];
@@ -57,6 +62,31 @@ export async function* runDiscussion(
   // 各ラウンドで全参加者が発言
   for (let round = startRound; round <= effectiveMaxRounds && !terminated; round++) {
     const pStartIndex = (round === startRound) ? startParticipantIndex : 0;
+
+    // eachRound検索: ラウンド開始時に検索を実行（2ラウンド目以降、または再開時の最初のラウンドで参加者0から開始の場合）
+    const shouldSearchEachRound = searchConfig?.enabled &&
+      searchConfig?.timing?.eachRound &&
+      ((round > 1 && pStartIndex === 0) || (round === startRound && pStartIndex === 0 && round > 1));
+
+    if (shouldSearchEachRound) {
+      yield {
+        type: 'searching',
+        searchResults: currentSearchResults,
+      };
+
+      const searchQuery = searchConfig?.query || topic;
+      const newResults = await performSearch(searchQuery, searchConfig);
+
+      if (newResults.length > 0) {
+        currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
+        // 検索結果をコールバックで通知
+        request.onSearchResult?.(currentSearchResults);
+        yield {
+          type: 'searching',
+          searchResults: currentSearchResults,
+        };
+      }
+    }
 
     for (let pIndex = pStartIndex; pIndex < participants.length && !terminated; pIndex++) {
       const participant = participants[pIndex];
@@ -106,7 +136,7 @@ export async function* runDiscussion(
         messages.length === 0,
         false,
         turnContext,
-        searchResults,
+        currentSearchResults.length > 0 ? currentSearchResults : undefined,
         participant.role,
         participant.customRolePrompt,
         participants,
@@ -201,7 +231,7 @@ export async function* runDiscussion(
   }
 
   // 統合回答を生成
-  yield* generateSummary(messages, participants, topic, rounds, turnContext, searchResults, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes);
+  yield* generateSummary(messages, participants, topic, rounds, turnContext, currentSearchResults.length > 0 ? currentSearchResults : undefined, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes);
 }
 
 /**
