@@ -1,4 +1,4 @@
-import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile, SearchResult, formatParticipantDisplayName } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile, SearchResult, SearchConfig, formatParticipantDisplayName } from '@/types';
 import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from '../ai-providers';
 import { DiscussionProgress, DiscussionRequest, getProviderDisplayName } from './types';
 import { checkConsensus, checkTerminationKeywords } from './termination';
@@ -8,6 +8,28 @@ import { performSearch, mergeSearchResults } from '../search';
 export type { DiscussionProgress, ResumeFromState, DiscussionRequest } from './types';
 export { getProviderDisplayName } from './types';
 export { checkConsensus, checkTerminationKeywords } from './termination';
+
+// 検索パターン: {{SEARCH:query}} または {{検索:query}}
+const SEARCH_PATTERN = /\{\{(?:SEARCH|検索):(.+?)\}\}/g;
+
+/**
+ * AIの応答から検索パターンを抽出
+ */
+function extractSearchQueries(content: string): string[] {
+  const queries: string[] = [];
+  let match;
+  while ((match = SEARCH_PATTERN.exec(content)) !== null) {
+    queries.push(match[1].trim());
+  }
+  return queries;
+}
+
+/**
+ * AIの応答から検索パターンを除去し、検索結果への参照に置換
+ */
+function replaceSearchPatterns(content: string): string {
+  return content.replace(SEARCH_PATTERN, '');
+}
 
 /**
  * 議論を実行するジェネレーター関数
@@ -131,7 +153,7 @@ export async function* runDiscussion(
         };
       });
 
-      const prompt = createDiscussionPrompt(
+      let prompt = createDiscussionPrompt(
         topic,
         previousMessages,
         messages.length === 0,
@@ -147,6 +169,14 @@ export async function* runDiscussion(
         discussionDepth,
         directionGuide
       );
+
+      // onDemand検索が有効な場合、検索リクエスト機能の説明を追加
+      if (searchConfig?.enabled && searchConfig?.timing?.onDemand) {
+        prompt += `\n\n【Web検索リクエスト機能】
+議論中に最新の情報が必要な場合、{{SEARCH:検索クエリ}} の形式で検索をリクエストできます。
+例: {{SEARCH:React 19 新機能}}
+検索結果は次の発言者に共有されます。`;
+      }
 
       // メッセージIDを事前に生成
       const newMessageId = `msg-${++messageId}`;
@@ -171,12 +201,45 @@ export async function* runDiscussion(
         continue;
       }
 
+      // onDemand検索: AIの応答から{{SEARCH:query}}パターンを検出
+      let messageContent = response.content;
+      if (searchConfig?.enabled && searchConfig?.timing?.onDemand) {
+        const searchQueries = extractSearchQueries(response.content);
+        if (searchQueries.length > 0) {
+          // 検索中を通知
+          yield {
+            type: 'searching',
+            searchResults: currentSearchResults,
+          };
+
+          // 各クエリで検索を実行
+          for (const query of searchQueries) {
+            const newResults = await performSearch(query, searchConfig);
+            if (newResults.length > 0) {
+              currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
+            }
+          }
+
+          // 検索結果をコールバックで通知
+          request.onSearchResult?.(currentSearchResults);
+
+          // 検索完了を通知
+          yield {
+            type: 'search_results',
+            searchResults: currentSearchResults,
+          };
+
+          // メッセージから検索パターンを除去
+          messageContent = replaceSearchPatterns(response.content).trim();
+        }
+      }
+
       const message: DiscussionMessage = {
         id: newMessageId,
         participantId: participant.id, // 参加者への参照
         provider: participant.provider,
         model: participant.model,
-        content: response.content,
+        content: messageContent,
         round,
         timestamp: new Date(),
         prompt,
