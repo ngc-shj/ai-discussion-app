@@ -148,8 +148,8 @@ export function MessageBubble({ message, participants, vote, onVote }: MessageBu
             )}
           </div>
         )}
-        {/* プロンプト表示エリア */}
-        {showPrompt && message.prompt && (
+        {/* プロンプト表示エリア（折りたたみ時は非表示） */}
+        {showPrompt && message.prompt && !isCollapsed && (
           <div className="mt-2 bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
             {message.prompt}
           </div>
