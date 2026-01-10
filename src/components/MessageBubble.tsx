@@ -14,6 +14,7 @@ export interface MessageBubbleProps {
 export function MessageBubble({ message, participants, vote, onVote }: MessageBubbleProps) {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [copied, setCopied] = useState(false);
   const provider = DEFAULT_PROVIDERS.find((p) => p.id === message.provider);
 
   // 参加者を取得（実行中は participants から、履歴表示時はスナップショットを使用）
@@ -33,6 +34,16 @@ export function MessageBubble({ message, participants, vote, onVote }: MessageBu
 
   // プレビューテキスト（折りたたみ時に表示）
   const previewText = message.content.slice(0, 100).replace(/\n/g, ' ') + (message.content.length > 100 ? '...' : '');
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   return (
     <div className="flex gap-2 md:gap-3 mb-3 md:mb-4">
@@ -87,9 +98,36 @@ export function MessageBubble({ message, participants, vote, onVote }: MessageBu
             <MarkdownRenderer content={message.content} />
           )}
         </div>
-        {/* プロンプト表示ボタン・投票ボタン（折りたたみ時は非表示） */}
+        {/* コピー・プロンプト表示ボタン（折りたたみ時は非表示） */}
         {!message.isLoading && !message.isStreaming && !isCollapsed && (
           <div className="flex items-center gap-1 mt-1.5">
+            {/* コピーボタン */}
+            <button
+              type="button"
+              onClick={handleCopy}
+              className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded transition-colors ${
+                copied
+                  ? 'bg-green-600 text-white'
+                  : 'text-gray-400 hover:text-blue-400 hover:bg-gray-700'
+              }`}
+              title="コピー"
+            >
+              {copied ? (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="hidden sm:inline">コピー完了</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <span className="hidden sm:inline">コピー</span>
+                </>
+              )}
+            </button>
             {/* プロンプト表示トグル */}
             {message.prompt && (
               <button

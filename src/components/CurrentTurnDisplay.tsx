@@ -150,20 +150,27 @@ export function CurrentTurnDisplay({
               <button
                 type="button"
                 onClick={handleCopyDiscussion}
-                className="flex items-center gap-1 px-1.5 py-0.5 md:px-2 md:py-1 text-xs text-gray-400 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 rounded transition-all"
+                className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded transition-colors ${
+                  discussionCopied
+                    ? 'bg-green-600 text-white'
+                    : 'text-gray-400 hover:text-blue-400 hover:bg-gray-700'
+                }`}
                 title="議論をコピー"
               >
                 {discussionCopied ? (
                   <>
-                    <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <span className="hidden sm:inline">コピー済</span>
+                    <span className="hidden sm:inline">コピー完了</span>
                   </>
                 ) : (
-                  <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span className="hidden sm:inline">議論をコピー</span>
+                  </>
                 )}
               </button>
             )}
@@ -254,10 +261,49 @@ export function CurrentTurnDisplay({
             <span className="text-white text-base md:text-lg">✨</span>
           </div>
           <div className="flex-1 min-w-0 relative">
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
-                {summaryPrompt && summaryState !== 'generating' && (
+            <div className="flex items-center mb-1">
+              <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
+            </div>
+            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg p-2 md:p-3 text-gray-200 text-sm md:text-base">
+              {summaryState === 'generating' && !finalAnswer ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-purple-400 rounded-full" />
+                  <span className="text-gray-400 text-sm md:text-base">議論を統合中...</span>
+                </div>
+              ) : (
+                <MarkdownRenderer content={finalAnswer || ''} />
+              )}
+            </div>
+            {/* コピー・プロンプト表示ボタン（統合完了後のみ） */}
+            {finalAnswer && summaryState !== 'generating' && (
+              <div className="flex items-center gap-1 mt-1.5">
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded transition-colors ${
+                    copied
+                      ? 'bg-green-600 text-white'
+                      : 'text-gray-400 hover:text-blue-400 hover:bg-gray-700'
+                  }`}
+                  title="コピー"
+                >
+                  {copied ? (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="hidden sm:inline">コピー完了</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      <span className="hidden sm:inline">コピー</span>
+                    </>
+                  )}
+                </button>
+                {summaryPrompt && (
                   <button
                     type="button"
                     onClick={() => setShowSummaryPrompt(!showSummaryPrompt)}
@@ -275,52 +321,13 @@ export function CurrentTurnDisplay({
                   </button>
                 )}
               </div>
-            </div>
+            )}
             {/* プロンプト表示エリア */}
             {showSummaryPrompt && summaryPrompt && (
-              <div className="mb-2 bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
+              <div className="mt-2 bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
                 {summaryPrompt}
               </div>
             )}
-            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg text-gray-200 text-sm md:text-base relative">
-              {summaryState === 'generating' && !finalAnswer ? (
-                <div className="flex items-center gap-2 p-2 md:p-3">
-                  <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-purple-400 rounded-full" />
-                  <span className="text-gray-400 text-sm md:text-base">議論を統合中...</span>
-                </div>
-              ) : (
-                <>
-                  {/* 固定コピーボタン */}
-                  <div className="sticky top-0 z-10 flex justify-end p-1.5 md:p-2 pb-0">
-                    <button
-                      type="button"
-                      onClick={handleCopy}
-                      className="flex items-center gap-1 px-1.5 py-0.5 md:px-2 md:py-1 text-xs text-gray-400 hover:text-white bg-gray-700/90 hover:bg-gray-600/90 rounded transition-all shadow-sm"
-                      title="コピー"
-                    >
-                      {copied ? (
-                        <>
-                          <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          <span className="hidden sm:inline">コピー済</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                          <span>コピー</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <div className="px-2 pb-2 md:px-3 md:pb-3">
-                    <MarkdownRenderer content={finalAnswer || ''} />
-                  </div>
-                </>
-              )}
-            </div>
             {/* アクションボタン（統合完了後のみ表示） */}
             {finalAnswer && summaryState !== 'generating' && !isLoading && (onDeepDive || onCounterargument) && (
               <div className="mt-2 flex justify-end gap-2 flex-wrap">

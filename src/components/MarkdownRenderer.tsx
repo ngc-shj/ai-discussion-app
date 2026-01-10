@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -11,44 +10,9 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ content, className = '' }: MarkdownRendererProps) {
-  const [showSource, setShowSource] = useState(false);
-
   return (
     <div className={className}>
-      {/* 表示切り替えボタン */}
-      <div className="flex justify-end mb-2">
-        <button
-          type="button"
-          onClick={() => setShowSource(!showSource)}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-gray-200 bg-gray-700/50 hover:bg-gray-700 rounded transition-colors"
-          title={showSource ? 'Markdown表示' : 'ソース表示'}
-        >
-          {showSource ? (
-            <>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-              <span>整形表示</span>
-            </>
-          ) : (
-            <>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-              </svg>
-              <span>ソース</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* コンテンツ表示 */}
-      {showSource ? (
-        <pre className="whitespace-pre-wrap text-sm text-gray-300 bg-gray-900/50 p-3 rounded-lg overflow-x-auto font-mono">
-          {content}
-        </pre>
-      ) : (
-        <div className="prose prose-invert prose-sm max-w-none">
+      <div className="prose prose-invert prose-sm max-w-none">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}
@@ -139,7 +103,6 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
             {content}
           </ReactMarkdown>
         </div>
-      )}
     </div>
   );
 }

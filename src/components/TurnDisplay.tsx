@@ -117,26 +117,33 @@ export function TurnDisplay({
             <button
               type="button"
               onClick={handleCopyDiscussion}
-              className="flex items-center gap-1 px-1.5 py-0.5 md:px-2 md:py-1 text-xs text-gray-400 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 rounded transition-all"
+              className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded transition-colors ${
+                discussionCopied
+                  ? 'bg-green-600 text-white'
+                  : 'text-gray-400 hover:text-blue-400 hover:bg-gray-700'
+              }`}
               title="議論をコピー"
             >
               {discussionCopied ? (
                 <>
-                  <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span className="hidden sm:inline">コピー済</span>
+                  <span className="hidden sm:inline">コピー完了</span>
                 </>
               ) : (
-                <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <span className="hidden sm:inline">議論をコピー</span>
+                </>
               )}
             </button>
           </div>
 
           {isExpanded && (
-            <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-gray-700 max-h-48 md:max-h-64 overflow-y-auto">
+            <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-gray-700">
               {turn.messages.map((message) => (
                 <MessageBubble
                   key={message.id}
@@ -157,64 +164,64 @@ export function TurnDisplay({
             <span className="text-white text-base md:text-lg">✨</span>
           </div>
           <div className="flex-1 min-w-0 relative">
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
-                {turn.summaryPrompt && (
-                  <button
-                    type="button"
-                    onClick={() => setShowSummaryPrompt(!showSummaryPrompt)}
-                    className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded transition-colors ${
-                      showSummaryPrompt
-                        ? 'bg-purple-600 text-white'
-                        : 'text-gray-400 hover:text-purple-400 hover:bg-gray-700'
-                    }`}
-                    title="プロンプトを表示"
-                  >
+            <div className="flex items-center mb-1">
+              <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
+            </div>
+            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg p-2 md:p-3 text-gray-200 text-sm md:text-base">
+              <MarkdownRenderer content={turn.finalAnswer} />
+            </div>
+            {/* コピー・プロンプト表示ボタン */}
+            <div className="flex items-center gap-1 mt-1.5">
+              <button
+                type="button"
+                onClick={handleCopy}
+                className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded transition-colors ${
+                  copied
+                    ? 'bg-green-600 text-white'
+                    : 'text-gray-400 hover:text-blue-400 hover:bg-gray-700'
+                }`}
+                title="コピー"
+              >
+                {copied ? (
+                  <>
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <span className="hidden sm:inline">Prompt</span>
-                  </button>
+                    <span className="hidden sm:inline">コピー完了</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span className="hidden sm:inline">コピー</span>
+                  </>
                 )}
-              </div>
+              </button>
+              {turn.summaryPrompt && (
+                <button
+                  type="button"
+                  onClick={() => setShowSummaryPrompt(!showSummaryPrompt)}
+                  className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded transition-colors ${
+                    showSummaryPrompt
+                      ? 'bg-purple-600 text-white'
+                      : 'text-gray-400 hover:text-purple-400 hover:bg-gray-700'
+                  }`}
+                  title="プロンプトを表示"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                  </svg>
+                  <span className="hidden sm:inline">Prompt</span>
+                </button>
+              )}
             </div>
             {/* プロンプト表示エリア */}
             {showSummaryPrompt && turn.summaryPrompt && (
-              <div className="mb-2 bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
+              <div className="mt-2 bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
                 {turn.summaryPrompt}
               </div>
             )}
-            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg text-gray-200 text-sm md:text-base relative">
-              {/* 固定コピーボタン */}
-              <div className="sticky top-0 z-10 flex justify-end p-1.5 md:p-2 pb-0">
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="flex items-center gap-1 px-1.5 py-0.5 md:px-2 md:py-1 text-xs text-gray-400 hover:text-white bg-gray-700/90 hover:bg-gray-600/90 rounded transition-all shadow-sm"
-                  title="コピー"
-                >
-                  {copied ? (
-                    <>
-                      <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="hidden sm:inline">コピー済</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      <span>コピー</span>
-                    </>
-                  )}
-                </button>
-              </div>
-              <div className="px-2 pb-2 md:px-3 md:pb-3">
-                <MarkdownRenderer content={turn.finalAnswer} />
-              </div>
-            </div>
             {/* アクションボタン */}
             {(onDeepDive || onCounterargument || onFork) && (
               <div className="mt-2 flex justify-end gap-2 flex-wrap">

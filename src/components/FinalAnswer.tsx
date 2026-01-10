@@ -27,38 +27,11 @@ export function FinalAnswer({ answer, isLoading }: FinalAnswerProps) {
 
   return (
     <div className="mx-3 mb-3 p-3 md:mx-4 md:mb-4 md:p-4 bg-gradient-to-r from-blue-900/50 to-purple-900/50 border border-blue-700 rounded-lg">
-      <div className="flex items-center justify-between mb-2 md:mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
-            <span className="text-white text-base md:text-lg">✨</span>
-          </div>
-          <h3 className="text-base md:text-lg font-semibold text-white">統合回答</h3>
+      <div className="flex items-center gap-2 mb-2 md:mb-3">
+        <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+          <span className="text-white text-base md:text-lg">✨</span>
         </div>
-        {!isLoading && answer && (
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="flex items-center gap-1 md:gap-1.5 px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm text-gray-300 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 rounded-md transition-colors"
-            title="回答をコピー"
-          >
-            {copied ? (
-              <>
-                <svg className="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="hidden sm:inline">コピーしました</span>
-                <span className="sm:hidden">完了</span>
-              </>
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                <span>コピー</span>
-              </>
-            )}
-          </button>
-        )}
+        <h3 className="text-base md:text-lg font-semibold text-white">統合回答</h3>
       </div>
       {isLoading ? (
         <div className="flex items-center gap-2 text-gray-300 text-sm md:text-base">
@@ -66,9 +39,41 @@ export function FinalAnswer({ answer, isLoading }: FinalAnswerProps) {
           <span>議論を統合中...</span>
         </div>
       ) : (
-        <div className="max-h-64 md:max-h-96 overflow-y-auto text-gray-200 text-sm md:text-base">
-          <MarkdownRenderer content={answer} />
-        </div>
+        <>
+          <div className="text-gray-200 text-sm md:text-base">
+            <MarkdownRenderer content={answer} />
+          </div>
+          {answer && (
+            <div className="flex items-center gap-1 mt-2">
+              <button
+                type="button"
+                onClick={handleCopy}
+                className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded transition-colors ${
+                  copied
+                    ? 'bg-green-600 text-white'
+                    : 'text-gray-400 hover:text-blue-400 hover:bg-gray-700'
+                }`}
+                title="回答をコピー"
+              >
+                {copied ? (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="hidden sm:inline">コピー完了</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span className="hidden sm:inline">コピー</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
