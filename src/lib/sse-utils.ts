@@ -8,6 +8,7 @@ import {
   InterruptedDiscussionState,
   PreviousTurnSummary,
   SearchResult,
+  SearchConfig,
   UserProfile,
   DiscussionMode,
   DiscussionDepth,
@@ -66,6 +67,16 @@ export interface SSECompleteEvent {
   type: 'complete';
 }
 
+export interface SSESearchingEvent {
+  type: 'searching';
+  searchResults?: SearchResult[];
+}
+
+export interface SSESearchResultsEvent {
+  type: 'search_results';
+  searchResults: SearchResult[];
+}
+
 export type SSEEvent =
   | SSEProgressEvent
   | SSEMessageEvent
@@ -74,7 +85,9 @@ export type SSEEvent =
   | SSEFollowupsEvent
   | SSEErrorEvent
   | SSEReadyForSummaryEvent
-  | SSECompleteEvent;
+  | SSECompleteEvent
+  | SSESearchingEvent
+  | SSESearchResultsEvent;
 
 // イベントハンドラのインターフェース
 export interface SSEEventHandlers {
@@ -86,6 +99,8 @@ export interface SSEEventHandlers {
   onError?: (error: string) => void;
   onReadyForSummary?: () => void;
   onComplete?: () => void;
+  onSearching?: (searchResults?: SearchResult[]) => void;
+  onSearchResults?: (searchResults: SearchResult[]) => void;
 }
 
 /**
@@ -122,6 +137,12 @@ export function parseSSELine(line: string, handlers: SSEEventHandlers): void {
         break;
       case 'complete':
         handlers.onComplete?.();
+        break;
+      case 'searching':
+        handlers.onSearching?.(event.searchResults);
+        break;
+      case 'search_results':
+        handlers.onSearchResults?.(event.searchResults);
         break;
     }
   } catch {
@@ -207,6 +228,7 @@ export interface CreateInterruptedStateParams {
   currentParticipantIndex: number;
   totalRounds: number;
   searchResults?: SearchResult[];
+  searchConfig?: SearchConfig;
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
   discussionDepth?: DiscussionDepth;
@@ -230,6 +252,7 @@ export function createInterruptedState(
     currentParticipantIndex: params.currentParticipantIndex,
     totalRounds: params.totalRounds,
     searchResults: params.searchResults,
+    searchConfig: params.searchConfig,
     userProfile: params.userProfile,
     discussionMode: params.discussionMode,
     discussionDepth: params.discussionDepth,

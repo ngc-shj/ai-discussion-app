@@ -1,12 +1,37 @@
-import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile, formatParticipantDisplayName } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile, SearchResult, SearchConfig, formatParticipantDisplayName } from '@/types';
 import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from '../ai-providers';
 import { DiscussionProgress, DiscussionRequest, getProviderDisplayName } from './types';
 import { checkConsensus, checkTerminationKeywords } from './termination';
+import { performSearch, mergeSearchResults } from '../search';
 
 // Re-export types
 export type { DiscussionProgress, ResumeFromState, DiscussionRequest } from './types';
 export { getProviderDisplayName } from './types';
 export { checkConsensus, checkTerminationKeywords } from './termination';
+
+// 検索パターン: {{SEARCH:query}} または {{検索:query}}
+const SEARCH_PATTERN = /\{\{(?:SEARCH|検索):(.+?)\}\}/g;
+
+/**
+ * AIの応答から検索パターンを抽出
+ */
+function extractSearchQueries(content: string): string[] {
+  const queries: string[] = [];
+  // グローバル正規表現のlastIndexをリセット
+  SEARCH_PATTERN.lastIndex = 0;
+  let match;
+  while ((match = SEARCH_PATTERN.exec(content)) !== null) {
+    queries.push(match[1].trim());
+  }
+  return queries;
+}
+
+/**
+ * AIの応答から検索パターンを除去し、検索結果への参照に置換
+ */
+function replaceSearchPatterns(content: string): string {
+  return content.replace(SEARCH_PATTERN, '');
+}
 
 /**
  * 議論を実行するジェネレーター関数
@@ -19,7 +44,8 @@ export async function* runDiscussion(
     participants,
     rounds,
     previousTurns,
-    searchResults,
+    searchResults: initialSearchResults,
+    searchConfig,
     userProfile,
     discussionMode,
     discussionDepth,
@@ -29,6 +55,9 @@ export async function* runDiscussion(
     messageVotes,
     skipSummary,
   } = request;
+
+  // 検索結果を動的に更新できるように変数化
+  let currentSearchResults: SearchResult[] = initialSearchResults ? [...initialSearchResults] : [];
 
   // 再開時は既存のメッセージから開始
   const messages: DiscussionMessage[] = resumeFrom?.messages ? [...resumeFrom.messages] : [];
@@ -57,6 +86,32 @@ export async function* runDiscussion(
   // 各ラウンドで全参加者が発言
   for (let round = startRound; round <= effectiveMaxRounds && !terminated; round++) {
     const pStartIndex = (round === startRound) ? startParticipantIndex : 0;
+
+    // eachRound検索: ラウンド開始時に検索を実行（2ラウンド目以降、または再開時の最初のラウンドで参加者0から開始の場合）
+    const shouldSearchEachRound = searchConfig?.enabled &&
+      searchConfig?.timing?.eachRound &&
+      ((round > 1 && pStartIndex === 0) || (round === startRound && pStartIndex === 0 && round > 1));
+
+    if (shouldSearchEachRound) {
+      yield {
+        type: 'searching',
+        searchResults: currentSearchResults,
+      };
+
+      const searchQuery = searchConfig?.query || topic;
+      const newResults = await performSearch(searchQuery, searchConfig);
+
+      if (newResults.length > 0) {
+        currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
+        // 検索結果をコールバックで通知
+        request.onSearchResult?.(currentSearchResults);
+      }
+      // 検索完了を通知
+      yield {
+        type: 'search_results',
+        searchResults: currentSearchResults,
+      };
+    }
 
     for (let pIndex = pStartIndex; pIndex < participants.length && !terminated; pIndex++) {
       const participant = participants[pIndex];
@@ -100,13 +155,13 @@ export async function* runDiscussion(
         };
       });
 
-      const prompt = createDiscussionPrompt(
+      let prompt = createDiscussionPrompt(
         topic,
         previousMessages,
         messages.length === 0,
         false,
         turnContext,
-        searchResults,
+        currentSearchResults.length > 0 ? currentSearchResults : undefined,
         participant.role,
         participant.customRolePrompt,
         participants,
@@ -117,17 +172,32 @@ export async function* runDiscussion(
         directionGuide
       );
 
+      // onDemand検索が有効な場合、検索リクエスト機能の説明を追加
+      if (searchConfig?.enabled && searchConfig?.timing?.onDemand) {
+        prompt += `\n\n【オプション: Web検索機能】
+議論中に追加の情報が必要な場合、回答の中で {{SEARCH:検索クエリ}} と記述すると、Web検索をリクエストできます。
+例: {{SEARCH:React 19 新機能}}
+
+※検索は任意です。まずは回答を作成し、必要に応じて検索をリクエストしてください。
+※検索結果は次の発言者に共有されます。`;
+      }
+
       // メッセージIDを事前に生成
       const newMessageId = `msg-${++messageId}`;
 
       // ストリーミング対応プロバイダーの場合はストリーミングを使用
       let response;
+      let streamedContent = '';
       if (provider.generateStream && request.onMessageChunk) {
-        let accumulatedContent = '';
         response = await provider.generateStream({ prompt }, (chunk) => {
-          accumulatedContent += chunk;
-          request.onMessageChunk!(newMessageId, chunk, accumulatedContent, participant.provider, participant.model, round);
+          streamedContent += chunk;
+          request.onMessageChunk!(newMessageId, chunk, streamedContent, participant.provider, participant.model, round);
         });
+        // ストリーミング完了後、蓄積したコンテンツをresponseに設定
+        // response.contentが空文字列の場合も含めて置き換える
+        if (streamedContent) {
+          response = { ...response, content: streamedContent };
+        }
       } else {
         response = await provider.generate({ prompt });
       }
@@ -140,12 +210,47 @@ export async function* runDiscussion(
         continue;
       }
 
+      // onDemand検索: AIの応答から{{SEARCH:query}}パターンを検出
+      let messageContent = response.content;
+      if (searchConfig?.enabled && searchConfig?.timing?.onDemand) {
+        const searchQueries = extractSearchQueries(response.content);
+        if (searchQueries.length > 0) {
+          // 検索中を通知
+          yield {
+            type: 'searching',
+            searchResults: currentSearchResults,
+          };
+
+          // 各クエリで検索を実行
+          for (const query of searchQueries) {
+            const newResults = await performSearch(query, searchConfig);
+            if (newResults.length > 0) {
+              currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
+            }
+          }
+
+          // 検索結果をコールバックで通知
+          request.onSearchResult?.(currentSearchResults);
+
+          // 検索完了を通知
+          yield {
+            type: 'search_results',
+            searchResults: currentSearchResults,
+          };
+
+          // メッセージから検索パターンを除去
+          const cleanedContent = replaceSearchPatterns(response.content).trim();
+          // 空にならないように元のコンテンツを保持
+          messageContent = cleanedContent || response.content;
+        }
+      }
+
       const message: DiscussionMessage = {
         id: newMessageId,
         participantId: participant.id, // 参加者への参照
         provider: participant.provider,
         model: participant.model,
-        content: response.content,
+        content: messageContent,
         round,
         timestamp: new Date(),
         prompt,
@@ -201,7 +306,7 @@ export async function* runDiscussion(
   }
 
   // 統合回答を生成
-  yield* generateSummary(messages, participants, topic, rounds, turnContext, searchResults, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes);
+  yield* generateSummary(messages, participants, topic, rounds, turnContext, currentSearchResults.length > 0 ? currentSearchResults : undefined, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes);
 }
 
 /**

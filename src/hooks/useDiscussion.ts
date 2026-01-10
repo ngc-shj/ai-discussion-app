@@ -131,6 +131,7 @@ export interface GenerateSummaryParams {
   discussionMode: DiscussionMode;
   discussionDepth: DiscussionDepth;
   directionGuide: DirectionGuide;
+  searchConfig: SearchConfig;
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setInterruptedState: (state: InterruptedDiscussionState | null) => void;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
@@ -176,6 +177,8 @@ interface CreateSSEHandlersParams {
   setIsGeneratingFollowUps: React.Dispatch<React.SetStateAction<boolean>>;
   setSummaryState?: React.Dispatch<React.SetStateAction<SummaryState>>;
   setIsLoading?: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsSearching?: React.Dispatch<React.SetStateAction<boolean>>;
+  setCurrentSearchResults?: React.Dispatch<React.SetStateAction<SearchResult[]>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setStreamingMessage?: React.Dispatch<React.SetStateAction<StreamingMessage | null>>;
   collectedMessagesRef: { current: DiscussionMessage[] };
@@ -200,6 +203,8 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     setIsGeneratingFollowUps,
     setSummaryState,
     setIsLoading,
+    setIsSearching,
+    setCurrentSearchResults,
     setError,
     setStreamingMessage,
     collectedMessagesRef,
@@ -353,6 +358,13 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       // startDiscussionの場合: onReadyForSummaryで'awaiting'に設定されるので、それを維持する
       // generateSummaryの場合: onSummaryで'idle'に設定されるので、ここでは不要
     },
+    onSearching: () => {
+      setIsSearching?.(true);
+    },
+    onSearchResults: (searchResults) => {
+      setIsSearching?.(false);
+      setCurrentSearchResults?.(searchResults);
+    },
   };
 }
 
@@ -436,6 +448,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         discussionMode,
         discussionDepth,
         directionGuide,
+        searchConfig,
         currentSessionRef,
         setInterruptedState,
         updateAndSaveSession,
@@ -445,6 +458,39 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       setError(null);
       // 復元・破棄ボタンをすぐに非表示にする
       setInterruptedState(null);
+
+      // beforeSummary検索
+      let summarySearchResults = currentSearchResults;
+      const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
+      if (searchConfig.enabled && timing.beforeSummary) {
+        setIsSearching(true);
+        try {
+          const searchQuery = searchConfig.query || currentTopic;
+          const searchResponse = await fetch('/api/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: searchQuery,
+              type: searchConfig.searchType,
+              limit: searchConfig.maxResults,
+              language: searchConfig.language || 'ja',
+            }),
+          });
+          if (searchResponse.ok) {
+            const searchData = await searchResponse.json();
+            const newResults = searchData.results || [];
+            // 既存の検索結果と統合（重複除去）
+            const existingUrls = new Set(summarySearchResults.map(r => r.url));
+            const uniqueNewResults = newResults.filter((r: SearchResult) => !existingUrls.has(r.url));
+            summarySearchResults = [...summarySearchResults, ...uniqueNewResults];
+            setCurrentSearchResults(summarySearchResults);
+          }
+        } catch (err) {
+          console.error('beforeSummary search failed:', err);
+        } finally {
+          setIsSearching(false);
+        }
+      }
 
       // セッションのinterruptedTurnを統合回答生成中状態に更新
       // クリアするのではなく、summaryState: 'generating'で更新することでリロード時に復元可能にする
@@ -472,7 +518,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             participants,
             messages: currentMessages,
             previousTurns,
-            searchResults: currentSearchResults,
+            searchResults: summarySearchResults,
             userProfile,
             discussionMode,
             discussionDepth,
@@ -521,7 +567,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             currentTopic,
             currentMessages,
             collectedFinalAnswer,
-            currentSearchResults.length > 0 ? currentSearchResults : undefined,
+            summarySearchResults.length > 0 ? summarySearchResults : undefined,
             collectedSummaryPrompt || undefined,
             collectedFollowUps.length > 0 ? collectedFollowUps : undefined
           );
@@ -600,9 +646,10 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         currentParticipant: participants[0],
       });
 
-      // 検索
+      // 検索（開始時）
       let searchResults: SearchResult[] = [];
-      if (searchConfig.enabled) {
+      const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
+      if (searchConfig.enabled && timing.onStart) {
         setIsSearching(true);
         try {
           const searchQuery = searchConfig.query || topic;
@@ -675,6 +722,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             rounds: terminationConfig.maxRounds,
             previousTurns,
             searchResults,
+            searchConfig,
             userProfile,
             discussionMode,
             discussionDepth,
@@ -703,6 +751,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setIsGeneratingFollowUps,
           setSummaryState,
           setIsLoading,
+          setIsSearching,
+          setCurrentSearchResults,
           setError,
           setStreamingMessage,
           collectedMessagesRef,
@@ -728,6 +778,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             currentParticipantIndex: currentProgressStateRef.current.currentParticipantIndex,
             totalRounds: terminationConfig.maxRounds,
             searchResults: searchResults.length > 0 ? searchResults : undefined,
+            searchConfig,
             userProfile,
             discussionMode,
             discussionDepth,
@@ -862,6 +913,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             rounds: interruptedState.totalRounds,
             previousTurns,
             searchResults: interruptedState.searchResults,
+            searchConfig: interruptedState.searchConfig,
             userProfile: interruptedState.userProfile,
             discussionMode: interruptedState.discussionMode,
             discussionDepth: interruptedState.discussionDepth,
@@ -895,6 +947,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setIsGeneratingFollowUps,
           setSummaryState,
           setIsLoading,
+          setIsSearching,
+          setCurrentSearchResults,
           setError,
           setStreamingMessage,
           collectedMessagesRef,
@@ -920,6 +974,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             currentParticipantIndex: currentProgressStateRef.current.currentParticipantIndex,
             totalRounds: interruptedState.totalRounds,
             searchResults: interruptedState.searchResults,
+            searchConfig: interruptedState.searchConfig,
             userProfile: interruptedState.userProfile,
             discussionMode: interruptedState.discussionMode,
             discussionDepth: interruptedState.discussionDepth,

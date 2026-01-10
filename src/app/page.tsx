@@ -144,13 +144,14 @@ export default function Home() {
           discussionMode: interruptedState.discussionMode || discussionMode,
           discussionDepth: interruptedState.discussionDepth || discussionDepth,
           directionGuide: interruptedState.directionGuide || directionGuide,
+          searchConfig,
           currentSessionRef,
           setInterruptedState,
           updateAndSaveSession,
         });
       }, 100);
     }
-  }, [isInitialLoadComplete, interruptedState, restoreFromSession, restoreDiscussionState, generateSummary, currentSessionRef, setInterruptedState, updateAndSaveSession, userProfile, discussionMode, discussionDepth, directionGuide]);
+  }, [isInitialLoadComplete, interruptedState, restoreFromSession, restoreDiscussionState, generateSummary, currentSessionRef, setInterruptedState, updateAndSaveSession, userProfile, discussionMode, discussionDepth, directionGuide, searchConfig]);
 
 
   // 新しいセッションを開始
@@ -255,6 +256,7 @@ export default function Home() {
             discussionMode: turn.discussionMode || discussionMode,
             discussionDepth: turn.discussionDepth || discussionDepth,
             directionGuide: turn.directionGuide || directionGuide,
+            searchConfig,
             currentSessionRef,
             setInterruptedState,
             updateAndSaveSession,
@@ -376,11 +378,12 @@ export default function Home() {
       discussionMode,
       discussionDepth,
       directionGuide,
+      searchConfig,
       currentSessionRef,
       setInterruptedState,
       updateAndSaveSession,
     });
-  }, [participants, userProfile, discussionMode, discussionDepth, directionGuide, currentSessionRef, setInterruptedState, updateAndSaveSession, generateSummary]);
+  }, [participants, userProfile, discussionMode, discussionDepth, directionGuide, searchConfig, currentSessionRef, setInterruptedState, updateAndSaveSession, generateSummary]);
 
   // 中断した議論を再開
   const handleResumeDiscussion = useCallback(async () => {
@@ -612,6 +615,7 @@ export default function Home() {
           currentProviderIndex={progress.currentParticipantIndex}
           isSummarizing={summaryState === 'generating'}
           isSearching={isSearching}
+          isStreaming={!!streamingMessage}
           participants={isLoading ? discussionParticipants : participants}
           completedParticipants={completedParticipants}
           onInterrupt={handleInterrupt}

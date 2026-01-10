@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
             rounds,
             previousTurns: body.previousTurns,
             searchResults: body.searchResults,
+            searchConfig: body.searchConfig,
             userProfile: body.userProfile,
             discussionMode: body.discussionMode,
             discussionDepth: body.discussionDepth,
@@ -46,6 +47,12 @@ export async function POST(request: NextRequest) {
                 provider,
                 model,
                 round,
+              });
+            },
+            onSearchResult: (results) => {
+              sendSSE({
+                type: 'search_results',
+                searchResults: results,
               });
             },
           })) {

@@ -7,6 +7,14 @@ export interface SearchResult {
   publishedDate?: string;
 }
 
+// 検索タイミング設定
+export interface SearchTiming {
+  onStart: boolean;        // 議論開始時に検索
+  eachRound: boolean;      // ラウンドごとに検索
+  beforeSummary: boolean;  // 統合回答生成前に検索
+  onDemand: boolean;       // AIが要求した時に検索（[[SEARCH:query]]パターン）
+}
+
 // 検索設定
 export interface SearchConfig {
   enabled: boolean;
@@ -15,6 +23,7 @@ export interface SearchConfig {
   searchType: 'web' | 'news' | 'images';
   language?: string;
   engines?: string[]; // 使用する検索エンジン
+  timing: SearchTiming; // 検索タイミング
 }
 
 // ユーザーの技術レベル

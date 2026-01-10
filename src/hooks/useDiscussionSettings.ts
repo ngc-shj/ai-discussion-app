@@ -42,6 +42,12 @@ const DEFAULT_SEARCH_CONFIG: SearchConfig = {
   maxResults: 5,
   searchType: 'web',
   language: 'ja',
+  timing: {
+    onStart: true,
+    eachRound: false,
+    beforeSummary: false,
+    onDemand: false,
+  },
 };
 
 export interface DiscussionSettingsState {
