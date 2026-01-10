@@ -50,7 +50,7 @@ export function ProgressStatus({
             <span className="font-medium" style={{ color: providerColor }}>
               {providerName}
             </span>
-            <span className="hidden sm:inline">{' が応答待ち...'}</span>
+            <span className="hidden sm:inline">{' の応答待ち...'}</span>
             <span className="sm:hidden">...</span>
             {elapsedTime && <span className="ml-1 text-gray-400">{elapsedTime}</span>}
           </span>

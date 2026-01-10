@@ -88,6 +88,7 @@ export class OllamaProvider implements AIProvider {
 
       const decoder = new TextDecoder();
       let content = '';
+      let thinking = ''; // 思考内容を別途蓄積
       let buffer = '';
 
       while (true) {
@@ -103,9 +104,14 @@ export class OllamaProvider implements AIProvider {
           if (!line.trim()) continue;
           try {
             const json = JSON.parse(line);
+            // responseがあれば使用
             if (json.response) {
               content += json.response;
               onChunk(json.response); // リアルタイムコールバック
+            }
+            // thinkingも蓄積（フォールバック用）
+            if (json.thinking) {
+              thinking += json.thinking;
             }
           } catch {
             // JSON パースエラーは無視（不完全な行の可能性）
@@ -121,13 +127,18 @@ export class OllamaProvider implements AIProvider {
             content += json.response;
             onChunk(json.response);
           }
+          if (json.thinking) {
+            thinking += json.thinking;
+          }
         } catch {
           // 無視
         }
       }
 
+      // responseが空でthinkingがある場合、thinkingをフォールバックとして使用
+      const finalContent = content || thinking;
       return {
-        content,
+        content: finalContent,
         provider: this.type,
       };
     } catch (error) {

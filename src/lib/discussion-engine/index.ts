@@ -17,6 +17,8 @@ const SEARCH_PATTERN = /\{\{(?:SEARCH|検索):(.+?)\}\}/g;
  */
 function extractSearchQueries(content: string): string[] {
   const queries: string[] = [];
+  // グローバル正規表現のlastIndexをリセット
+  SEARCH_PATTERN.lastIndex = 0;
   let match;
   while ((match = SEARCH_PATTERN.exec(content)) !== null) {
     queries.push(match[1].trim());
@@ -172,21 +174,12 @@ export async function* runDiscussion(
 
       // onDemand検索が有効な場合、検索リクエスト機能の説明を追加
       if (searchConfig?.enabled && searchConfig?.timing?.onDemand) {
-        prompt += `\n\n【重要: Web検索機能】
-あなたは議論中にWeb検索をリクエストできます。以下の場合は積極的に検索を行ってください：
-- 最新の統計データや数値が必要な場合
-- 特定の製品・サービスの現在の状況を確認したい場合
-- 法律、規制、ガイドラインの最新情報が必要な場合
-- 技術の最新バージョンや動向を確認したい場合
-- 事実確認が必要な場合
+        prompt += `\n\n【オプション: Web検索機能】
+議論中に追加の情報が必要な場合、回答の中で {{SEARCH:検索クエリ}} と記述すると、Web検索をリクエストできます。
+例: {{SEARCH:React 19 新機能}}
 
-【使用方法】
-回答の中で {{SEARCH:検索クエリ}} と記述してください。
-例: {{SEARCH:React 19 新機能 2024}}
-例: {{SEARCH:生成AI 最新動向}}
-
-検索結果は自動的に取得され、次の発言者に共有されます。
-不確かな情報を推測で述べるよりも、検索で確認することを推奨します。`;
+※検索は任意です。まずは回答を作成し、必要に応じて検索をリクエストしてください。
+※検索結果は次の発言者に共有されます。`;
       }
 
       // メッセージIDを事前に生成
@@ -194,12 +187,17 @@ export async function* runDiscussion(
 
       // ストリーミング対応プロバイダーの場合はストリーミングを使用
       let response;
+      let streamedContent = '';
       if (provider.generateStream && request.onMessageChunk) {
-        let accumulatedContent = '';
         response = await provider.generateStream({ prompt }, (chunk) => {
-          accumulatedContent += chunk;
-          request.onMessageChunk!(newMessageId, chunk, accumulatedContent, participant.provider, participant.model, round);
+          streamedContent += chunk;
+          request.onMessageChunk!(newMessageId, chunk, streamedContent, participant.provider, participant.model, round);
         });
+        // ストリーミング完了後、蓄積したコンテンツをresponseに設定
+        // response.contentが空文字列の場合も含めて置き換える
+        if (streamedContent) {
+          response = { ...response, content: streamedContent };
+        }
       } else {
         response = await provider.generate({ prompt });
       }
@@ -241,7 +239,9 @@ export async function* runDiscussion(
           };
 
           // メッセージから検索パターンを除去
-          messageContent = replaceSearchPatterns(response.content).trim();
+          const cleanedContent = replaceSearchPatterns(response.content).trim();
+          // 空にならないように元のコンテンツを保持
+          messageContent = cleanedContent || response.content;
         }
       }
 
