@@ -9,6 +9,7 @@ interface ProgressStatusProps {
   totalRounds: number;
   currentProviderIndex: number;
   totalProviders: number;
+  elapsedTime?: string;
 }
 
 export function ProgressStatus({
@@ -16,10 +17,7 @@ export function ProgressStatus({
   isSummarizing,
   providerName,
   providerColor,
-  currentRound,
-  totalRounds,
-  currentProviderIndex,
-  totalProviders,
+  elapsedTime,
 }: ProgressStatusProps) {
   return (
     <div className="flex items-center gap-1.5 md:gap-2 min-w-0 flex-1">
@@ -31,12 +29,16 @@ export function ProgressStatus({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             Web検索中...
+            {elapsedTime && <span className="ml-1 text-cyan-300/70">{elapsedTime}</span>}
           </span>
         </>
       ) : isSummarizing ? (
         <>
           <div className="animate-spin w-3.5 h-3.5 md:w-4 md:h-4 border-2 border-purple-400 border-t-transparent rounded-full shrink-0" />
-          <span className="text-purple-400 font-medium truncate">統合回答を生成中...</span>
+          <span className="text-purple-400 font-medium truncate">
+            統合回答を生成中...
+            {elapsedTime && <span className="ml-1 text-purple-300/70">{elapsedTime}</span>}
+          </span>
         </>
       ) : (
         <>
@@ -48,8 +50,9 @@ export function ProgressStatus({
             <span className="font-medium" style={{ color: providerColor }}>
               {providerName}
             </span>
-            <span className="hidden sm:inline">{' が回答中...'}</span>
+            <span className="hidden sm:inline">{' が応答待ち...'}</span>
             <span className="sm:hidden">...</span>
+            {elapsedTime && <span className="ml-1 text-gray-400">{elapsedTime}</span>}
           </span>
         </>
       )}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { AIProviderType, DiscussionParticipant, DEFAULT_PROVIDERS, getLocalModelColor, formatParticipantDisplayName } from '@/types';
+import { useElapsedTime } from '@/hooks';
 import { ParticipantChip, SummaryChip, ProgressStatus, ProgressInfo, InterruptButton } from './progress-indicator';
 
 // 各参加者の実行状態
@@ -23,6 +24,7 @@ interface ProgressIndicatorProps {
   currentProviderIndex: number;
   isSummarizing: boolean;
   isSearching?: boolean;
+  isStreaming?: boolean;
   participants?: DiscussionParticipant[];
   completedParticipants?: Set<string>;
   onInterrupt?: () => void;
@@ -38,11 +40,24 @@ export function ProgressIndicator({
   currentProviderIndex,
   isSummarizing,
   isSearching = false,
+  isStreaming = false,
   participants = [],
   completedParticipants = new Set(),
   onInterrupt,
 }: ProgressIndicatorProps) {
   const [isInterrupting, setIsInterrupting] = useState(false);
+
+  // 参加者のキーを生成
+  const getParticipantKey = (p: DiscussionParticipant) => `${p.provider}-${p.model}`;
+  const currentParticipantKey = currentParticipant ? getParticipantKey(currentParticipant) : null;
+
+  // 経過時間タイマー（応答待ち中のみカウント、ストリーミング中はカウントしない）
+  const isWaitingForResponse = isActive && !isStreaming && !isSummarizing && !isSearching;
+  const { formattedTime } = useElapsedTime(
+    isWaitingForResponse,
+    // 参加者が切り替わったらタイマーをリセット（同じモデルでも別参加者なら別キー）
+    `${currentRound}-${currentProviderIndex}`
+  );
 
   // isActiveがfalseになったら中断中状態をリセット
   if (!isActive && isInterrupting) {
@@ -70,10 +85,6 @@ export function ProgressIndicator({
     ? totalSteps
     : (currentRound - 1) * totalProviders + currentProviderIndex + 1;
   const progressPercent = (currentStep / totalSteps) * 100;
-
-  // 参加者のキーを生成
-  const getParticipantKey = (p: DiscussionParticipant) => `${p.provider}-${p.model}`;
-  const currentParticipantKey = currentParticipant ? getParticipantKey(currentParticipant) : null;
 
   return (
     <div className="px-3 py-2 md:px-4 md:py-3 bg-gray-800 border-t border-gray-700">
@@ -118,6 +129,7 @@ export function ProgressIndicator({
           totalRounds={totalRounds}
           currentProviderIndex={currentProviderIndex}
           totalProviders={totalProviders}
+          elapsedTime={isWaitingForResponse ? formattedTime : undefined}
         />
         <div className="flex items-center gap-2 shrink-0 ml-2">
           <ProgressInfo
