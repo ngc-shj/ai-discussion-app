@@ -174,6 +174,7 @@ export function TurnDisplay({
               onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
               className="flex items-center gap-1.5 mb-1 hover:opacity-80 transition-opacity"
             >
+              <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
               <svg
                 className={`w-3 h-3 text-purple-400 transition-transform ${isSummaryExpanded ? 'rotate-90' : ''}`}
                 fill="none"
@@ -182,7 +183,6 @@ export function TurnDisplay({
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-              <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
             </button>
             {isSummaryExpanded ? (
               <>
@@ -250,93 +250,93 @@ export function TurnDisplay({
                     {turn.summaryPrompt}
                   </div>
                 )}
-                {/* アクションボタン */}
-                {(onDeepDive || onCounterargument || onFork) && (
-                  <div className="mt-2 flex justify-end gap-2 flex-wrap">
-                    {onDeepDive && (
-                      <button
-                        type="button"
-                        onClick={() => setIsDeepDiveModalOpen(true)}
-                        disabled={disabled}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-purple-300 hover:text-white bg-purple-900/50 hover:bg-purple-800/50 border border-purple-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="この回答について深掘りする"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7m14-8l-7 7-7-7" />
-                        </svg>
-                        <span>深掘りする</span>
-                      </button>
-                    )}
-                    {onCounterargument && (
-                      <CounterargumentButton
-                        onClick={() => onCounterargument(turn.topic, turn.finalAnswer)}
-                        disabled={disabled}
-                      />
-                    )}
-                    {onFork && (
-                      <ForkButton
-                        onClick={() => setIsForkModalOpen(true)}
-                        disabled={disabled}
-                      />
-                    )}
-                  </div>
-                )}
-                {/* DeepDiveModal */}
+              </>
+            )}
+            {/* アクションボタン（常に表示） */}
+            {(onDeepDive || onCounterargument || onFork) && (
+              <div className="mt-2 flex justify-end gap-2 flex-wrap">
                 {onDeepDive && (
-                  <DeepDiveModal
-                    isOpen={isDeepDiveModalOpen}
-                    onClose={() => setIsDeepDiveModalOpen(false)}
-                    onStartDeepDive={(type, customPrompt) => onDeepDive(turn.topic, turn.finalAnswer, type, customPrompt)}
-                    topic={turn.topic}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsDeepDiveModalOpen(true)}
+                    disabled={disabled}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-purple-300 hover:text-white bg-purple-900/50 hover:bg-purple-800/50 border border-purple-700/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="この回答について深掘りする"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 13l-7 7-7-7m14-8l-7 7-7-7" />
+                    </svg>
+                    <span>深掘りする</span>
+                  </button>
                 )}
-                {/* ForkModal */}
-                {onFork && (
-                  <ForkModal
-                    isOpen={isForkModalOpen}
-                    onClose={() => setIsForkModalOpen(false)}
-                    onCreateFork={(label, perspective) => onFork(turn.id, turn.topic, turn.finalAnswer, label, perspective)}
-                    topic={turn.topic}
-                  />
-                )}
-                {/* フォローアップ質問候補 */}
-                {turn.suggestedFollowUps && turn.suggestedFollowUps.length > 0 && onFollowUp ? (
-                  <FollowUpSuggestions
-                    questions={turn.suggestedFollowUps}
-                    onSelect={(question) => onFollowUp(question, turn.finalAnswer)}
+                {onCounterargument && (
+                  <CounterargumentButton
+                    onClick={() => onCounterargument(turn.topic, turn.finalAnswer)}
                     disabled={disabled}
                   />
-                ) : onGenerateFollowUps && onFollowUp && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onGenerateFollowUps(turn.id, turn.topic, turn.finalAnswer)}
-                      disabled={disabled || isGeneratingFollowUps}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-gray-300 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 border border-gray-600/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="フォローアップ質問を生成"
-                    >
-                      {isGeneratingFollowUps ? (
-                        <>
-                          <div className="animate-spin w-3.5 h-3.5 border-2 border-gray-500 border-t-blue-400 rounded-full" />
-                          <span>生成中...</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span>フォローアップを生成</span>
-                        </>
-                      )}
-                    </button>
-                    {!isGeneratingFollowUps && (
-                      <span className="text-xs text-gray-500">
-                        この議論に関する追加の質問を生成します
-                      </span>
-                    )}
-                  </div>
                 )}
-              </>
+                {onFork && (
+                  <ForkButton
+                    onClick={() => setIsForkModalOpen(true)}
+                    disabled={disabled}
+                  />
+                )}
+              </div>
+            )}
+            {/* DeepDiveModal */}
+            {onDeepDive && (
+              <DeepDiveModal
+                isOpen={isDeepDiveModalOpen}
+                onClose={() => setIsDeepDiveModalOpen(false)}
+                onStartDeepDive={(type, customPrompt) => onDeepDive(turn.topic, turn.finalAnswer, type, customPrompt)}
+                topic={turn.topic}
+              />
+            )}
+            {/* ForkModal */}
+            {onFork && (
+              <ForkModal
+                isOpen={isForkModalOpen}
+                onClose={() => setIsForkModalOpen(false)}
+                onCreateFork={(label, perspective) => onFork(turn.id, turn.topic, turn.finalAnswer, label, perspective)}
+                topic={turn.topic}
+              />
+            )}
+            {/* フォローアップ質問候補（常に表示） */}
+            {turn.suggestedFollowUps && turn.suggestedFollowUps.length > 0 && onFollowUp ? (
+              <FollowUpSuggestions
+                questions={turn.suggestedFollowUps}
+                onSelect={(question) => onFollowUp(question, turn.finalAnswer)}
+                disabled={disabled}
+              />
+            ) : onGenerateFollowUps && onFollowUp && (
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onGenerateFollowUps(turn.id, turn.topic, turn.finalAnswer)}
+                  disabled={disabled || isGeneratingFollowUps}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-gray-300 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 border border-gray-600/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="フォローアップ質問を生成"
+                >
+                  {isGeneratingFollowUps ? (
+                    <>
+                      <div className="animate-spin w-3.5 h-3.5 border-2 border-gray-500 border-t-blue-400 rounded-full" />
+                      <span>生成中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>フォローアップを生成</span>
+                    </>
+                  )}
+                </button>
+                {!isGeneratingFollowUps && (
+                  <span className="text-xs text-gray-500">
+                    この議論に関する追加の質問を生成します
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>
