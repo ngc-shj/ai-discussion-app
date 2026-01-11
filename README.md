@@ -188,10 +188,14 @@ This setup uses a custom settings file with JSON format output already enabled.
 
 ### Web Search Feature
 
-When enabled, the app searches for relevant information before the discussion starts:
+When enabled, the app searches for relevant information and provides it to AI participants:
 
 - **Search Type**: Web search or News search
 - **Result Count**: 3-10 search results
+- **Search Timing**:
+  - **Before Only**: Search once before the discussion starts (default)
+  - **Each Round**: Search at the beginning of each round for updated context
+  - **On Demand**: AI can request searches during discussion using `{{SEARCH:query}}` pattern
 - Results are displayed in a collapsible section and provided to all AI participants
 
 ## Tech Stack
