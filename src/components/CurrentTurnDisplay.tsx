@@ -3,14 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { DiscussionMessage, DiscussionParticipant, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, formatParticipantDisplayName, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
 import { StreamingMessage } from '@/hooks';
-import { MessageBubble } from './MessageBubble';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FollowUpSuggestions } from './FollowUpSuggestions';
 import { DeepDiveModal } from './DeepDiveModal';
 import { ExtendDiscussionModal } from './ExtendDiscussionModal';
 import { CounterargumentButton } from './CounterargumentButton';
 import { SearchResultsDisplay } from './SearchResultsDisplay';
-import { StartSeparatorInline, ExtensionSeparatorInline } from './ExtensionSeparator';
+import { MessageList } from './MessageList';
 
 interface CurrentTurnDisplayProps {
   topic: string;
@@ -195,70 +194,17 @@ export function CurrentTurnDisplay({
 
           {isExpanded && (
             <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-gray-700">
-              {/* 議論開始セパレーター（議論開始時に表示） */}
-              {startMarker && (isLoading || messages.length > 0 || streamingMessage) && (
-                <StartSeparatorInline marker={startMarker} />
-              )}
-              {messages.map((message, index) => {
-                // このメッセージの前に延長セパレーターを表示するか判定
-                const prevMessage = index > 0 ? messages[index - 1] : null;
-                const extensionMarker = prevMessage
-                  ? extensionMarkers.find(m => m.afterRound === prevMessage.round && message.round > prevMessage.round)
-                  : null;
-
-                return (
-                  <div key={message.id}>
-                    {extensionMarker && (
-                      <ExtensionSeparatorInline marker={extensionMarker} />
-                    )}
-                    <MessageBubble
-                      message={message}
-                      participants={participants}
-                      vote={messageVotes?.find(v => v.messageId === message.id)?.vote}
-                      onVote={onVote ? (vote) => onVote(message.id, vote) : undefined}
-                    />
-                  </div>
-                );
-              })}
-              {/* 延長セパレーター（延長開始時、最初のメッセージ完了前に表示） */}
-              {(() => {
-                // 延長直後でまだ新ラウンドのメッセージがない場合に表示
-                const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-                const pendingExtensionMarker = lastMessage
-                  ? extensionMarkers.find(m => m.afterRound === lastMessage.round)
-                  : null;
-                // ストリーミング中または読み込み中で、まだこのマーカーに対応するメッセージがない場合
-                if (pendingExtensionMarker && (isLoading || streamingMessage)) {
-                  const hasMessageAfterExtension = messages.some(msg => msg.round > pendingExtensionMarker.afterRound);
-                  if (!hasMessageAfterExtension) {
-                    return <ExtensionSeparatorInline marker={pendingExtensionMarker} />;
-                  }
-                }
-                return null;
-              })()}
-              {streamingMessage && (
-                <MessageBubble
-                  key={streamingMessage.messageId}
-                  participants={participants}
-                  message={{
-                    id: streamingMessage.messageId,
-                    participantId: streamingMessage.participantId,
-                    provider: streamingMessage.provider as import('@/types').AIProviderType,
-                    model: streamingMessage.model,
-                    content: streamingMessage.content,
-                    round: streamingMessage.round,
-                    timestamp: new Date(),
-                    isStreaming: true,
-                  }}
-                />
-              )}
-              {isLoading && messages.length === 0 && !streamingMessage && (
-                <div className="flex items-center gap-2 py-3 md:py-4">
-                  <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-blue-400 rounded-full" />
-                  <span className="text-gray-400 text-sm md:text-base">議論を開始中...</span>
-                </div>
-              )}
-              <div ref={bottomRef} />
+              <MessageList
+                messages={messages}
+                participants={participants}
+                startMarker={startMarker}
+                extensionMarkers={extensionMarkers}
+                messageVotes={messageVotes}
+                onVote={onVote}
+                streamingMessage={streamingMessage}
+                isLoading={isLoading}
+                bottomRef={bottomRef}
+              />
             </div>
           )}
         </div>
