@@ -57,19 +57,21 @@ export function MessageBubble({ message, participants, vote, onVote }: MessageBu
         <button
           type="button"
           onClick={() => !message.isLoading && !message.isStreaming && setIsCollapsed(!isCollapsed)}
-          className="flex items-center gap-2 mb-1 flex-wrap w-full text-left group"
+          className="flex items-center justify-between w-full mb-1 text-left group"
           disabled={message.isLoading || message.isStreaming}
         >
-          <span className="font-semibold truncate text-sm md:text-base" style={{ color }} title={displayName}>
-            {displayName}
-          </span>
-          <span className="text-xs text-gray-400 shrink-0">
-            Round {message.round}
-          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold truncate text-sm md:text-base" style={{ color }} title={displayName}>
+              {displayName}
+            </span>
+            <span className="text-xs text-gray-400 shrink-0">
+              Round {message.round}
+            </span>
+          </div>
           {/* 折りたたみインジケーター */}
           {!message.isLoading && !message.isStreaming && (
             <svg
-              className={`w-4 h-4 text-gray-500 transition-transform ${isCollapsed ? '' : 'rotate-180'}`}
+              className={`w-4 h-4 text-gray-500 transition-transform shrink-0 ${isCollapsed ? '' : 'rotate-180'}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
