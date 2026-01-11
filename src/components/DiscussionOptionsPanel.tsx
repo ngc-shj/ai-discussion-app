@@ -300,6 +300,50 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
               </label>
             </div>
           </div>
+
+          {/* 詳細コンテンツ取得 */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-gray-400">ページ詳細取得</label>
+              <button
+                type="button"
+                onClick={() => onSearchConfigChange({ ...searchConfig, fetchFullContent: !searchConfig.fetchFullContent })}
+                disabled={disabled}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                  searchConfig.fetchFullContent ? 'bg-green-600' : 'bg-gray-600'
+                } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                aria-label="ページ詳細取得を切り替え"
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    searchConfig.fetchFullContent ? 'translate-x-5' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            {searchConfig.fetchFullContent && (
+              <div className="flex items-center gap-2 pl-2">
+                <span className="text-xs text-gray-400">取得数:</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="5"
+                  value={searchConfig.fullContentMaxResults || 3}
+                  onChange={(e) => onSearchConfigChange({
+                    ...searchConfig,
+                    fullContentMaxResults: Number(e.target.value)
+                  })}
+                  disabled={disabled}
+                  title={`詳細取得数: ${searchConfig.fullContentMaxResults || 3}`}
+                  className={`flex-1 h-1.5 bg-gray-600 rounded-lg appearance-none accent-green-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                />
+                <span className="text-xs text-green-400 w-4">{searchConfig.fullContentMaxResults || 3}</span>
+              </div>
+            )}
+            <p className="text-xs text-gray-500">
+              {searchConfig.fetchFullContent ? 'Jina Readerでページ全文を取得' : '検索スニペットのみ使用'}
+            </p>
+          </div>
         </div>
       )}
       <p className="text-xs text-gray-500">
