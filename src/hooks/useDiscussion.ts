@@ -430,6 +430,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     // isLoading/isSearchingもリセットして、プログレスバーを非表示にする
     setIsLoading(false);
     setIsSearching(false);
+    // 注: discussionParticipantsはクリアしない
+    // セッション切り替え時にセッションの参加者が復元されるため
     // 注: interruptRequestedRefはここでリセットしない
     // SSEストリーム処理が中断を検出して状態を保存するまで維持する必要がある
   }, []);

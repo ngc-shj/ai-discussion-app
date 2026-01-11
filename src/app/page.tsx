@@ -270,6 +270,12 @@ export default function Home() {
       // 中断状態がない場合は現在の表示をクリア
       clearCurrentTurnState();
       setInterruptedState(null);
+      // セッションに保存された参加者を復元
+      if (session.participants && session.participants.length > 0) {
+        restoreFromSession({
+          participants: session.participants,
+        });
+      }
     }
   }, [restoreFromSession, restoreDiscussionState, clearCurrentTurnState, setCurrentSession, setInterruptedState, generateSummary, userProfile, discussionMode, discussionDepth, directionGuide, currentSessionRef, updateAndSaveSession]);
 
