@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useEffect, useCallback } from 'react';
 import {
   DiscussionMode,
   DISCUSSION_MODE_PRESETS,
@@ -72,8 +73,24 @@ export function InputForm({
     onTerminationConfigChange,
   });
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const currentModePreset = DISCUSSION_MODE_PRESETS.find((m) => m.id === discussionMode);
   const currentDepthPreset = DISCUSSION_DEPTH_PRESETS.find((d) => d.level === discussionDepth);
+
+  // textareaの高さを自動調整
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    }
+  }, []);
+
+  // topicが変わるたびに高さを調整
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [topic, adjustTextareaHeight]);
 
   // 設定のサマリーを生成
   const hasCustomSettings =
@@ -136,19 +153,28 @@ export function InputForm({
         )}
       </div>
 
-      <div className="flex gap-2 md:gap-3">
-        <input
-          type="text"
+      <div className="flex gap-2 md:gap-3 items-end">
+        <textarea
+          ref={textareaRef}
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
-          placeholder="議論したいトピックを入力..."
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              if (!disabled && topic.trim()) {
+                handleSubmit(e as unknown as React.FormEvent);
+              }
+            }
+          }}
+          placeholder="議論したいトピックを入力...（Shift+Enterで改行）"
           disabled={disabled}
-          className="flex-1 px-3 py-2 md:px-4 md:py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 text-sm md:text-base"
+          rows={1}
+          className="flex-1 px-3 py-2 md:px-4 md:py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 text-sm md:text-base resize-none min-h-[42px] max-h-[200px] overflow-y-auto"
         />
         <button
           type="submit"
           disabled={disabled || !topic.trim()}
-          className="px-4 py-2 md:px-6 md:py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm md:text-base whitespace-nowrap"
+          className="px-4 py-2 md:px-6 md:py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm md:text-base whitespace-nowrap self-end"
         >
           議論開始
         </button>
