@@ -26,6 +26,9 @@ export interface SearchParams {
   engines?: string[];
 }
 
+// デフォルトで使用するエンジン
+const DEFAULT_ENGINES = ['google'];
+
 /**
  * SearXNGのURLを構築
  */
@@ -45,9 +48,9 @@ export function buildSearchUrl(params: SearchParams): URL {
     url.searchParams.set('categories', 'general');
   }
 
-  if (engines && engines.length > 0) {
-    url.searchParams.set('engines', engines.join(','));
-  }
+  // エンジンが指定されていない場合はデフォルト（Google）を使用
+  const engineList = engines && engines.length > 0 ? engines : DEFAULT_ENGINES;
+  url.searchParams.set('engines', engineList.join(','));
 
   return url;
 }

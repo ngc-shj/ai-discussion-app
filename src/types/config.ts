@@ -34,6 +34,22 @@ export interface SearchConfig {
   timing: SearchTiming; // 検索タイミング
 }
 
+// 検索エンジンのプリセット
+export interface SearchEnginePreset {
+  id: string;
+  name: string;
+  description: string;
+}
+
+// 検索エンジンプリセット一覧（SearXNGで利用可能なエンジン）
+export const SEARCH_ENGINE_PRESETS: SearchEnginePreset[] = [
+  { id: 'google', name: 'Google', description: '最も広範な検索結果' },
+  { id: 'bing', name: 'Bing', description: 'Microsoft提供の検索エンジン' },
+  { id: 'duckduckgo', name: 'DuckDuckGo', description: 'プライバシー重視の検索' },
+  { id: 'brave', name: 'Brave', description: '独自インデックスの検索' },
+  { id: 'qwant', name: 'Qwant', description: 'EU発のプライバシー重視検索' },
+];
+
 // ユーザーの技術レベル
 export type TechLevel = 'beginner' | 'intermediate' | 'advanced';
 

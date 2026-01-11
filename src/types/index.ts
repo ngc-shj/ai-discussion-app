@@ -30,6 +30,7 @@ export type {
   SearchResult,
   SearchKeywordInfo,
   SearchConfig,
+  SearchEnginePreset,
   TechLevel,
   ResponseStyle,
   UserProfile,
@@ -49,6 +50,7 @@ export {
   DISCUSSION_MODE_PRESETS,
   DISCUSSION_DEPTH_PRESETS,
   TERMINATION_PRESETS,
+  SEARCH_ENGINE_PRESETS,
 } from './config';
 
 // Follow-up types
