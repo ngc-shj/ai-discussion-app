@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { DiscussionTurn, DiscussionMessage, DiscussionParticipant, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
+import { DiscussionTurn, DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { TurnDisplay } from './TurnDisplay';
 import { CurrentTurnDisplay } from './CurrentTurnDisplay';
@@ -15,6 +15,7 @@ interface DiscussionPanelProps {
   currentSummaryPrompt?: string;
   isLoading: boolean;
   searchResults?: SearchResult[];
+  searchKeywords?: SearchKeywordInfo[];
   onFollowUp?: (topic: string, previousAnswer: string) => void;
   onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
   onCounterargument?: (topic: string, previousAnswer: string) => void;
@@ -45,6 +46,7 @@ export function DiscussionPanel({
   currentSummaryPrompt,
   isLoading,
   searchResults,
+  searchKeywords,
   onFollowUp,
   onDeepDive,
   onCounterargument,
@@ -116,6 +118,7 @@ export function DiscussionPanel({
           isLoading={isLoading}
           summaryState={summaryState}
           searchResults={searchResults}
+          searchKeywords={searchKeywords}
           onFollowUp={onFollowUp}
           onDeepDive={onDeepDive}
           onCounterargument={onCounterargument}

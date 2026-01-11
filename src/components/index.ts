@@ -3,6 +3,7 @@ export { DiscussionPanel } from './DiscussionPanel';
 export { TurnDisplay } from './TurnDisplay';
 export { CurrentTurnDisplay } from './CurrentTurnDisplay';
 export { SearchResultsDisplay } from './SearchResultsDisplay';
+export { SearchKeywordsDisplay } from './SearchKeywordsDisplay';
 export { AISelector } from './AISelector';
 export { SettingsPanel } from './SettingsPanel';
 export { InputForm } from './InputForm';

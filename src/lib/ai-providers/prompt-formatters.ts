@@ -253,3 +253,58 @@ export function formatMessageVotes(
 
   return `\n${lines.join('\n')}\n\n※ユーザーの投票を考慮して、同意された意見を重視し、反対された意見については批判的に検討してください。中立の意見は参考程度に扱ってください。\n`;
 }
+
+/**
+ * 検索キーワード生成のタイミング
+ */
+export type SearchKeywordTiming = 'start' | 'round' | 'summary';
+
+/**
+ * 検索キーワード生成用プロンプトを作成
+ */
+export function createSearchKeywordPrompt(
+  topic: string,
+  messages?: Array<{ provider: string; content: string }>,
+  timing: SearchKeywordTiming = 'start'
+): string {
+  const currentYear = new Date().getFullYear();
+
+  if (timing === 'start') {
+    return `以下のトピックについてWeb検索を行います。
+効果的な検索のためのキーワードを3つ生成してください。
+
+トピック: ${topic}
+
+要件:
+- 各キーワードは検索エンジンに最適化された形式（短く、具体的に）
+- 最新の情報を得られるよう必要に応じて「${currentYear}」などの年号を含める
+- 専門用語や固有名詞を適切に使用
+- 日本語と英語を適切に使い分ける
+
+出力形式（JSONのみ、他の文章は不要）:
+["キーワード1", "キーワード2", "キーワード3"]`;
+  }
+
+  // 各ラウンド・統合回答前
+  const formattedMessages = messages
+    ?.map((m) => `【${m.provider}】\n${m.content}`)
+    .join('\n\n') || '';
+
+  const timingLabel = timing === 'round' ? '追加調査' : 'ファクトチェック';
+
+  return `以下の議論を踏まえて、${timingLabel}のための検索キーワードを3つ生成してください。
+
+トピック: ${topic}
+
+議論内容:
+${formattedMessages}
+
+要件:
+- 議論で言及された具体的な事実・統計・人名などを確認できるキーワード
+- まだ議論で十分に扱われていない関連トピック
+- 異なる視点や反論を見つけられるキーワード
+- 最新の情報を得られるよう必要に応じて「${currentYear}」などの年号を含める
+
+出力形式（JSONのみ、他の文章は不要）:
+["キーワード1", "キーワード2", "キーワード3"]`;
+}

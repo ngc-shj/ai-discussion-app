@@ -9,6 +9,7 @@ import { CounterargumentButton } from './CounterargumentButton';
 import { ForkButton } from './ForkButton';
 import { ForkModal } from './ForkModal';
 import { SearchResultsDisplay } from './SearchResultsDisplay';
+import { SearchKeywordsDisplay } from './SearchKeywordsDisplay';
 import { MessageList } from './MessageList';
 
 interface TurnDisplayProps {
@@ -94,6 +95,11 @@ export function TurnDisplay({
       {/* 検索結果を表示（過去のターン） */}
       {turn.searchResults && turn.searchResults.length > 0 && (
         <SearchResultsDisplay results={turn.searchResults} />
+      )}
+
+      {/* 検索キーワードを表示（過去のターン） */}
+      {turn.searchKeywords && turn.searchKeywords.length > 0 && (
+        <SearchKeywordsDisplay keywords={turn.searchKeywords} />
       )}
 
       {/* AIの議論（折りたたみ） */}

@@ -8,6 +8,7 @@ import {
   InterruptedDiscussionState,
   PreviousTurnSummary,
   SearchResult,
+  SearchKeywordInfo,
   SearchConfig,
   UserProfile,
   DiscussionMode,
@@ -85,6 +86,11 @@ export interface SSESearchResultsEvent {
   searchResults: SearchResult[];
 }
 
+export interface SSESearchKeywordsEvent {
+  type: 'search_keywords';
+  searchKeywords: SearchKeywordInfo;
+}
+
 export type SSEEvent =
   | SSEProgressEvent
   | SSEMessageEvent
@@ -96,7 +102,8 @@ export type SSEEvent =
   | SSEReadyForSummaryEvent
   | SSECompleteEvent
   | SSESearchingEvent
-  | SSESearchResultsEvent;
+  | SSESearchResultsEvent
+  | SSESearchKeywordsEvent;
 
 // イベントハンドラのインターフェース
 export interface SSEEventHandlers {
@@ -111,6 +118,7 @@ export interface SSEEventHandlers {
   onComplete?: () => void;
   onSearching?: (searchResults?: SearchResult[]) => void;
   onSearchResults?: (searchResults: SearchResult[]) => void;
+  onSearchKeywords?: (searchKeywords: SearchKeywordInfo) => void;
 }
 
 /**
@@ -156,6 +164,9 @@ export function parseSSELine(line: string, handlers: SSEEventHandlers): void {
         break;
       case 'search_results':
         handlers.onSearchResults?.(event.searchResults);
+        break;
+      case 'search_keywords':
+        handlers.onSearchKeywords?.(event.searchKeywords);
         break;
     }
   } catch {
@@ -241,6 +252,7 @@ export interface CreateInterruptedStateParams {
   currentParticipantIndex: number;
   totalRounds: number;
   searchResults?: SearchResult[];
+  searchKeywords?: SearchKeywordInfo[];
   searchConfig?: SearchConfig;
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
@@ -268,6 +280,7 @@ export function createInterruptedState(
     currentParticipantIndex: params.currentParticipantIndex,
     totalRounds: params.totalRounds,
     searchResults: params.searchResults,
+    searchKeywords: params.searchKeywords,
     searchConfig: params.searchConfig,
     userProfile: params.userProfile,
     discussionMode: params.discussionMode,
