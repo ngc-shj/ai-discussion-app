@@ -1,4 +1,5 @@
 import { SearchResult, SearchConfig } from '@/types';
+import { enrichSearchResultsWithContent } from './jina-reader';
 
 const SEARXNG_BASE_URL = process.env.SEARXNG_BASE_URL || 'http://localhost:8080';
 
@@ -110,6 +111,17 @@ export async function performSearch(
       language: config.language || 'ja',
       engines: config.engines,
     });
+
+    // 詳細コンテンツを取得
+    if (config.fetchFullContent && results.length > 0) {
+      const enrichedResults = await enrichSearchResultsWithContent(
+        results,
+        { apiKey: process.env.JINA_API_KEY },
+        config.fullContentMaxResults || 3
+      );
+      return enrichedResults;
+    }
+
     return results;
   } catch (error) {
     console.error('Search error:', error);

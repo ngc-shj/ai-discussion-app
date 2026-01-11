@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchSearchResults } from '@/lib/search';
+import { enrichSearchResultsWithContent } from '@/lib/search/jina-reader';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -8,6 +9,8 @@ export async function GET(request: NextRequest) {
   const maxResults = parseInt(searchParams.get('limit') || '5', 10);
   const language = searchParams.get('lang') || 'ja';
   const engines = searchParams.get('engines')?.split(',').filter(Boolean);
+  const fetchFullContent = searchParams.get('fullContent') === 'true';
+  const fullContentMaxResults = parseInt(searchParams.get('fullContentLimit') || '3', 10);
 
   if (!query) {
     return NextResponse.json(
@@ -24,6 +27,19 @@ export async function GET(request: NextRequest) {
       language,
       engines,
     });
+
+    // 詳細コンテンツを取得
+    if (fetchFullContent && result.results.length > 0) {
+      const enrichedResults = await enrichSearchResultsWithContent(
+        result.results,
+        { apiKey: process.env.JINA_API_KEY },
+        fullContentMaxResults
+      );
+      return NextResponse.json({
+        ...result,
+        results: enrichedResults,
+      });
+    }
 
     return NextResponse.json(result);
   } catch (error) {
@@ -47,6 +63,8 @@ export async function POST(request: NextRequest) {
       limit = 5,
       language = 'ja',
       engines,
+      fetchFullContent = false,
+      fullContentLimit = 3,
     } = body;
 
     if (!query) {
@@ -63,6 +81,19 @@ export async function POST(request: NextRequest) {
       language,
       engines: engines?.split?.(',').filter(Boolean) || engines,
     });
+
+    // 詳細コンテンツを取得
+    if (fetchFullContent && result.results.length > 0) {
+      const enrichedResults = await enrichSearchResultsWithContent(
+        result.results,
+        { apiKey: process.env.JINA_API_KEY },
+        fullContentLimit
+      );
+      return NextResponse.json({
+        ...result,
+        results: enrichedResults,
+      });
+    }
 
     return NextResponse.json(result);
   } catch (error) {

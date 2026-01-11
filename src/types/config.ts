@@ -5,6 +5,7 @@ export interface SearchResult {
   content: string;
   engine?: string;
   publishedDate?: string;
+  fullContent?: string;  // Jina Readerで取得した詳細コンテンツ
 }
 
 // 検索キーワード情報
@@ -32,6 +33,8 @@ export interface SearchConfig {
   language?: string;
   engines?: string[]; // 使用する検索エンジン
   timing: SearchTiming; // 検索タイミング
+  fetchFullContent?: boolean; // 詳細コンテンツを取得するか
+  fullContentMaxResults?: number; // 詳細取得する最大数（デフォルト3）
 }
 
 // 検索エンジンのプリセット
