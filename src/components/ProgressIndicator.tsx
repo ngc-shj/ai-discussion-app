@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AIProviderType, DiscussionParticipant, DEFAULT_PROVIDERS, getLocalModelColor, formatParticipantDisplayName } from '@/types';
 import { useElapsedTime } from '@/hooks';
-import { ParticipantChip, SummaryChip, ProgressStatus, ProgressInfo, InterruptButton } from './progress-indicator';
+import { ParticipantChip, SummaryChip, FollowUpChip, ProgressStatus, ProgressInfo, InterruptButton } from './progress-indicator';
 
 // 各参加者の実行状態
 export type ParticipantStatus = 'pending' | 'active' | 'completed' | 'error';
@@ -85,6 +85,9 @@ export function ProgressIndicator({
     }
   };
 
+  // 統合回答が完了したかどうか（フォローアップ生成中 = 統合回答完了）
+  const isSummaryCompleted = isGeneratingFollowUps;
+
   const provider = DEFAULT_PROVIDERS.find((p) => p.id === currentProvider);
   const providerName = currentParticipant
     ? formatParticipantDisplayName(currentParticipant)
@@ -129,18 +132,12 @@ export function ProgressIndicator({
           <SummaryChip
             isSummarizing={isSummarizing}
             isSummaryStreaming={isSummaryStreaming}
-            isCompleted={isGeneratingFollowUps}
+            isCompleted={isSummaryCompleted}
           />
-          {/* フォローアップ生成中のみ表示 */}
-          {isGeneratingFollowUps && (
-            <div
-              className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border border-green-400 bg-green-400/20 ring-2 ring-green-400 ring-offset-1 ring-offset-gray-800 scale-105 transition-all duration-300"
-              title="フォローアップ質問を生成中"
-            >
-              <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-green-400 font-medium">F/U</span>
-            </div>
-          )}
+          <FollowUpChip
+            isGenerating={isGeneratingFollowUps}
+            isCompleted={false}
+          />
         </div>
       )}
 
