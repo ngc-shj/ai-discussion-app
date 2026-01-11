@@ -142,8 +142,15 @@ export default function Home() {
       topic: interruptedState.topic,
       messages: interruptedState.messages,
       searchResults: interruptedState.searchResults,
+      searchKeywords: interruptedState.searchKeywords,
       // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
       summaryState: interruptedState.summaryState === 'generating' ? 'awaiting' : interruptedState.summaryState,
+      startMarker: interruptedState.startMarker,
+      extensionMarkers: interruptedState.extensionMarkers,
+      discussionMode: interruptedState.discussionMode,
+      discussionDepth: interruptedState.discussionDepth,
+      directionGuide: interruptedState.directionGuide,
+      terminationConfig: interruptedState.terminationConfig,
     });
   }, [isInitialLoadComplete, interruptedState, restoreFromSession, restoreDiscussionState]);
 
@@ -165,6 +172,7 @@ export default function Home() {
         currentParticipantIndex: progress.currentParticipantIndex,
         totalRounds: progress.totalRounds,
         searchResults: currentSearchResults.length > 0 ? currentSearchResults : undefined,
+        searchKeywords: currentSearchKeywords.length > 0 ? currentSearchKeywords : undefined,
         userProfile,
         discussionMode,
         discussionDepth,
@@ -172,6 +180,8 @@ export default function Home() {
         terminationConfig,
         interruptedAt: new Date(),
         summaryState: 'idle' as const,
+        startMarker: startMarker || undefined,
+        extensionMarkers: extensionMarkers.length > 0 ? extensionMarkers : undefined,
       };
       updateAndSaveSession({ interruptedTurn });
     }
@@ -183,6 +193,7 @@ export default function Home() {
     currentTopic,
     currentMessages,
     currentSearchResults,
+    currentSearchKeywords,
     discussionParticipants,
     participants,
     progress,
@@ -191,6 +202,8 @@ export default function Home() {
     discussionDepth,
     directionGuide,
     terminationConfig,
+    startMarker,
+    extensionMarkers,
     handleInterrupt,
     updateAndSaveSession,
     setCurrentSession,
@@ -220,7 +233,15 @@ export default function Home() {
         topic: turn.topic,
         messages: turn.messages,
         searchResults: turn.searchResults,
-        summaryState: turn.summaryState,
+        searchKeywords: turn.searchKeywords,
+        // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
+        summaryState: turn.summaryState === 'generating' ? 'awaiting' : turn.summaryState,
+        startMarker: turn.startMarker,
+        extensionMarkers: turn.extensionMarkers,
+        discussionMode: turn.discussionMode,
+        discussionDepth: turn.discussionDepth,
+        directionGuide: turn.directionGuide,
+        terminationConfig: turn.terminationConfig,
       });
 
       setInterruptedState({
@@ -232,6 +253,7 @@ export default function Home() {
         currentParticipantIndex: turn.currentParticipantIndex,
         totalRounds: turn.totalRounds,
         searchResults: turn.searchResults,
+        searchKeywords: turn.searchKeywords,
         userProfile: turn.userProfile,
         discussionMode: turn.discussionMode,
         discussionDepth: turn.discussionDepth,
@@ -240,6 +262,9 @@ export default function Home() {
         interruptedAt: turn.interruptedAt,
         // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
         summaryState: turn.summaryState === 'generating' ? 'awaiting' : turn.summaryState,
+        // マーカーを復元
+        startMarker: turn.startMarker,
+        extensionMarkers: turn.extensionMarkers,
       });
     } else {
       // 中断状態がない場合は現在の表示をクリア

@@ -76,6 +76,7 @@ export interface InterruptedTurnState {
   currentParticipantIndex: number;
   totalRounds: number;
   searchResults?: SearchResult[];
+  searchKeywords?: SearchKeywordInfo[]; // 検索キーワード
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
   discussionDepth?: DiscussionDepth;
@@ -113,6 +114,7 @@ export interface InterruptedDiscussionState {
   currentParticipantIndex: number;
   totalRounds: number;
   searchResults?: SearchResult[];
+  searchKeywords?: SearchKeywordInfo[]; // 検索キーワード
   searchConfig?: SearchConfig;
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;

@@ -271,7 +271,7 @@ export function createSearchKeywordPrompt(
 
   if (timing === 'start') {
     return `以下のトピックについてWeb検索を行います。
-効果的な検索のためのキーワードを5つ生成してください。
+効果的な検索のためのキーワードを3つ生成してください。
 
 トピック: ${topic}
 
@@ -282,7 +282,7 @@ export function createSearchKeywordPrompt(
 - 日本語と英語を適切に使い分ける
 
 出力形式（JSONのみ、他の文章は不要）:
-["キーワード1", "キーワード2", "キーワード3", "キーワード4", "キーワード5"]`;
+["キーワード1", "キーワード2", "キーワード3"]`;
   }
 
   // 各ラウンド・統合回答前
@@ -292,7 +292,7 @@ export function createSearchKeywordPrompt(
 
   const timingLabel = timing === 'round' ? '追加調査' : 'ファクトチェック';
 
-  return `以下の議論を踏まえて、${timingLabel}のための検索キーワードを5つ生成してください。
+  return `以下の議論を踏まえて、${timingLabel}のための検索キーワードを3つ生成してください。
 
 トピック: ${topic}
 
@@ -306,5 +306,5 @@ ${formattedMessages}
 - 最新の情報を得られるよう必要に応じて「${currentYear}」などの年号を含める
 
 出力形式（JSONのみ、他の文章は不要）:
-["キーワード1", "キーワード2", "キーワード3", "キーワード4", "キーワード5"]`;
+["キーワード1", "キーワード2", "キーワード3"]`;
 }

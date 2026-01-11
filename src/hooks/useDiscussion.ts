@@ -86,7 +86,14 @@ export interface RestoreDiscussionStateParams {
   topic: string;
   messages: DiscussionMessage[];
   searchResults?: SearchResult[];
+  searchKeywords?: SearchKeywordInfo[];
   summaryState?: SummaryState;
+  startMarker?: StartMarker;
+  extensionMarkers?: ExtensionMarker[];
+  discussionMode?: DiscussionMode;
+  discussionDepth?: DiscussionDepth;
+  directionGuide?: DirectionGuide;
+  terminationConfig?: TerminationConfig;
 }
 
 export interface DiscussionActions {
@@ -191,6 +198,7 @@ interface DiscussionContext {
   participants: DiscussionParticipant[];
   totalRounds: number;
   searchResults?: SearchResult[];
+  searchKeywords?: SearchKeywordInfo[];
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
   discussionDepth?: DiscussionDepth;
@@ -225,6 +233,7 @@ interface CreateSSEHandlersParams {
   collectedMessagesRef: { current: DiscussionMessage[] };
   collectedFinalAnswerRef: { current: string };
   collectedSummaryPromptRef: { current: string };
+  collectedSearchKeywordsRef?: { current: SearchKeywordInfo[] };
   currentProgressStateRef: { current: { currentRound: number; currentParticipantIndex: number } };
   includeReadyForSummary?: boolean;
 }
@@ -252,6 +261,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     collectedMessagesRef,
     collectedFinalAnswerRef,
     collectedSummaryPromptRef,
+    collectedSearchKeywordsRef,
     currentProgressStateRef,
     includeReadyForSummary = false,
   } = params;
@@ -311,6 +321,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
           currentParticipantIndex: nextParticipantIndex,
           totalRounds: context.totalRounds,
           searchResults: context.searchResults,
+          searchKeywords: collectedSearchKeywordsRef?.current?.length ? collectedSearchKeywordsRef.current : context.searchKeywords,
           userProfile: context.userProfile,
           discussionMode: context.discussionMode,
           discussionDepth: context.discussionDepth,
@@ -377,6 +388,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
               currentParticipantIndex: currentProgressStateRef.current.currentParticipantIndex,
               totalRounds: context.totalRounds,
               searchResults: context.searchResults,
+              searchKeywords: collectedSearchKeywordsRef?.current?.length ? collectedSearchKeywordsRef.current : context.searchKeywords,
               interruptedAt: new Date(),
               summaryState: 'awaiting',
               startMarker: context.startMarker,
@@ -413,6 +425,10 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     },
     onSearchKeywords: (searchKeywords) => {
       setCurrentSearchKeywords?.(prev => [...prev, searchKeywords]);
+      // refにも追加して、クロージャ内でも最新の値を参照できるようにする
+      if (collectedSearchKeywordsRef) {
+        collectedSearchKeywordsRef.current = [...collectedSearchKeywordsRef.current, searchKeywords];
+      }
     },
   };
 }
@@ -494,12 +510,20 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setCurrentTopic(params.topic);
     setCurrentMessages(params.messages);
     setCurrentSearchResults(params.searchResults || []);
+    setCurrentSearchKeywords(params.searchKeywords || []);
     setSummaryState(params.summaryState || 'idle');
     setCurrentFinalAnswer('');
     setCurrentSummaryPrompt('');
     setError(null);
     setSuggestedFollowUps([]);
     setIsGeneratingFollowUps(false);
+    // マーカーと議論設定を復元
+    setStartMarker(params.startMarker || null);
+    setExtensionMarkers(params.extensionMarkers || []);
+    setCurrentDiscussionMode(params.discussionMode || null);
+    setCurrentDiscussionDepth(params.discussionDepth || null);
+    setCurrentDirectionGuide(params.directionGuide || null);
+    setCurrentTerminationConfig(params.terminationConfig || null);
   }, []);
 
   const handleInterrupt = useCallback(() => {
@@ -800,7 +824,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         setSummaryState('idle');
       }
     },
-    [currentMessages, currentTopic, currentSearchResults, messageVotes, clearCurrentTurnState, startMarker, extensionMarkers]
+    [currentMessages, currentTopic, currentSearchResults, currentSearchKeywords, messageVotes, clearCurrentTurnState, startMarker, extensionMarkers]
   );
 
   // 議論を開始
@@ -871,6 +895,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
 
       // 検索（開始時）
       let searchResults: SearchResult[] = [];
+      let collectedSearchKeywords: SearchKeywordInfo[] = [];
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
       if (searchConfig.enabled && timing.onStart) {
         setIsSearching(true);
@@ -901,6 +926,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             keywords: searchKeywords,
             timestamp: new Date(),
           };
+          collectedSearchKeywords = [keywordInfo];
           setCurrentSearchKeywords([keywordInfo]);
 
           // 生成されたキーワードで検索
@@ -964,6 +990,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       const collectedMessagesRef = { current: [] as DiscussionMessage[] };
       const collectedFinalAnswerRef = { current: '' };
       const collectedSummaryPromptRef = { current: '' };
+      const collectedSearchKeywordsRef = { current: collectedSearchKeywords };
       const currentProgressStateRef = { current: { currentRound: 1, currentParticipantIndex: 0 } };
 
       // 開始マーカーを作成（context用）
@@ -980,6 +1007,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         participants,
         totalRounds: terminationConfig.maxRounds,
         searchResults: searchResults.length > 0 ? searchResults : undefined,
+        searchKeywords: collectedSearchKeywords.length > 0 ? collectedSearchKeywords : undefined,
         userProfile,
         discussionMode,
         discussionDepth,
@@ -1037,6 +1065,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           collectedMessagesRef,
           collectedFinalAnswerRef,
           collectedSummaryPromptRef,
+          collectedSearchKeywordsRef,
           currentProgressStateRef,
           includeReadyForSummary: true,
         });
@@ -1065,6 +1094,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             currentParticipantIndex: currentProgressStateRef.current.currentParticipantIndex,
             totalRounds: terminationConfig.maxRounds,
             searchResults: searchResults.length > 0 ? searchResults : undefined,
+            searchKeywords: collectedSearchKeywordsRef.current.length > 0 ? collectedSearchKeywordsRef.current : undefined,
             searchConfig,
             userProfile,
             discussionMode,
@@ -1098,7 +1128,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             undefined, // suggestedFollowUps
             turnStartMarker,
             undefined, // 新規議論なのでextensionMarkersはなし
-            currentSearchKeywords.length > 0 ? currentSearchKeywords : undefined
+            collectedSearchKeywordsRef.current.length > 0 ? collectedSearchKeywordsRef.current : undefined
           );
           const latestSession = currentSessionRef.current;
 
@@ -1213,6 +1243,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       const collectedMessagesRef = { current: [...interruptedState.messages] };
       const collectedFinalAnswerRef = { current: '' };
       const collectedSummaryPromptRef = { current: '' };
+      const collectedSearchKeywordsRef = { current: interruptedState.searchKeywords || [] };
       const currentProgressStateRef = {
         current: {
           currentRound: interruptedState.currentRound,
@@ -1225,6 +1256,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         participants: interruptedState.participants,
         totalRounds: interruptedState.totalRounds,
         searchResults: interruptedState.searchResults,
+        searchKeywords: interruptedState.searchKeywords,
         userProfile: interruptedState.userProfile,
         discussionMode: interruptedState.discussionMode,
         discussionDepth: interruptedState.discussionDepth,
@@ -1287,6 +1319,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           collectedMessagesRef,
           collectedFinalAnswerRef,
           collectedSummaryPromptRef,
+          collectedSearchKeywordsRef,
           currentProgressStateRef,
           includeReadyForSummary: true,
         });
@@ -1307,6 +1340,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             currentParticipantIndex: currentProgressStateRef.current.currentParticipantIndex,
             totalRounds: interruptedState.totalRounds,
             searchResults: interruptedState.searchResults,
+            searchKeywords: collectedSearchKeywordsRef.current.length > 0 ? collectedSearchKeywordsRef.current : undefined,
             searchConfig: interruptedState.searchConfig,
             userProfile: interruptedState.userProfile,
             discussionMode: interruptedState.discussionMode,
@@ -1347,7 +1381,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             undefined, // suggestedFollowUps
             turnStartMarker,
             turnExtensionMarkers,
-            currentSearchKeywords.length > 0 ? currentSearchKeywords : undefined
+            collectedSearchKeywordsRef.current.length > 0 ? collectedSearchKeywordsRef.current : undefined
           );
           const latestSession = currentSessionRef.current;
 

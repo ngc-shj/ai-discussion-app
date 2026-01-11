@@ -252,6 +252,7 @@ export interface CreateInterruptedStateParams {
   currentParticipantIndex: number;
   totalRounds: number;
   searchResults?: SearchResult[];
+  searchKeywords?: SearchKeywordInfo[];
   searchConfig?: SearchConfig;
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
@@ -279,6 +280,7 @@ export function createInterruptedState(
     currentParticipantIndex: params.currentParticipantIndex,
     totalRounds: params.totalRounds,
     searchResults: params.searchResults,
+    searchKeywords: params.searchKeywords,
     searchConfig: params.searchConfig,
     userProfile: params.userProfile,
     discussionMode: params.discussionMode,

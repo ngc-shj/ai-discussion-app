@@ -65,6 +65,20 @@ function serializeSession(session: DiscussionSession): Record<string, unknown> {
         ...msg,
         timestamp: toISOString(msg.timestamp),
       })),
+      // 中断状態の検索キーワードのtimestampをシリアライズ
+      searchKeywords: session.interruptedTurn.searchKeywords?.map((info) => ({
+        ...info,
+        timestamp: toISOString(info.timestamp),
+      })),
+      // 中断状態のマーカーのtimestampをシリアライズ
+      startMarker: session.interruptedTurn.startMarker ? {
+        ...session.interruptedTurn.startMarker,
+        timestamp: toISOString(session.interruptedTurn.startMarker.timestamp),
+      } : undefined,
+      extensionMarkers: session.interruptedTurn.extensionMarkers?.map((marker) => ({
+        ...marker,
+        timestamp: toISOString(marker.timestamp),
+      })),
     } : undefined,
   };
 }
@@ -108,14 +122,33 @@ function deserializeSession(data: Record<string, unknown>): DiscussionSession {
         };
       }),
       // 中断状態がある場合はデシリアライズ
-      interruptedTurn: interruptedTurnData ? {
-        ...interruptedTurnData,
-        interruptedAt: new Date(interruptedTurnData.interruptedAt as string),
-        messages: ((interruptedTurnData.messages as Array<Record<string, unknown>>) || []).map((msg) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp as string),
-        })),
-      } : undefined,
+      interruptedTurn: interruptedTurnData ? (() => {
+        const interruptedSearchKeywordsData = interruptedTurnData.searchKeywords as Array<Record<string, unknown>> | undefined;
+        const interruptedStartMarkerData = interruptedTurnData.startMarker as Record<string, unknown> | undefined;
+        const interruptedExtensionMarkersData = interruptedTurnData.extensionMarkers as Array<Record<string, unknown>> | undefined;
+        return {
+          ...interruptedTurnData,
+          interruptedAt: new Date(interruptedTurnData.interruptedAt as string),
+          messages: ((interruptedTurnData.messages as Array<Record<string, unknown>>) || []).map((msg) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp as string),
+          })),
+          // 中断状態の検索キーワードのtimestampをデシリアライズ
+          searchKeywords: interruptedSearchKeywordsData?.map((info) => ({
+            ...info,
+            timestamp: new Date(info.timestamp as string),
+          })),
+          // 中断状態のマーカーのtimestampをデシリアライズ
+          startMarker: interruptedStartMarkerData ? {
+            ...interruptedStartMarkerData,
+            timestamp: new Date(interruptedStartMarkerData.timestamp as string),
+          } : undefined,
+          extensionMarkers: interruptedExtensionMarkersData?.map((marker) => ({
+            ...marker,
+            timestamp: new Date(marker.timestamp as string),
+          })),
+        };
+      })() : undefined,
     } as DiscussionSession;
   } catch (err) {
     console.error('Failed to deserialize session:', err, data);
