@@ -259,3 +259,11 @@ export const TERMINATION_PRESETS: TerminationPreset[] = [
     description: 'ユーザーが手動で終了',
   },
 ];
+
+// 議論延長設定
+export interface ExtendDiscussionConfig {
+  additionalRounds: number;           // 追加ラウンド数（1-5）
+  discussionMode?: DiscussionMode;    // 議論モード（オプション）
+  discussionDepth?: DiscussionDepth;  // 議論の深さ（オプション）
+  directionGuide?: DirectionGuide;    // 方向性ガイド（オプション）
+}

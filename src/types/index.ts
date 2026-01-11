@@ -18,6 +18,8 @@ export type {
   MessageVote,
   MessageRating,
   InterruptedDiscussionState,
+  StartMarker,
+  ExtensionMarker,
 } from './message';
 
 // Session types
@@ -38,6 +40,7 @@ export type {
   TerminationCondition,
   TerminationConfig,
   TerminationPreset,
+  ExtendDiscussionConfig,
 } from './config';
 export {
   TECH_LEVEL_PRESETS,

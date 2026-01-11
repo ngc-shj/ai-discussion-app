@@ -61,6 +61,9 @@ export interface DiscussionTurn {
   // 分岐・フォーク用
   parentTurnId?: string;  // 分岐元のターンID
   branchLabel?: string;   // 分岐のラベル
+  // 議論マーカー（履歴表示用）
+  startMarker?: StartMarker;        // 議論開始時の設定
+  extensionMarkers?: ExtensionMarker[];  // 議論延長マーカー
 }
 
 // 中断された議論の進行状態（セッション内保存用）
@@ -79,6 +82,9 @@ export interface InterruptedTurnState {
   terminationConfig?: TerminationConfig;
   interruptedAt: Date;
   summaryState?: SummaryState; // 統合回答の状態
+  // 議論マーカー
+  startMarker?: StartMarker;
+  extensionMarkers?: ExtensionMarker[];
 }
 
 // メッセージへの投票/評価
@@ -114,4 +120,33 @@ export interface InterruptedDiscussionState {
   terminationConfig?: TerminationConfig;
   interruptedAt: Date;
   summaryState?: SummaryState; // 統合回答の状態
+  // 議論マーカー
+  startMarker?: StartMarker;
+  extensionMarkers?: ExtensionMarker[];
+}
+
+// 議論開始マーカー（表示用）
+export interface StartMarker {
+  totalRounds: number;        // 総ラウンド数
+  mode: DiscussionMode;       // 議論モード
+  depth: DiscussionDepth;     // 議論の深さ
+  keywords?: string[];        // キーワード
+  timestamp: Date;
+}
+
+// 議論延長マーカー（表示用）
+export interface ExtensionMarker {
+  afterRound: number;         // このラウンドの後に延長された
+  additionalRounds: number;   // 追加されたラウンド数
+  newTotalRounds: number;     // 延長後の総ラウンド数
+  modeChanged?: {
+    from: DiscussionMode;
+    to: DiscussionMode;
+  };
+  depthChanged?: {
+    from: DiscussionDepth;
+    to: DiscussionDepth;
+  };
+  keywordsAdded?: string[];
+  timestamp: Date;
 }

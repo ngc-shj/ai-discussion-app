@@ -6,6 +6,7 @@ import {
   DeepDiveType,
   DEEP_DIVE_PRESETS,
   SettingsPreset,
+  ExtendDiscussionConfig,
 } from '@/types';
 import {
   DiscussionPanel,
@@ -64,9 +65,15 @@ export default function Home() {
     handleInterrupt,
     startDiscussion,
     resumeDiscussion,
+    extendDiscussion,
     generateSummary,
     generateFollowUps,
     streamingMessage,
+    startMarker,
+    extensionMarkers,
+    currentDiscussionMode,
+    currentDiscussionDepth,
+    currentDirectionGuide,
   } = useDiscussion();
 
   // セッション管理（カスタムフックを使用）
@@ -429,6 +436,21 @@ export default function Home() {
     });
   }, [interruptedState, restoreFromSession, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, resumeDiscussion]);
 
+  // 議論を延長
+  const handleExtendDiscussion = useCallback(async (config: ExtendDiscussionConfig) => {
+    await extendDiscussion({
+      config,
+      participants,
+      searchConfig,
+      userProfile,
+      currentSessionRef,
+      setCurrentSession,
+      setSessions,
+      setInterruptedState,
+      updateAndSaveSession,
+    });
+  }, [participants, searchConfig, userProfile, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, extendDiscussion]);
+
   // 議論を開始
   const handleStartDiscussion = useCallback(async (topic: string) => {
     await startDiscussion({
@@ -635,7 +657,14 @@ export default function Home() {
           suggestedFollowUps={suggestedFollowUps}
           isGeneratingFollowUps={isGeneratingFollowUps}
           onGenerateSummary={handleGenerateSummary}
+          onExtendDiscussion={handleExtendDiscussion}
+          currentRounds={progress.currentRound}
+          currentMode={currentDiscussionMode || discussionMode}
+          currentDepth={currentDiscussionDepth || discussionDepth}
+          currentKeywords={currentDirectionGuide?.keywords || directionGuide.keywords}
           streamingMessage={streamingMessage}
+          startMarker={startMarker}
+          extensionMarkers={extensionMarkers}
         />
 
         {/* 進捗インジケーター */}

@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { DiscussionMessage, DiscussionParticipant, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, formatParticipantDisplayName } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, formatParticipantDisplayName, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { MessageBubble } from './MessageBubble';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FollowUpSuggestions } from './FollowUpSuggestions';
 import { DeepDiveModal } from './DeepDiveModal';
+import { ExtendDiscussionModal } from './ExtendDiscussionModal';
 import { CounterargumentButton } from './CounterargumentButton';
 import { SearchResultsDisplay } from './SearchResultsDisplay';
+import { StartSeparatorInline, ExtensionSeparatorInline } from './ExtensionSeparator';
 
 interface CurrentTurnDisplayProps {
   topic: string;
@@ -27,7 +29,14 @@ interface CurrentTurnDisplayProps {
   suggestedFollowUps?: FollowUpQuestion[];
   isGeneratingFollowUps?: boolean;
   onGenerateSummary?: () => void;
+  onExtendDiscussion?: (config: ExtendDiscussionConfig) => void;
+  currentRounds?: number;
+  currentMode?: DiscussionMode;
+  currentDepth?: DiscussionDepth;
+  currentKeywords?: string[];
   streamingMessage?: StreamingMessage | null;
+  startMarker?: StartMarker | null;
+  extensionMarkers?: ExtensionMarker[];
 }
 
 export function CurrentTurnDisplay({
@@ -47,13 +56,21 @@ export function CurrentTurnDisplay({
   suggestedFollowUps,
   isGeneratingFollowUps,
   onGenerateSummary,
+  onExtendDiscussion,
+  currentRounds = 0,
+  currentMode,
+  currentDepth,
+  currentKeywords,
   streamingMessage,
+  startMarker,
+  extensionMarkers = [],
 }: CurrentTurnDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [discussionCopied, setDiscussionCopied] = useState(false);
   const [isDeepDiveModalOpen, setIsDeepDiveModalOpen] = useState(false);
+  const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [showSummaryPrompt, setShowSummaryPrompt] = useState(false);
 
   useEffect(() => {
@@ -178,15 +195,47 @@ export function CurrentTurnDisplay({
 
           {isExpanded && (
             <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-gray-700">
-              {messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  participants={participants}
-                  vote={messageVotes?.find(v => v.messageId === message.id)?.vote}
-                  onVote={onVote ? (vote) => onVote(message.id, vote) : undefined}
-                />
-              ))}
+              {/* 議論開始セパレーター（議論開始時に表示） */}
+              {startMarker && (isLoading || messages.length > 0 || streamingMessage) && (
+                <StartSeparatorInline marker={startMarker} />
+              )}
+              {messages.map((message, index) => {
+                // このメッセージの前に延長セパレーターを表示するか判定
+                const prevMessage = index > 0 ? messages[index - 1] : null;
+                const extensionMarker = prevMessage
+                  ? extensionMarkers.find(m => m.afterRound === prevMessage.round && message.round > prevMessage.round)
+                  : null;
+
+                return (
+                  <div key={message.id}>
+                    {extensionMarker && (
+                      <ExtensionSeparatorInline marker={extensionMarker} />
+                    )}
+                    <MessageBubble
+                      message={message}
+                      participants={participants}
+                      vote={messageVotes?.find(v => v.messageId === message.id)?.vote}
+                      onVote={onVote ? (vote) => onVote(message.id, vote) : undefined}
+                    />
+                  </div>
+                );
+              })}
+              {/* 延長セパレーター（延長開始時、最初のメッセージ完了前に表示） */}
+              {(() => {
+                // 延長直後でまだ新ラウンドのメッセージがない場合に表示
+                const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+                const pendingExtensionMarker = lastMessage
+                  ? extensionMarkers.find(m => m.afterRound === lastMessage.round)
+                  : null;
+                // ストリーミング中または読み込み中で、まだこのマーカーに対応するメッセージがない場合
+                if (pendingExtensionMarker && (isLoading || streamingMessage)) {
+                  const hasMessageAfterExtension = messages.some(msg => msg.round > pendingExtensionMarker.afterRound);
+                  if (!hasMessageAfterExtension) {
+                    return <ExtensionSeparatorInline marker={pendingExtensionMarker} />;
+                  }
+                }
+                return null;
+              })()}
               {streamingMessage && (
                 <MessageBubble
                   key={streamingMessage.messageId}
@@ -236,7 +285,19 @@ export function CurrentTurnDisplay({
                     </p>
                   </div>
                 </div>
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  {onExtendDiscussion && (
+                    <button
+                      type="button"
+                      onClick={() => setIsExtendModalOpen(true)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-lg transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <span>議論を延長</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={onGenerateSummary}
@@ -250,6 +311,18 @@ export function CurrentTurnDisplay({
                 </div>
               </div>
             </div>
+            {/* 議論延長モーダル */}
+            {onExtendDiscussion && (
+              <ExtendDiscussionModal
+                isOpen={isExtendModalOpen}
+                onClose={() => setIsExtendModalOpen(false)}
+                onExtend={onExtendDiscussion}
+                currentRounds={maxRound}
+                currentMode={currentMode}
+                currentDepth={currentDepth}
+                currentKeywords={currentKeywords}
+              />
+            )}
           </div>
         </div>
       )}
