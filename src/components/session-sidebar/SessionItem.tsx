@@ -92,14 +92,38 @@ export function SessionItem({
           )}
 
           <div
-            className={`flex-1 min-w-0 pr-2 cursor-pointer ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+            className={`flex-1 min-w-0 pr-2 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
             onClick={isMultiSelectMode ? onToggleCheck : onSelect}
           >
             <div className="flex items-center gap-1.5">
               <div className="text-sm text-white truncate flex-1" title={session.title}>
                 {session.title}
               </div>
-              {/* 状態マーク（現在アクティブなセッションで議論中の場合は非表示） */}
+              {/* 状態マーク */}
+              {/* アクティブなセッションで処理中（disabled） */}
+              {isSelected && disabled && (() => {
+                // session.interruptedTurnのsummaryStateで状態を判断
+                const summaryState = session.interruptedTurn?.summaryState;
+                const isGeneratingSummary = summaryState === 'generating';
+
+                return (
+                  <span
+                    className={`shrink-0 px-1.5 py-0.5 text-[10px] rounded font-medium flex items-center gap-1 ${
+                      isGeneratingSummary
+                        ? 'bg-purple-600/80 text-purple-100'
+                        : 'bg-green-600/80 text-green-100'
+                    }`}
+                    title={isGeneratingSummary ? '統合回答を生成中' : '議論中'}
+                  >
+                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    {isGeneratingSummary ? '統合中' : '議論中'}
+                  </span>
+                );
+              })()}
+              {/* 中断状態（処理中でない場合） */}
               {session.interruptedTurn && !(isSelected && disabled) && (
                 <span
                   className={`shrink-0 px-1.5 py-0.5 text-[10px] rounded font-medium ${

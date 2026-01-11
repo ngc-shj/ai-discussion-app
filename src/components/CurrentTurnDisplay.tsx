@@ -281,7 +281,7 @@ export function CurrentTurnDisplay({
                     <p className="font-medium text-purple-300 mb-1">議論が完了しました</p>
                     <p className="text-gray-400">
                       各AIの意見に対して投票（同意・反対・中立）を行うと、統合回答に反映されます。
-                      投票が完了したら「統合回答を生成」ボタンをクリックしてください。
+                      「議論を延長」で追加ラウンドを実行、または「統合回答を生成」で結論をまとめます。
                     </p>
                   </div>
                 </div>
