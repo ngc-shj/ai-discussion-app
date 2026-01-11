@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { DiscussionTurn, DiscussionMessage, DiscussionParticipant, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState } from '@/types';
+import { DiscussionTurn, DiscussionMessage, DiscussionParticipant, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { TurnDisplay } from './TurnDisplay';
 import { CurrentTurnDisplay } from './CurrentTurnDisplay';
@@ -26,7 +26,14 @@ interface DiscussionPanelProps {
   isGeneratingFollowUps?: boolean;
   summaryState?: SummaryState;
   onGenerateSummary?: () => void;
+  onExtendDiscussion?: (config: ExtendDiscussionConfig) => void;
+  currentRounds?: number;
+  currentMode?: DiscussionMode;
+  currentDepth?: DiscussionDepth;
+  currentKeywords?: string[];
   streamingMessage?: StreamingMessage | null;
+  startMarker?: StartMarker | null;
+  extensionMarkers?: ExtensionMarker[];
 }
 
 export function DiscussionPanel({
@@ -49,7 +56,14 @@ export function DiscussionPanel({
   isGeneratingFollowUps,
   summaryState,
   onGenerateSummary,
+  onExtendDiscussion,
+  currentRounds,
+  currentMode,
+  currentDepth,
+  currentKeywords,
   streamingMessage,
+  startMarker,
+  extensionMarkers,
 }: DiscussionPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -110,7 +124,14 @@ export function DiscussionPanel({
           suggestedFollowUps={suggestedFollowUps}
           isGeneratingFollowUps={isGeneratingFollowUps}
           onGenerateSummary={onGenerateSummary}
+          onExtendDiscussion={onExtendDiscussion}
+          currentRounds={currentRounds}
+          currentMode={currentMode}
+          currentDepth={currentDepth}
+          currentKeywords={currentKeywords}
           streamingMessage={streamingMessage}
+          startMarker={startMarker}
+          extensionMarkers={extensionMarkers}
         />
       )}
     </div>

@@ -10,6 +10,7 @@ import { CounterargumentButton } from './CounterargumentButton';
 import { ForkButton } from './ForkButton';
 import { ForkModal } from './ForkModal';
 import { SearchResultsDisplay } from './SearchResultsDisplay';
+import { StartSeparatorInline, ExtensionSeparatorInline } from './ExtensionSeparator';
 
 interface TurnDisplayProps {
   turn: DiscussionTurn;
@@ -149,14 +150,30 @@ export function TurnDisplay({
 
           {isExpanded && (
             <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-gray-700">
-              {turn.messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  vote={messageVotes?.find(v => v.messageId === message.id)?.vote}
-                  onVote={onVote ? (vote) => onVote(message.id, vote) : undefined}
-                />
-              ))}
+              {/* 議論開始セパレーター */}
+              {turn.startMarker && (
+                <StartSeparatorInline marker={turn.startMarker} />
+              )}
+              {turn.messages.map((message, index) => {
+                // このメッセージの前に延長マーカーを表示するか判定
+                const prevRound = index > 0 ? turn.messages[index - 1].round : 0;
+                const extensionMarker = turn.extensionMarkers?.find(
+                  m => m.afterRound === prevRound && message.round > prevRound
+                );
+
+                return (
+                  <div key={message.id}>
+                    {extensionMarker && (
+                      <ExtensionSeparatorInline marker={extensionMarker} />
+                    )}
+                    <MessageBubble
+                      message={message}
+                      vote={messageVotes?.find(v => v.messageId === message.id)?.vote}
+                      onVote={onVote ? (vote) => onVote(message.id, vote) : undefined}
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

@@ -17,6 +17,9 @@ import {
   TerminationConfig,
   SearchConfig,
   SummaryState,
+  ExtendDiscussionConfig,
+  StartMarker,
+  ExtensionMarker,
 } from '@/types';
 import {
   getAllSessions,
@@ -68,6 +71,13 @@ export interface DiscussionState {
   messageVotes: MessageVote[];
   discussionParticipants: DiscussionParticipant[];
   streamingMessage: StreamingMessage | null;
+  startMarker: StartMarker | null;
+  extensionMarkers: ExtensionMarker[];
+  // 現在の議論で使用中の設定（延長時に参照）
+  currentDiscussionMode: DiscussionMode | null;
+  currentDiscussionDepth: DiscussionDepth | null;
+  currentDirectionGuide: DirectionGuide | null;
+  currentTerminationConfig: TerminationConfig | null;
 }
 
 export interface RestoreDiscussionStateParams {
@@ -90,6 +100,7 @@ export interface DiscussionActions {
   handleInterrupt: () => void;
   startDiscussion: (params: StartDiscussionParams) => Promise<void>;
   resumeDiscussion: (params: ResumeDiscussionParams) => Promise<void>;
+  extendDiscussion: (params: ExtendDiscussionParams) => Promise<void>;
   generateSummary: (params: GenerateSummaryParams) => Promise<void>;
   generateFollowUps: (params: GenerateFollowUpsParams) => Promise<void>;
 }
@@ -146,6 +157,18 @@ export interface GenerateFollowUpsParams {
   participants: DiscussionParticipant[];
   userProfile: UserProfile;
   currentSessionRef: React.RefObject<DiscussionSession | null>;
+  updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
+}
+
+export interface ExtendDiscussionParams {
+  config: ExtendDiscussionConfig;
+  participants: DiscussionParticipant[];
+  searchConfig: SearchConfig;
+  userProfile: UserProfile;
+  currentSessionRef: React.RefObject<DiscussionSession | null>;
+  setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
+  setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
+  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
 }
 
@@ -400,6 +423,13 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [messageVotes, setMessageVotes] = useState<MessageVote[]>([]);
   const [discussionParticipants, setDiscussionParticipants] = useState<DiscussionParticipant[]>([]);
   const [streamingMessage, setStreamingMessage] = useState<StreamingMessage | null>(null);
+  const [startMarker, setStartMarker] = useState<StartMarker | null>(null);
+  const [extensionMarkers, setExtensionMarkers] = useState<ExtensionMarker[]>([]);
+  // 現在の議論で使用中の設定（延長時に参照するため）
+  const [currentDiscussionMode, setCurrentDiscussionMode] = useState<DiscussionMode | null>(null);
+  const [currentDiscussionDepth, setCurrentDiscussionDepth] = useState<DiscussionDepth | null>(null);
+  const [currentDirectionGuide, setCurrentDirectionGuide] = useState<DirectionGuide | null>(null);
+  const [currentTerminationConfig, setCurrentTerminationConfig] = useState<TerminationConfig | null>(null);
 
   const interruptRequestedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -430,6 +460,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     // isLoading/isSearchingもリセットして、プログレスバーを非表示にする
     setIsLoading(false);
     setIsSearching(false);
+    // 開始マーカー・延長マーカーもクリア
+    setStartMarker(null);
+    setExtensionMarkers([]);
+    // 現在の議論設定もクリア
+    setCurrentDiscussionMode(null);
+    setCurrentDiscussionDepth(null);
+    setCurrentDirectionGuide(null);
+    setCurrentTerminationConfig(null);
     // 注: discussionParticipantsはクリアしない
     // セッション切り替え時にセッションの参加者が復元されるため
     // 注: interruptRequestedRefはここでリセットしない
@@ -609,7 +647,9 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             collectedFinalAnswer,
             summarySearchResults.length > 0 ? summarySearchResults : undefined,
             collectedSummaryPrompt || undefined,
-            undefined // フォローアップはまだない
+            undefined, // フォローアップはまだない
+            startMarker || undefined,
+            extensionMarkers.length > 0 ? extensionMarkers : undefined
           );
           const latestSession = currentSessionRef.current;
 
@@ -705,7 +745,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         setSummaryState('idle');
       }
     },
-    [currentMessages, currentTopic, currentSearchResults, messageVotes, clearCurrentTurnState]
+    [currentMessages, currentTopic, currentSearchResults, messageVotes, clearCurrentTurnState, startMarker, extensionMarkers]
   );
 
   // 議論を開始
@@ -744,6 +784,20 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       // 新しい議論開始時にsummaryStateをリセット
       // 前回の議論が'awaiting'や'generating'で終わっていた場合に備える
       setSummaryState('idle');
+      // 新しい議論開始時に開始マーカーを設定、延長マーカーをクリア
+      setStartMarker({
+        totalRounds: terminationConfig.maxRounds,
+        mode: discussionMode,
+        depth: discussionDepth,
+        keywords: directionGuide.keywords?.length ? directionGuide.keywords : undefined,
+        timestamp: new Date(),
+      });
+      setExtensionMarkers([]);
+      // 現在の議論設定を保存（延長時に参照するため）
+      setCurrentDiscussionMode(discussionMode);
+      setCurrentDiscussionDepth(discussionDepth);
+      setCurrentDirectionGuide(directionGuide);
+      setCurrentTerminationConfig(terminationConfig);
       setError(null);
       setIsLoading(true);
       setCurrentTopic(topic);
@@ -891,6 +945,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         );
 
         if (wasInterrupted) {
+          // 開始マーカーを作成
+          const interruptedStartMarker: StartMarker = {
+            totalRounds: terminationConfig.maxRounds,
+            mode: discussionMode,
+            depth: discussionDepth,
+            keywords: directionGuide.keywords?.length ? directionGuide.keywords : undefined,
+            timestamp: new Date(),
+          };
           const interrupted = createInterruptedState({
             sessionId: sessionAtStart?.id || '',
             topic,
@@ -906,6 +968,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             discussionDepth,
             directionGuide,
             terminationConfig,
+            startMarker: interruptedStartMarker,
+            // 新規議論なのでextensionMarkersはなし
           });
           saveInterruptedState(interrupted);
           setInterruptedState(interrupted);
@@ -914,12 +978,23 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         }
 
         if (collectedFinalAnswerRef.current) {
+          // 開始マーカーを作成（startDiscussion内で設定した値と同じ）
+          const turnStartMarker: StartMarker = {
+            totalRounds: terminationConfig.maxRounds,
+            mode: discussionMode,
+            depth: discussionDepth,
+            keywords: directionGuide.keywords?.length ? directionGuide.keywords : undefined,
+            timestamp: new Date(),
+          };
           const newTurn = createNewTurn(
             topic,
             collectedMessagesRef.current,
             collectedFinalAnswerRef.current,
             searchResults.length > 0 ? searchResults : undefined,
-            collectedSummaryPromptRef.current || undefined
+            collectedSummaryPromptRef.current || undefined,
+            undefined, // suggestedFollowUps
+            turnStartMarker,
+            undefined // 新規議論なのでextensionMarkersはなし
           );
           const latestSession = currentSessionRef.current;
 
@@ -1006,6 +1081,26 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         totalParticipants: interruptedState.participants.length,
         currentParticipant: interruptedState.participants[interruptedState.currentParticipantIndex],
       });
+      // 中断状態からマーカーを復元
+      if (interruptedState.startMarker) {
+        setStartMarker(interruptedState.startMarker);
+      }
+      if (interruptedState.extensionMarkers) {
+        setExtensionMarkers(interruptedState.extensionMarkers);
+      }
+      // 中断状態から議論設定を復元（延長時に参照するため）
+      if (interruptedState.discussionMode) {
+        setCurrentDiscussionMode(interruptedState.discussionMode);
+      }
+      if (interruptedState.discussionDepth) {
+        setCurrentDiscussionDepth(interruptedState.discussionDepth);
+      }
+      if (interruptedState.directionGuide) {
+        setCurrentDirectionGuide(interruptedState.directionGuide);
+      }
+      if (interruptedState.terminationConfig) {
+        setCurrentTerminationConfig(interruptedState.terminationConfig);
+      }
 
       const previousTurns = getPreviousTurns(session || currentSessionRef.current);
       const resumeSession = currentSessionRef.current;
@@ -1111,6 +1206,9 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             discussionDepth: interruptedState.discussionDepth,
             directionGuide: interruptedState.directionGuide,
             terminationConfig: interruptedState.terminationConfig,
+            // 中断前のマーカーを引き継ぐ
+            startMarker: interruptedState.startMarker,
+            extensionMarkers: interruptedState.extensionMarkers,
           });
           saveInterruptedState(newInterruptedState);
           setInterruptedState(newInterruptedState);
@@ -1119,12 +1217,29 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         }
 
         if (collectedFinalAnswerRef.current) {
+          // 中断状態から保存されたマーカーを使用、なければ設定から作成
+          const turnStartMarker: StartMarker | undefined = interruptedState.startMarker || (
+            interruptedState.discussionMode && interruptedState.discussionDepth ? {
+              totalRounds: interruptedState.terminationConfig?.maxRounds || interruptedState.totalRounds,
+              mode: interruptedState.discussionMode,
+              depth: interruptedState.discussionDepth,
+              keywords: interruptedState.directionGuide?.keywords?.length ? interruptedState.directionGuide.keywords : undefined,
+              timestamp: new Date(),
+            } : undefined
+          );
+          // 中断状態から保存された延長マーカーを使用、なければ現在の状態から
+          const turnExtensionMarkers = interruptedState.extensionMarkers?.length
+            ? interruptedState.extensionMarkers
+            : (extensionMarkers.length > 0 ? extensionMarkers : undefined);
           const newTurn = createNewTurn(
             interruptedState.topic,
             collectedMessagesRef.current,
             collectedFinalAnswerRef.current,
             interruptedState.searchResults,
-            collectedSummaryPromptRef.current || undefined
+            collectedSummaryPromptRef.current || undefined,
+            undefined, // suggestedFollowUps
+            turnStartMarker,
+            turnExtensionMarkers
           );
           const latestSession = currentSessionRef.current;
 
@@ -1150,7 +1265,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         setIsLoading(false);
       }
     },
-    [messageVotes, clearCurrentTurnState]
+    [messageVotes, clearCurrentTurnState, extensionMarkers]
   );
 
   // 特定のターンに対してフォローアップ質問を生成
@@ -1232,6 +1347,143 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     []
   );
 
+  // 議論を延長
+  const extendDiscussion = useCallback(
+    async (params: ExtendDiscussionParams) => {
+      const {
+        config,
+        participants,
+        searchConfig,
+        userProfile,
+        currentSessionRef,
+        setCurrentSession,
+        setSessions,
+        setInterruptedState,
+        updateAndSaveSession,
+      } = params;
+
+      // 現在の状態から延長用のInterruptedTurnStateを構築
+      const currentSession = currentSessionRef.current;
+      if (!currentSession) {
+        setError('セッションが見つかりません');
+        return;
+      }
+
+      // 現在の議論設定を使用（フック内の状態から取得）
+      // 1回目の延長で変更された設定が正しく引き継がれる
+      const discussionMode: DiscussionMode = currentDiscussionMode || 'free';
+      const discussionDepth: DiscussionDepth = currentDiscussionDepth || 2;
+      const directionGuide: DirectionGuide = currentDirectionGuide || { keywords: [] };
+      const terminationConfig: TerminationConfig = currentTerminationConfig || { condition: 'rounds', maxRounds: 2 };
+
+      // メッセージから完了済みラウンド数を計算（最も信頼性が高い）
+      const completedRounds = currentMessages.length > 0
+        ? Math.max(...currentMessages.map(m => m.round))
+        : 0;
+
+      // 新しい設定を適用
+      const newMode = config.discussionMode || discussionMode;
+      const newDepth = config.discussionDepth || discussionDepth;
+      const newDirectionGuide = config.directionGuide || directionGuide;
+      const newTotalRounds = completedRounds + config.additionalRounds;
+
+      // 延長マーカーを作成
+      const newMarker: ExtensionMarker = {
+        afterRound: completedRounds,
+        additionalRounds: config.additionalRounds,
+        newTotalRounds,
+        timestamp: new Date(),
+      };
+
+      // モード変更があれば記録
+      if (config.discussionMode && config.discussionMode !== discussionMode) {
+        newMarker.modeChanged = {
+          from: discussionMode,
+          to: config.discussionMode,
+        };
+      }
+
+      // 深さ変更があれば記録
+      if (config.discussionDepth && config.discussionDepth !== discussionDepth) {
+        newMarker.depthChanged = {
+          from: discussionDepth,
+          to: config.discussionDepth,
+        };
+      }
+
+      // キーワード追加があれば記録
+      if (config.directionGuide?.keywords && config.directionGuide.keywords.length > 0) {
+        // 既存のキーワードとの差分を取得
+        const existingKeywords = new Set(directionGuide?.keywords || []);
+        const newKeywords = config.directionGuide.keywords.filter(k => !existingKeywords.has(k));
+        if (newKeywords.length > 0) {
+          newMarker.keywordsAdded = newKeywords;
+        }
+      }
+
+      // 延長マーカーリストを更新
+      const updatedExtensionMarkers = [...extensionMarkers, newMarker];
+
+      // InterruptedDiscussionStateを作成（マーカーを含める）
+      const interruptedState: InterruptedDiscussionState = {
+        sessionId: currentSession.id,
+        topic: currentTopic,
+        participants,
+        messages: currentMessages,
+        currentRound: completedRounds + 1, // 次のラウンドから開始
+        currentParticipantIndex: 0,
+        totalRounds: newTotalRounds,
+        searchResults: currentSearchResults,
+        searchConfig,
+        userProfile,
+        discussionMode: newMode,
+        discussionDepth: newDepth,
+        directionGuide: newDirectionGuide,
+        terminationConfig: {
+          ...terminationConfig,
+          maxRounds: newTotalRounds,
+        },
+        interruptedAt: new Date(),
+        summaryState: 'idle',
+        startMarker: startMarker || undefined,
+        extensionMarkers: updatedExtensionMarkers,
+      };
+
+      // 延長マーカーを状態に追加
+      setExtensionMarkers(updatedExtensionMarkers);
+
+      // 統合回答待ち状態をリセット
+      setSummaryState('idle');
+      setCurrentFinalAnswer('');
+      setSuggestedFollowUps([]);
+
+      // resumeDiscussionを呼び出して議論を再開
+      await resumeDiscussion({
+        interruptedState,
+        restoreFromSession: () => {
+          // 設定は既に適用済みなので何もしない
+        },
+        currentSessionRef,
+        setCurrentSession,
+        setSessions,
+        setInterruptedState,
+        updateAndSaveSession,
+      });
+    },
+    [
+      currentTopic,
+      currentMessages,
+      currentSearchResults,
+      resumeDiscussion,
+      startMarker,
+      extensionMarkers,
+      currentDiscussionMode,
+      currentDiscussionDepth,
+      currentDirectionGuide,
+      currentTerminationConfig,
+    ]
+  );
+
   // 処理中フラグ（議論実行中、検索中、統合回答生成中、フォローアップ生成中）
   const isProcessing = isLoading || isSearching || summaryState === 'generating' || isGeneratingFollowUps;
 
@@ -1253,6 +1505,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     messageVotes,
     discussionParticipants,
     streamingMessage,
+    startMarker,
+    extensionMarkers,
+    currentDiscussionMode,
+    currentDiscussionDepth,
+    currentDirectionGuide,
+    currentTerminationConfig,
     setCurrentMessages,
     setCurrentFinalAnswer,
     setCurrentTopic,
@@ -1265,6 +1523,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     handleInterrupt,
     startDiscussion,
     resumeDiscussion,
+    extendDiscussion,
     generateSummary,
     generateFollowUps,
   };

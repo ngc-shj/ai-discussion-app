@@ -14,6 +14,8 @@ import {
   DiscussionDepth,
   DirectionGuide,
   TerminationConfig,
+  StartMarker,
+  ExtensionMarker,
 } from '@/types';
 
 // SSEイベントの型定義
@@ -245,6 +247,9 @@ export interface CreateInterruptedStateParams {
   discussionDepth?: DiscussionDepth;
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
+  // 議論マーカー
+  startMarker?: StartMarker;
+  extensionMarkers?: ExtensionMarker[];
 }
 
 /**
@@ -270,6 +275,8 @@ export function createInterruptedState(
     directionGuide: params.directionGuide,
     terminationConfig: params.terminationConfig,
     interruptedAt: new Date(),
+    startMarker: params.startMarker,
+    extensionMarkers: params.extensionMarkers,
   };
 }
 

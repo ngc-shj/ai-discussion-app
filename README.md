@@ -39,6 +39,7 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 - **Follow-up Suggestions**: AI-generated follow-up questions after discussions
 - **Deep Dive Analysis**: In-depth analysis of specific topics
 - **Discussion Forking**: Branch discussions to explore alternative directions
+- **Discussion Extension**: Extend completed discussions with additional rounds and modified settings
 - **Message Voting**: Rate individual messages in discussions
 - **Interrupted Discussion Recovery**: Resume discussions that were interrupted
 - **Termination Conditions**: End discussions by rounds, consensus detection, or manually

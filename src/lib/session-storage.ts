@@ -1,4 +1,4 @@
-import { DiscussionSession, DiscussionTurn, SearchResult, InterruptedDiscussionState, DiscussionMessage } from '@/types';
+import { DiscussionSession, DiscussionTurn, SearchResult, InterruptedDiscussionState, DiscussionMessage, StartMarker, ExtensionMarker } from '@/types';
 
 const DB_NAME = 'ai-discussion-db';
 const DB_VERSION = 1;
@@ -42,6 +42,15 @@ function serializeSession(session: DiscussionSession): Record<string, unknown> {
         ...msg,
         timestamp: toISOString(msg.timestamp),
       })),
+      // マーカーのtimestampをシリアライズ
+      startMarker: turn.startMarker ? {
+        ...turn.startMarker,
+        timestamp: toISOString(turn.startMarker.timestamp),
+      } : undefined,
+      extensionMarkers: turn.extensionMarkers?.map((marker) => ({
+        ...marker,
+        timestamp: toISOString(marker.timestamp),
+      })),
     })),
     // 中断状態がある場合はシリアライズ
     interruptedTurn: session.interruptedTurn ? {
@@ -65,14 +74,28 @@ function deserializeSession(data: Record<string, unknown>): DiscussionSession {
       ...data,
       createdAt: new Date(data.createdAt as string),
       updatedAt: new Date(data.updatedAt as string),
-      turns: (turnsData || []).map((turn) => ({
-        ...turn,
-        createdAt: new Date(turn.createdAt as string),
-        messages: ((turn.messages as Array<Record<string, unknown>>) || []).map((msg) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp as string),
-        })),
-      })),
+      turns: (turnsData || []).map((turn) => {
+        const startMarkerData = turn.startMarker as Record<string, unknown> | undefined;
+        const extensionMarkersData = turn.extensionMarkers as Array<Record<string, unknown>> | undefined;
+
+        return {
+          ...turn,
+          createdAt: new Date(turn.createdAt as string),
+          messages: ((turn.messages as Array<Record<string, unknown>>) || []).map((msg) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp as string),
+          })),
+          // マーカーのtimestampをデシリアライズ
+          startMarker: startMarkerData ? {
+            ...startMarkerData,
+            timestamp: new Date(startMarkerData.timestamp as string),
+          } : undefined,
+          extensionMarkers: extensionMarkersData?.map((marker) => ({
+            ...marker,
+            timestamp: new Date(marker.timestamp as string),
+          })),
+        };
+      }),
       // 中断状態がある場合はデシリアライズ
       interruptedTurn: interruptedTurnData ? {
         ...interruptedTurnData,
@@ -203,7 +226,9 @@ export function createNewTurn(
   finalAnswer: string,
   searchResults?: SearchResult[],
   summaryPrompt?: string,
-  suggestedFollowUps?: DiscussionTurn['suggestedFollowUps']
+  suggestedFollowUps?: DiscussionTurn['suggestedFollowUps'],
+  startMarker?: StartMarker,
+  extensionMarkers?: ExtensionMarker[]
 ): DiscussionTurn {
   return {
     id: `turn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -214,6 +239,8 @@ export function createNewTurn(
     searchResults,
     suggestedFollowUps,
     createdAt: new Date(),
+    startMarker,
+    extensionMarkers,
   };
 }
 
@@ -229,11 +256,23 @@ function serializeInterruptedState(state: InterruptedDiscussionState): Record<st
       ...msg,
       timestamp: toISOString(msg.timestamp),
     })),
+    // マーカーのtimestampをシリアライズ
+    startMarker: state.startMarker ? {
+      ...state.startMarker,
+      timestamp: toISOString(state.startMarker.timestamp),
+    } : undefined,
+    extensionMarkers: state.extensionMarkers?.map((marker) => ({
+      ...marker,
+      timestamp: toISOString(marker.timestamp),
+    })),
   };
 }
 
 // 中断状態をデシリアライズ（文字列をDate型に変換）
 function deserializeInterruptedState(data: Record<string, unknown>): InterruptedDiscussionState {
+  const startMarkerData = data.startMarker as Record<string, unknown> | undefined;
+  const extensionMarkersData = data.extensionMarkers as Array<Record<string, unknown>> | undefined;
+
   return {
     ...data,
     interruptedAt: new Date(data.interruptedAt as string),
@@ -241,6 +280,15 @@ function deserializeInterruptedState(data: Record<string, unknown>): Interrupted
       ...msg,
       timestamp: new Date(msg.timestamp as string),
     })) as DiscussionMessage[],
+    // マーカーのtimestampをデシリアライズ
+    startMarker: startMarkerData ? {
+      ...startMarkerData,
+      timestamp: new Date(startMarkerData.timestamp as string),
+    } : undefined,
+    extensionMarkers: extensionMarkersData?.map((marker) => ({
+      ...marker,
+      timestamp: new Date(marker.timestamp as string),
+    })),
   } as InterruptedDiscussionState;
 }
 
