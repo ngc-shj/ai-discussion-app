@@ -172,16 +172,16 @@ export function TurnDisplay({
             <button
               type="button"
               onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
-              className="flex items-center gap-1.5 mb-1 hover:opacity-80 transition-opacity"
+              className="flex items-center justify-between w-full mb-1 hover:opacity-80 transition-opacity"
             >
               <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
               <svg
-                className={`w-3 h-3 text-purple-400 transition-transform ${isSummaryExpanded ? 'rotate-90' : ''}`}
+                className={`w-4 h-4 text-gray-500 transition-transform ${isSummaryExpanded ? 'rotate-180' : ''}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
             {isSummaryExpanded ? (
