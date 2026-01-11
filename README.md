@@ -4,6 +4,18 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 
 [日本語版 README](README.ja.md)
 
+![Overview](docs/images/overview.png)
+
+## Screenshots
+
+| Discussion Options | Discussion in Progress |
+|:--:|:--:|
+| ![Options](docs/images/options.png) | ![Discussion](docs/images/discussion.png) |
+
+| Integrated Answer | Follow-up Suggestions |
+|:--:|:--:|
+| ![Summary](docs/images/summary.png) | ![Follow-up](docs/images/followup.png) |
+
 ## Features
 
 ### Core Features
@@ -52,20 +64,6 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 | **Ollama** | Local | Ollama server running |
 | **OpenAI** | Cloud API | OpenAI API Key |
 | **Gemini** | Cloud API | Google AI API Key |
-
-## Screenshots
-
-### Discussion View
-
-The main discussion panel showing AI conversations with model status indicators:
-
-```text
-┌─────────────────────────────────────────────────────┐
-│  [gemma2:2b ✓] [qwen3:4b ●] [統合]   ← Model chips │
-│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ← Progress    │
-│  ● qwen3:4b is responding...   Round 1/2          │
-└─────────────────────────────────────────────────────┘
-```
 
 ## Setup
 
