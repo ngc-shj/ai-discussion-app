@@ -159,6 +159,8 @@ export function InputForm({
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           onKeyDown={(e) => {
+            // IME入力中（日本語変換中など）はsubmitしない
+            if (e.nativeEvent.isComposing) return;
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               if (!disabled && topic.trim()) {
