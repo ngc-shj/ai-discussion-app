@@ -193,6 +193,8 @@ interface DiscussionContext {
   discussionDepth?: DiscussionDepth;
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
+  startMarker?: StartMarker;
+  extensionMarkers?: ExtensionMarker[];
 }
 
 // ============================================
@@ -311,6 +313,8 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
           terminationConfig: context.terminationConfig,
           interruptedAt: new Date(),
           summaryState: isAllComplete ? 'awaiting' : 'idle',
+          startMarker: context.startMarker,
+          extensionMarkers: context.extensionMarkers,
         };
         const updatedSession: DiscussionSession = {
           ...latestSession,
@@ -370,6 +374,8 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
               searchResults: context.searchResults,
               interruptedAt: new Date(),
               summaryState: 'awaiting',
+              startMarker: context.startMarker,
+              extensionMarkers: context.extensionMarkers,
             };
             const updatedSession: DiscussionSession = {
               ...latestSession,
@@ -875,6 +881,15 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       const collectedSummaryPromptRef = { current: '' };
       const currentProgressStateRef = { current: { currentRound: 1, currentParticipantIndex: 0 } };
 
+      // 開始マーカーを作成（context用）
+      const turnStartMarker: StartMarker = {
+        totalRounds: terminationConfig.maxRounds,
+        mode: discussionMode,
+        depth: discussionDepth,
+        keywords: directionGuide.keywords?.length ? directionGuide.keywords : undefined,
+        timestamp: new Date(),
+      };
+
       const context: DiscussionContext = {
         topic,
         participants,
@@ -885,6 +900,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         discussionDepth,
         directionGuide,
         terminationConfig,
+        startMarker: turnStartMarker,
+        extensionMarkers: [], // 新規議論なのでextensionMarkersは空
       };
 
       try {
@@ -1126,6 +1143,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         discussionDepth: interruptedState.discussionDepth,
         directionGuide: interruptedState.directionGuide,
         terminationConfig: interruptedState.terminationConfig,
+        startMarker: interruptedState.startMarker,
+        extensionMarkers: interruptedState.extensionMarkers,
       };
 
       try {
