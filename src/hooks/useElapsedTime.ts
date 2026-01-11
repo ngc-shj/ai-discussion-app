@@ -48,8 +48,10 @@ export function useElapsedTime(isActive: boolean, resetKey?: string): ElapsedTim
         }
       }, 1000);
     } else {
-      // タイマー停止
+      // タイマー停止時に状態をクリア（次回開始時に0秒から始まるように）
       clearTimer();
+      setElapsedSeconds(0);
+      startTimeRef.current = null;
     }
 
     return clearTimer;
