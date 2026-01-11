@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { DiscussionMessage, DiscussionParticipant, SearchResult, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, formatParticipantDisplayName, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, formatParticipantDisplayName, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FollowUpSuggestions } from './FollowUpSuggestions';
@@ -9,6 +9,7 @@ import { DeepDiveModal } from './DeepDiveModal';
 import { ExtendDiscussionModal } from './ExtendDiscussionModal';
 import { CounterargumentButton } from './CounterargumentButton';
 import { SearchResultsDisplay } from './SearchResultsDisplay';
+import { SearchKeywordsDisplay } from './SearchKeywordsDisplay';
 import { MessageList } from './MessageList';
 
 interface CurrentTurnDisplayProps {
@@ -20,6 +21,7 @@ interface CurrentTurnDisplayProps {
   isLoading: boolean;
   summaryState?: SummaryState;
   searchResults?: SearchResult[];
+  searchKeywords?: SearchKeywordInfo[];
   onFollowUp?: (topic: string, previousAnswer: string) => void;
   onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
   onCounterargument?: (topic: string, previousAnswer: string) => void;
@@ -47,6 +49,7 @@ export function CurrentTurnDisplay({
   isLoading,
   summaryState,
   searchResults,
+  searchKeywords,
   onFollowUp,
   onDeepDive,
   onCounterargument,
@@ -128,6 +131,11 @@ export function CurrentTurnDisplay({
           </div>
         </div>
       </div>
+
+      {/* 検索キーワードを表示 */}
+      {searchKeywords && searchKeywords.length > 0 && (
+        <SearchKeywordsDisplay keywords={searchKeywords} />
+      )}
 
       {/* 検索結果を表示 */}
       {searchResults && searchResults.length > 0 && (

@@ -7,6 +7,14 @@ export interface SearchResult {
   publishedDate?: string;
 }
 
+// 検索キーワード情報
+export interface SearchKeywordInfo {
+  timing: 'start' | 'round' | 'summary';  // 検索タイミング
+  round?: number;                          // ラウンド番号（eachRound時）
+  keywords: string[];                      // 生成されたキーワード
+  timestamp: Date;                         // 生成時刻
+}
+
 // 検索タイミング設定
 export interface SearchTiming {
   onStart: boolean;        // 議論開始時に検索

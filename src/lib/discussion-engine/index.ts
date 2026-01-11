@@ -1,5 +1,6 @@
 import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile, SearchResult, SearchConfig, formatParticipantDisplayName } from '@/types';
 import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from '../ai-providers';
+import { createSearchKeywordPrompt, SearchKeywordTiming } from '../ai-providers/prompt-formatters';
 import { DiscussionProgress, DiscussionRequest, getProviderDisplayName } from './types';
 import { checkConsensus, checkTerminationKeywords } from './termination';
 import { performSearch, mergeSearchResults } from '../search';
@@ -31,6 +32,70 @@ function extractSearchQueries(content: string): string[] {
  */
 function replaceSearchPatterns(content: string): string {
   return content.replace(SEARCH_PATTERN, '');
+}
+
+/**
+ * AIの応答からJSONキーワード配列をパース
+ */
+function parseKeywordsResponse(content: string): string[] {
+  // JSONブロックを抽出（```json ... ``` または 単独の [...] ）
+  const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) ||
+                    content.match(/\[[\s\S]*?\]/);
+
+  if (jsonMatch) {
+    try {
+      const jsonStr = jsonMatch[1] || jsonMatch[0];
+      const parsed = JSON.parse(jsonStr.trim());
+      if (Array.isArray(parsed) && parsed.every(item => typeof item === 'string')) {
+        return parsed;
+      }
+    } catch {
+      // パース失敗時はフォールバック
+    }
+  }
+
+  // フォールバック: 行ごとに分割してキーワードを抽出
+  const lines = content.split('\n')
+    .map(line => line.replace(/^[-*\d.]+\s*/, '').trim())
+    .filter(line => line.length > 0 && line.length < 100);
+
+  return lines.slice(0, 5);
+}
+
+/**
+ * AIを使って検索キーワードを生成
+ */
+async function generateSearchKeywords(
+  topic: string,
+  messages: DiscussionMessage[],
+  timing: SearchKeywordTiming,
+  participant: DiscussionParticipant
+): Promise<string[]> {
+  try {
+    const provider = createProvider(participant.provider, participant.model);
+    const isAvailable = await provider.isAvailable();
+    if (!isAvailable) {
+      return [topic]; // フォールバック
+    }
+
+    const messagesForPrompt = messages.map(m => ({
+      provider: m.displayName || `${m.provider}/${m.model}`,
+      content: m.content,
+    }));
+
+    const prompt = createSearchKeywordPrompt(topic, messagesForPrompt, timing);
+    const response = await provider.generate({ prompt });
+
+    if (response.error) {
+      return [topic]; // フォールバック
+    }
+
+    const keywords = parseKeywordsResponse(response.content);
+    return keywords.length > 0 ? keywords : [topic];
+  } catch (error) {
+    console.error('Failed to generate search keywords:', error);
+    return [topic]; // フォールバック
+  }
 }
 
 /**
@@ -98,14 +163,41 @@ export async function* runDiscussion(
         searchResults: currentSearchResults,
       };
 
-      const searchQuery = searchConfig?.query || topic;
-      const newResults = await performSearch(searchQuery, searchConfig);
+      // 直前のラウンドのメッセージを取得
+      const previousRoundMessages = messages.filter(m => m.round === round - 1);
 
-      if (newResults.length > 0) {
-        currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
-        // 検索結果をコールバックで通知
+      // AIにキーワードを生成させる
+      const searchKeywords = await generateSearchKeywords(
+        topic,
+        previousRoundMessages.length > 0 ? previousRoundMessages : messages,
+        'round',
+        participants[0]
+      );
+
+      // 検索キーワード情報を通知
+      yield {
+        type: 'search_keywords',
+        searchKeywords: {
+          timing: 'round',
+          round: round,
+          keywords: searchKeywords,
+          timestamp: new Date(),
+        },
+      };
+
+      // 各キーワードで検索
+      for (const keyword of searchKeywords) {
+        const newResults = await performSearch(keyword, searchConfig);
+        if (newResults.length > 0) {
+          currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
+        }
+      }
+
+      // 検索結果をコールバックで通知
+      if (currentSearchResults.length > 0) {
         request.onSearchResult?.(currentSearchResults);
       }
+
       // 検索完了を通知
       yield {
         type: 'search_results',

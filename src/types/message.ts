@@ -1,6 +1,6 @@
 import { AIProviderType } from './provider';
 import { DiscussionParticipant } from './participant';
-import { SearchResult, SearchConfig, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig } from './config';
+import { SearchResult, SearchKeywordInfo, SearchConfig, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig } from './config';
 import { FollowUpQuestion } from './followup';
 
 // 統合回答の状態
@@ -56,6 +56,7 @@ export interface DiscussionTurn {
   finalAnswer: string;
   summaryPrompt?: string; // 統合回答生成に使用したプロンプト
   searchResults?: SearchResult[];
+  searchKeywords?: SearchKeywordInfo[]; // 検索に使用したキーワード
   suggestedFollowUps?: FollowUpQuestion[]; // AI生成のフォローアップ質問候補
   createdAt: Date;
   // 分岐・フォーク用

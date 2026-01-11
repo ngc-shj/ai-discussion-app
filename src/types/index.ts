@@ -28,6 +28,7 @@ export type { TurnBranch, DiscussionSession } from './session';
 // Config types
 export type {
   SearchResult,
+  SearchKeywordInfo,
   SearchConfig,
   TechLevel,
   ResponseStyle,

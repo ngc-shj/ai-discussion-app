@@ -6,6 +6,7 @@ import {
   DiscussionParticipant,
   DiscussionSession,
   SearchResult,
+  SearchKeywordInfo,
   MessageVote,
   FollowUpQuestion,
   InterruptedDiscussionState,
@@ -59,6 +60,7 @@ export interface DiscussionState {
   currentSummaryPrompt: string;
   currentTopic: string;
   currentSearchResults: SearchResult[];
+  currentSearchKeywords: SearchKeywordInfo[];
   isLoading: boolean;
   isSearching: boolean;
   isGeneratingFollowUps: boolean;
@@ -92,6 +94,7 @@ export interface DiscussionActions {
   setCurrentFinalAnswer: React.Dispatch<React.SetStateAction<string>>;
   setCurrentTopic: React.Dispatch<React.SetStateAction<string>>;
   setCurrentSearchResults: React.Dispatch<React.SetStateAction<SearchResult[]>>;
+  setCurrentSearchKeywords: React.Dispatch<React.SetStateAction<SearchKeywordInfo[]>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setMessageVotes: React.Dispatch<React.SetStateAction<MessageVote[]>>;
   handleVote: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
@@ -216,6 +219,7 @@ interface CreateSSEHandlersParams {
   setIsLoading?: React.Dispatch<React.SetStateAction<boolean>>;
   setIsSearching?: React.Dispatch<React.SetStateAction<boolean>>;
   setCurrentSearchResults?: React.Dispatch<React.SetStateAction<SearchResult[]>>;
+  setCurrentSearchKeywords?: React.Dispatch<React.SetStateAction<SearchKeywordInfo[]>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setStreamingMessage?: React.Dispatch<React.SetStateAction<StreamingMessage | null>>;
   collectedMessagesRef: { current: DiscussionMessage[] };
@@ -242,6 +246,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     setIsLoading,
     setIsSearching,
     setCurrentSearchResults,
+    setCurrentSearchKeywords,
     setError,
     setStreamingMessage,
     collectedMessagesRef,
@@ -406,6 +411,9 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       setIsSearching?.(false);
       setCurrentSearchResults?.(searchResults);
     },
+    onSearchKeywords: (searchKeywords) => {
+      setCurrentSearchKeywords?.(prev => [...prev, searchKeywords]);
+    },
   };
 }
 
@@ -431,6 +439,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [streamingMessage, setStreamingMessage] = useState<StreamingMessage | null>(null);
   const [startMarker, setStartMarker] = useState<StartMarker | null>(null);
   const [extensionMarkers, setExtensionMarkers] = useState<ExtensionMarker[]>([]);
+  const [currentSearchKeywords, setCurrentSearchKeywords] = useState<SearchKeywordInfo[]>([]);
   // 現在の議論で使用中の設定（延長時に参照するため）
   const [currentDiscussionMode, setCurrentDiscussionMode] = useState<DiscussionMode | null>(null);
   const [currentDiscussionDepth, setCurrentDiscussionDepth] = useState<DiscussionDepth | null>(null);
@@ -458,6 +467,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setCurrentSummaryPrompt('');
     setCurrentTopic('');
     setCurrentSearchResults([]);
+    setCurrentSearchKeywords([]);
     setError(null);
     // suggestedFollowUpsはクリアしない（次のアクション用に保持する必要がある）
     // 新しい議論開始時やセッション切り替え時に個別にクリアする
@@ -532,27 +542,65 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       if (searchConfig.enabled && timing.beforeSummary) {
         setIsSearching(true);
         try {
-          const searchQuery = searchConfig.query || currentTopic;
-          const searchResponse = await fetch('/api/search', {
+          // 議論内容をAIに渡してキーワードを生成
+          const messagesForKeywords = currentMessages.map(m => ({
+            provider: m.displayName || `${m.provider}/${m.model}`,
+            content: m.content,
+          }));
+
+          const keywordsResponse = await fetch('/api/generate-search-keywords', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              query: searchQuery,
-              type: searchConfig.searchType,
-              limit: searchConfig.maxResults,
-              language: searchConfig.language || 'ja',
+              topic: currentTopic,
+              messages: messagesForKeywords,
+              timing: 'summary',
+              participant: participants[0],
             }),
             signal: abortControllerRef.current.signal,
           });
-          if (searchResponse.ok) {
-            const searchData = await searchResponse.json();
-            const newResults = searchData.results || [];
-            // 既存の検索結果と統合（重複除去）
-            const existingUrls = new Set(summarySearchResults.map(r => r.url));
-            const uniqueNewResults = newResults.filter((r: SearchResult) => !existingUrls.has(r.url));
-            summarySearchResults = [...summarySearchResults, ...uniqueNewResults];
-            setCurrentSearchResults(summarySearchResults);
+
+          let searchKeywords: string[] = [currentTopic]; // フォールバック
+          if (keywordsResponse.ok) {
+            const keywordsData = await keywordsResponse.json();
+            if (keywordsData.keywords && keywordsData.keywords.length > 0) {
+              searchKeywords = keywordsData.keywords;
+            }
           }
+
+          // 検索キーワード情報を追加
+          const keywordInfo: SearchKeywordInfo = {
+            timing: 'summary',
+            keywords: searchKeywords,
+            timestamp: new Date(),
+          };
+          setCurrentSearchKeywords(prev => [...prev, keywordInfo]);
+
+          // 生成されたキーワードで検索
+          for (const keyword of searchKeywords) {
+            const searchResponse = await fetch('/api/search', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: keyword,
+                type: searchConfig.searchType,
+                limit: Math.ceil(searchConfig.maxResults / searchKeywords.length),
+                language: searchConfig.language || 'ja',
+              }),
+              signal: abortControllerRef.current.signal,
+            });
+            if (searchResponse.ok) {
+              const searchData = await searchResponse.json();
+              const newResults = searchData.results || [];
+              // 既存の検索結果と統合（重複除去）
+              const existingUrls = new Set(summarySearchResults.map(r => r.url));
+              const uniqueNewResults = newResults.filter((r: SearchResult) => !existingUrls.has(r.url));
+              summarySearchResults = [...summarySearchResults, ...uniqueNewResults];
+            }
+          }
+          // 最大件数に制限
+          summarySearchResults = summarySearchResults.slice(0, searchConfig.maxResults * 2); // 統合前は多めに
+          setCurrentSearchResults(summarySearchResults);
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
             // 中断された場合は正常終了
@@ -655,7 +703,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             collectedSummaryPrompt || undefined,
             undefined, // フォローアップはまだない
             startMarker || undefined,
-            extensionMarkers.length > 0 ? extensionMarkers : undefined
+            extensionMarkers.length > 0 ? extensionMarkers : undefined,
+            currentSearchKeywords.length > 0 ? currentSearchKeywords : undefined
           );
           const latestSession = currentSessionRef.current;
 
@@ -826,23 +875,59 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       if (searchConfig.enabled && timing.onStart) {
         setIsSearching(true);
         try {
-          const searchQuery = searchConfig.query || topic;
-          const searchResponse = await fetch('/api/search', {
+          // AIにキーワードを生成させる
+          const keywordsResponse = await fetch('/api/generate-search-keywords', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              query: searchQuery,
-              type: searchConfig.searchType,
-              limit: searchConfig.maxResults,
-              language: searchConfig.language || 'ja',
+              topic,
+              timing: 'start',
+              participant: participants[0], // 最初の参加者のプロバイダーを使用
             }),
             signal: abortControllerRef.current.signal,
           });
-          if (searchResponse.ok) {
-            const searchData = await searchResponse.json();
-            searchResults = searchData.results || [];
-            setCurrentSearchResults(searchResults);
+
+          let searchKeywords: string[] = [topic]; // フォールバック
+          if (keywordsResponse.ok) {
+            const keywordsData = await keywordsResponse.json();
+            if (keywordsData.keywords && keywordsData.keywords.length > 0) {
+              searchKeywords = keywordsData.keywords;
+            }
           }
+
+          // 検索キーワード情報を保存
+          const keywordInfo: SearchKeywordInfo = {
+            timing: 'start',
+            keywords: searchKeywords,
+            timestamp: new Date(),
+          };
+          setCurrentSearchKeywords([keywordInfo]);
+
+          // 生成されたキーワードで検索
+          for (const keyword of searchKeywords) {
+            const searchResponse = await fetch('/api/search', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: keyword,
+                type: searchConfig.searchType,
+                limit: Math.ceil(searchConfig.maxResults / searchKeywords.length),
+                language: searchConfig.language || 'ja',
+              }),
+              signal: abortControllerRef.current.signal,
+            });
+            if (searchResponse.ok) {
+              const searchData = await searchResponse.json();
+              const newResults = searchData.results || [];
+              // 重複除去して追加
+              const existingUrls = new Set(searchResults.map(r => r.url));
+              const uniqueResults = newResults.filter((r: SearchResult) => !existingUrls.has(r.url));
+              searchResults = [...searchResults, ...uniqueResults];
+            }
+          }
+          // 最大件数に制限
+          searchResults = searchResults.slice(0, searchConfig.maxResults);
+          setCurrentSearchResults(searchResults);
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
             // 中断された場合は正常終了
@@ -946,6 +1031,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setIsLoading,
           setIsSearching,
           setCurrentSearchResults,
+          setCurrentSearchKeywords,
           setError,
           setStreamingMessage,
           collectedMessagesRef,
@@ -1011,7 +1097,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             collectedSummaryPromptRef.current || undefined,
             undefined, // suggestedFollowUps
             turnStartMarker,
-            undefined // 新規議論なのでextensionMarkersはなし
+            undefined, // 新規議論なのでextensionMarkersはなし
+            currentSearchKeywords.length > 0 ? currentSearchKeywords : undefined
           );
           const latestSession = currentSessionRef.current;
 
@@ -1194,6 +1281,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setIsLoading,
           setIsSearching,
           setCurrentSearchResults,
+          setCurrentSearchKeywords,
           setError,
           setStreamingMessage,
           collectedMessagesRef,
@@ -1258,7 +1346,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             collectedSummaryPromptRef.current || undefined,
             undefined, // suggestedFollowUps
             turnStartMarker,
-            turnExtensionMarkers
+            turnExtensionMarkers,
+            currentSearchKeywords.length > 0 ? currentSearchKeywords : undefined
           );
           const latestSession = currentSessionRef.current;
 
@@ -1512,6 +1601,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     currentSummaryPrompt,
     currentTopic,
     currentSearchResults,
+    currentSearchKeywords,
     isLoading,
     isSearching,
     isGeneratingFollowUps,
@@ -1534,6 +1624,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setCurrentFinalAnswer,
     setCurrentTopic,
     setCurrentSearchResults,
+    setCurrentSearchKeywords,
     setError,
     setMessageVotes,
     handleVote,

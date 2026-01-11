@@ -48,6 +48,7 @@ export default function Home() {
     currentSummaryPrompt,
     currentTopic,
     currentSearchResults,
+    currentSearchKeywords,
     isLoading,
     isSearching,
     isGeneratingFollowUps,
@@ -141,27 +142,10 @@ export default function Home() {
       topic: interruptedState.topic,
       messages: interruptedState.messages,
       searchResults: interruptedState.searchResults,
-      summaryState: interruptedState.summaryState,
+      // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
+      summaryState: interruptedState.summaryState === 'generating' ? 'awaiting' : interruptedState.summaryState,
     });
-
-    // 統合回答生成中だった場合は自動的に再開
-    if (interruptedState.summaryState === 'generating') {
-      // 少し遅延させて状態が安定してから再開
-      setTimeout(() => {
-        generateSummary({
-          participants: interruptedState.participants,
-          userProfile: interruptedState.userProfile || userProfile,
-          discussionMode: interruptedState.discussionMode || discussionMode,
-          discussionDepth: interruptedState.discussionDepth || discussionDepth,
-          directionGuide: interruptedState.directionGuide || directionGuide,
-          searchConfig,
-          currentSessionRef,
-          setInterruptedState,
-          updateAndSaveSession,
-        });
-      }, 100);
-    }
-  }, [isInitialLoadComplete, interruptedState, restoreFromSession, restoreDiscussionState, generateSummary, currentSessionRef, setInterruptedState, updateAndSaveSession, userProfile, discussionMode, discussionDepth, directionGuide, searchConfig]);
+  }, [isInitialLoadComplete, interruptedState, restoreFromSession, restoreDiscussionState]);
 
 
   // 新しいセッションを開始
@@ -254,25 +238,9 @@ export default function Home() {
         directionGuide: turn.directionGuide,
         terminationConfig: turn.terminationConfig,
         interruptedAt: turn.interruptedAt,
-        summaryState: turn.summaryState,
+        // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
+        summaryState: turn.summaryState === 'generating' ? 'awaiting' : turn.summaryState,
       });
-
-      // 統合回答生成中だった場合は自動的に再開
-      if (turn.summaryState === 'generating') {
-        setTimeout(() => {
-          generateSummary({
-            participants: turn.participants || session.participants,
-            userProfile: turn.userProfile || userProfile,
-            discussionMode: turn.discussionMode || discussionMode,
-            discussionDepth: turn.discussionDepth || discussionDepth,
-            directionGuide: turn.directionGuide || directionGuide,
-            searchConfig,
-            currentSessionRef,
-            setInterruptedState,
-            updateAndSaveSession,
-          });
-        }, 100);
-      }
     } else {
       // 中断状態がない場合は現在の表示をクリア
       clearCurrentTurnState();
@@ -284,7 +252,7 @@ export default function Home() {
         });
       }
     }
-  }, [restoreFromSession, restoreDiscussionState, clearCurrentTurnState, setCurrentSession, setInterruptedState, generateSummary, userProfile, discussionMode, discussionDepth, directionGuide, currentSessionRef, updateAndSaveSession]);
+  }, [restoreFromSession, restoreDiscussionState, clearCurrentTurnState, setCurrentSession, setInterruptedState]);
 
   // セッションを削除
   const handleDeleteSession = useCallback(async (id: string) => {
@@ -647,6 +615,7 @@ export default function Home() {
           isLoading={isLoading}
           summaryState={summaryState}
           searchResults={currentSearchResults}
+          searchKeywords={currentSearchKeywords}
           onFollowUp={handleFollowUp}
           onDeepDive={handleDeepDive}
           onCounterargument={handleCounterargument}

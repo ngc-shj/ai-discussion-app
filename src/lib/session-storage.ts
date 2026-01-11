@@ -1,4 +1,4 @@
-import { DiscussionSession, DiscussionTurn, SearchResult, InterruptedDiscussionState, DiscussionMessage, StartMarker, ExtensionMarker } from '@/types';
+import { DiscussionSession, DiscussionTurn, SearchResult, SearchKeywordInfo, InterruptedDiscussionState, DiscussionMessage, StartMarker, ExtensionMarker } from '@/types';
 
 const DB_NAME = 'ai-discussion-db';
 const DB_VERSION = 1;
@@ -51,6 +51,11 @@ function serializeSession(session: DiscussionSession): Record<string, unknown> {
         ...marker,
         timestamp: toISOString(marker.timestamp),
       })),
+      // 検索キーワードのtimestampをシリアライズ
+      searchKeywords: turn.searchKeywords?.map((info) => ({
+        ...info,
+        timestamp: toISOString(info.timestamp),
+      })),
     })),
     // 中断状態がある場合はシリアライズ
     interruptedTurn: session.interruptedTurn ? {
@@ -77,6 +82,7 @@ function deserializeSession(data: Record<string, unknown>): DiscussionSession {
       turns: (turnsData || []).map((turn) => {
         const startMarkerData = turn.startMarker as Record<string, unknown> | undefined;
         const extensionMarkersData = turn.extensionMarkers as Array<Record<string, unknown>> | undefined;
+        const searchKeywordsData = turn.searchKeywords as Array<Record<string, unknown>> | undefined;
 
         return {
           ...turn,
@@ -93,6 +99,11 @@ function deserializeSession(data: Record<string, unknown>): DiscussionSession {
           extensionMarkers: extensionMarkersData?.map((marker) => ({
             ...marker,
             timestamp: new Date(marker.timestamp as string),
+          })),
+          // 検索キーワードのtimestampをデシリアライズ
+          searchKeywords: searchKeywordsData?.map((info) => ({
+            ...info,
+            timestamp: new Date(info.timestamp as string),
           })),
         };
       }),
@@ -228,7 +239,8 @@ export function createNewTurn(
   summaryPrompt?: string,
   suggestedFollowUps?: DiscussionTurn['suggestedFollowUps'],
   startMarker?: StartMarker,
-  extensionMarkers?: ExtensionMarker[]
+  extensionMarkers?: ExtensionMarker[],
+  searchKeywords?: SearchKeywordInfo[]
 ): DiscussionTurn {
   return {
     id: `turn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -237,6 +249,7 @@ export function createNewTurn(
     finalAnswer,
     summaryPrompt,
     searchResults,
+    searchKeywords,
     suggestedFollowUps,
     createdAt: new Date(),
     startMarker,
