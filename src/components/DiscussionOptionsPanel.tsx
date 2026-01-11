@@ -9,6 +9,7 @@ import {
   TerminationConfig,
   TERMINATION_PRESETS,
   SearchConfig,
+  SEARCH_ENGINE_PRESETS,
 } from '@/types';
 
 interface DiscussionOptionsPanelProps {
@@ -178,6 +179,49 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
       </div>
       {searchConfig.enabled && (
         <div className="space-y-3 pl-2 border-l-2 border-green-600/30">
+          {/* 検索エンジン選択 */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-gray-400">検索エンジン</label>
+            <div className="flex flex-wrap gap-1.5">
+              {SEARCH_ENGINE_PRESETS.map((engine) => {
+                const isSelected = searchConfig.engines?.includes(engine.id) ?? (engine.id === 'google');
+                return (
+                  <button
+                    key={engine.id}
+                    type="button"
+                    onClick={() => {
+                      const currentEngines = searchConfig.engines ?? ['google'];
+                      let newEngines: string[];
+                      if (isSelected) {
+                        // 最低1つは選択されている必要がある
+                        if (currentEngines.length > 1) {
+                          newEngines = currentEngines.filter(e => e !== engine.id);
+                        } else {
+                          return; // 1つしかない場合は解除不可
+                        }
+                      } else {
+                        newEngines = [...currentEngines, engine.id];
+                      }
+                      onSearchConfigChange({
+                        ...searchConfig,
+                        engines: newEngines
+                      });
+                    }}
+                    disabled={disabled}
+                    title={engine.description}
+                    className={`px-2 py-1 text-xs rounded border transition-colors ${
+                      isSelected
+                        ? 'bg-green-600 border-green-500 text-white'
+                        : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500'
+                    } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    {engine.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* 検索タイプと結果数 */}
           <div className="flex items-center gap-2">
             <select
