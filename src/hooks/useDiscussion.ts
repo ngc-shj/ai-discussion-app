@@ -91,6 +91,7 @@ export interface DiscussionActions {
   startDiscussion: (params: StartDiscussionParams) => Promise<void>;
   resumeDiscussion: (params: ResumeDiscussionParams) => Promise<void>;
   generateSummary: (params: GenerateSummaryParams) => Promise<void>;
+  generateFollowUps: (params: GenerateFollowUpsParams) => Promise<void>;
 }
 
 export interface StartDiscussionParams {
@@ -135,6 +136,16 @@ export interface GenerateSummaryParams {
   searchConfig: SearchConfig;
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
+}
+
+export interface GenerateFollowUpsParams {
+  turnId: string;
+  topic: string;
+  finalAnswer: string;
+  participants: DiscussionParticipant[];
+  userProfile: UserProfile;
+  currentSessionRef: React.RefObject<DiscussionSession | null>;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
 }
 
@@ -391,6 +402,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [streamingMessage, setStreamingMessage] = useState<StreamingMessage | null>(null);
 
   const interruptRequestedRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleVote = useCallback((messageId: string, vote: 'agree' | 'disagree' | 'neutral') => {
     setMessageVotes((prev: MessageVote[]) => {
@@ -436,6 +448,10 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
 
   const handleInterrupt = useCallback(() => {
     interruptRequestedRef.current = true;
+    // AbortControllerがあればキャンセル
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
   }, []);
 
   // 統合回答を生成
@@ -460,6 +476,10 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       // 復元・破棄ボタンをすぐに非表示にする
       setInterruptedState(null);
 
+      // AbortControllerを初期化
+      abortControllerRef.current = new AbortController();
+      interruptRequestedRef.current = false;
+
       // beforeSummary検索
       let summarySearchResults = currentSearchResults;
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
@@ -476,6 +496,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
               limit: searchConfig.maxResults,
               language: searchConfig.language || 'ja',
             }),
+            signal: abortControllerRef.current.signal,
           });
           if (searchResponse.ok) {
             const searchData = await searchResponse.json();
@@ -487,6 +508,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             setCurrentSearchResults(summarySearchResults);
           }
         } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            // 中断された場合は正常終了
+            setIsSearching(false);
+            setSummaryState('idle');
+            return;
+          }
           console.error('beforeSummary search failed:', err);
         } finally {
           setIsSearching(false);
@@ -508,9 +535,9 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       const previousTurns = getPreviousTurns(currentSessionRef.current);
       let collectedFinalAnswer = '';
       let collectedSummaryPrompt = '';
-      let collectedFollowUps: FollowUpQuestion[] = [];
 
       try {
+        // ===== ステージ1: 統合回答の生成 =====
         const response = await fetch('/api/summarize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -526,6 +553,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             directionGuide,
             messageVotes,
           }),
+          signal: abortControllerRef.current?.signal,
         });
 
         if (!response.ok) {
@@ -536,20 +564,18 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           onProgress: () => {
             // Progress is tracked via summaryState
           },
+          onSummaryChunk: (_chunk, accumulatedContent) => {
+            // ストリーミング中のテキストをリアルタイム表示
+            setCurrentFinalAnswer(accumulatedContent);
+          },
           onSummary: (finalAnswer, summaryPrompt) => {
             collectedFinalAnswer = finalAnswer;
             collectedSummaryPrompt = summaryPrompt || '';
             setCurrentFinalAnswer(finalAnswer);
             setCurrentSummaryPrompt(summaryPrompt || '');
             // 状態遷移: 'generating' → 'idle'
-            // 統合回答の生成が完了したので、アクションボタンとフォローアップ質問を表示可能にする
+            // 統合回答の生成が完了したので、アクションボタンを表示可能にする
             setSummaryState('idle');
-            setIsGeneratingFollowUps(true);
-          },
-          onFollowups: (followups) => {
-            collectedFollowUps = followups;
-            setSuggestedFollowUps(followups);
-            setIsGeneratingFollowUps(false);
           },
           onError: (errorMsg) => {
             console.error('Summary error:', errorMsg);
@@ -557,12 +583,23 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           },
           onComplete: () => {
             setSummaryState('idle');
-            setIsGeneratingFollowUps(false);
           },
         };
 
-        await processSSEStream(response, handlers);
+        const wasInterrupted = await processSSEStream(
+          response,
+          handlers,
+          () => interruptRequestedRef.current
+        );
 
+        if (wasInterrupted) {
+          // 中断された場合は状態をリセットして終了
+          setSummaryState('idle');
+          return;
+        }
+
+        // 統合回答が生成されたらすぐにセッションに保存
+        // これにより、フォローアップ生成中に中断/リロードしても統合回答は保持される
         if (collectedFinalAnswer) {
           const newTurn = createNewTurn(
             currentTopic,
@@ -570,7 +607,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             collectedFinalAnswer,
             summarySearchResults.length > 0 ? summarySearchResults : undefined,
             collectedSummaryPrompt || undefined,
-            collectedFollowUps.length > 0 ? collectedFollowUps : undefined
+            undefined // フォローアップはまだない
           );
           const latestSession = currentSessionRef.current;
 
@@ -583,12 +620,84 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
 
           clearInterruptedState();
           setInterruptedState(null);
+        }
+
+        // ===== ステージ2: フォローアップ質問の生成 =====
+        if (collectedFinalAnswer && !interruptRequestedRef.current) {
+          setIsGeneratingFollowUps(true);
+
+          // 新しいAbortControllerを作成（統合回答のAbortControllerは使い終わっている）
+          abortControllerRef.current = new AbortController();
+
+          try {
+            const followupsResponse = await fetch('/api/followups', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                topic: currentTopic,
+                finalAnswer: collectedFinalAnswer,
+                participants,
+                userProfile,
+              }),
+              signal: abortControllerRef.current?.signal,
+            });
+
+            if (followupsResponse.ok) {
+              const followupsHandlers: SSEEventHandlers = {
+                onFollowups: (followups) => {
+                  setSuggestedFollowUps(followups);
+                  // フォローアップ質問をターンに保存
+                  const latestSession = currentSessionRef.current;
+                  if (latestSession && latestSession.turns.length > 0) {
+                    const updatedTurns = [...latestSession.turns];
+                    const lastTurnIndex = updatedTurns.length - 1;
+                    updatedTurns[lastTurnIndex] = {
+                      ...updatedTurns[lastTurnIndex],
+                      suggestedFollowUps: followups,
+                    };
+                    updateAndSaveSession({ turns: updatedTurns }, { async: true });
+                  }
+                },
+                onError: (errorMsg) => {
+                  console.error('Follow-up generation error:', errorMsg);
+                  // フォローアップ生成のエラーは致命的ではないのでログのみ
+                },
+                onComplete: () => {
+                  setIsGeneratingFollowUps(false);
+                },
+              };
+
+              await processSSEStream(
+                followupsResponse,
+                followupsHandlers,
+                () => interruptRequestedRef.current
+              );
+            }
+          } catch (followupErr) {
+            if (followupErr instanceof Error && followupErr.name === 'AbortError') {
+              // フォローアップ生成の中断は正常（統合回答は既に保存済み）
+            } else {
+              console.error('Follow-up generation failed:', followupErr);
+            }
+          } finally {
+            setIsGeneratingFollowUps(false);
+          }
+        }
+
+        // 完了後の状態クリア
+        if (collectedFinalAnswer) {
           clearCurrentTurnState();
           setMessageVotes([]);
         }
       } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          // 中断された場合は正常終了
+          return;
+        }
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
+        // AbortControllerをクリア
+        abortControllerRef.current = null;
         // エラー時のフォールバック: summaryStateを確実にidleに戻す
         // 成功時はonSummaryで既にidleに設定されているので二重設定になるが問題ない
         setSummaryState('idle');
@@ -639,6 +748,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       setDiscussionParticipants(participants);
       setCompletedParticipants(new Set());
       interruptRequestedRef.current = false;
+      // AbortControllerを初期化
+      abortControllerRef.current = new AbortController();
       setProgress({
         currentRound: 1,
         totalRounds: terminationConfig.maxRounds,
@@ -663,6 +774,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
               limit: searchConfig.maxResults,
               language: searchConfig.language || 'ja',
             }),
+            signal: abortControllerRef.current.signal,
           });
           if (searchResponse.ok) {
             const searchData = await searchResponse.json();
@@ -670,6 +782,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             setCurrentSearchResults(searchResults);
           }
         } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            // 中断された場合は正常終了
+            setIsSearching(false);
+            setIsLoading(false);
+            return;
+          }
           console.error('Search failed:', err);
         } finally {
           setIsSearching(false);
@@ -732,6 +850,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             messageVotes,
             skipSummary: true,
           }),
+          signal: abortControllerRef.current?.signal,
         });
 
         if (!response.ok) {
@@ -814,8 +933,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setSuggestedFollowUps([]);
         }
       } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          // 中断された場合は正常終了
+          return;
+        }
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
+        // AbortControllerをクリア
+        abortControllerRef.current = null;
         setIsLoading(false);
       }
     },
@@ -869,6 +994,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       setIsLoading(true);
       setError(null);
       interruptRequestedRef.current = false;
+      // AbortControllerを初期化
+      abortControllerRef.current = new AbortController();
       setCompletedParticipants(new Set());
       setProgress({
         currentRound: interruptedState.currentRound,
@@ -928,6 +1055,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             },
             skipSummary: true,
           }),
+          signal: abortControllerRef.current?.signal,
         });
 
         if (!response.ok) {
@@ -1009,12 +1137,97 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setSuggestedFollowUps([]);
         }
       } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          // 中断された場合は正常終了
+          return;
+        }
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
+        // AbortControllerをクリア
+        abortControllerRef.current = null;
         setIsLoading(false);
       }
     },
     [messageVotes, clearCurrentTurnState]
+  );
+
+  // 特定のターンに対してフォローアップ質問を生成
+  const generateFollowUps = useCallback(
+    async (params: GenerateFollowUpsParams) => {
+      const {
+        turnId,
+        topic,
+        finalAnswer,
+        participants,
+        userProfile,
+        currentSessionRef,
+        updateAndSaveSession,
+      } = params;
+
+      setIsGeneratingFollowUps(true);
+      setError(null);
+
+      // AbortControllerを初期化
+      abortControllerRef.current = new AbortController();
+      interruptRequestedRef.current = false;
+
+      try {
+        const followupsResponse = await fetch('/api/followups', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic,
+            finalAnswer,
+            participants,
+            userProfile,
+          }),
+          signal: abortControllerRef.current.signal,
+        });
+
+        if (!followupsResponse.ok) {
+          throw new Error('Failed to generate follow-up questions');
+        }
+
+        const followupsHandlers: SSEEventHandlers = {
+          onFollowups: (followups) => {
+            setSuggestedFollowUps(followups);
+            // フォローアップ質問をターンに保存
+            const latestSession = currentSessionRef.current;
+            if (latestSession) {
+              const updatedTurns = latestSession.turns.map((turn) =>
+                turn.id === turnId
+                  ? { ...turn, suggestedFollowUps: followups }
+                  : turn
+              );
+              updateAndSaveSession({ turns: updatedTurns }, { async: true });
+            }
+          },
+          onError: (errorMsg) => {
+            console.error('Follow-up generation error:', errorMsg);
+            setError(errorMsg);
+          },
+          onComplete: () => {
+            setIsGeneratingFollowUps(false);
+          },
+        };
+
+        await processSSEStream(
+          followupsResponse,
+          followupsHandlers,
+          () => interruptRequestedRef.current
+        );
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          // 中断された場合は正常終了
+          return;
+        }
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        abortControllerRef.current = null;
+        setIsGeneratingFollowUps(false);
+      }
+    },
+    []
   );
 
   // 処理中フラグ（議論実行中、検索中、統合回答生成中、フォローアップ生成中）
@@ -1051,5 +1264,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     startDiscussion,
     resumeDiscussion,
     generateSummary,
+    generateFollowUps,
   };
 }

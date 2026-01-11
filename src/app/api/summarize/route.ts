@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult, ROLE_PRESETS, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, MessageVote } from '@/types';
-import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from '@/lib/ai-providers';
+import { createProvider, createDiscussionPrompt } from '@/lib/ai-providers';
 
 interface SummarizeRequest {
   topic: string;
@@ -95,17 +95,57 @@ export async function POST(request: NextRequest) {
               directionGuide,
               messageVotes
             );
-            const summaryResponse = await summaryProvider.generate({ prompt: summaryPrompt });
 
-            if (!summaryResponse.error && summaryResponse.content) {
-              summaryContent = summaryResponse.content;
-              usedSummaryPrompt = summaryPrompt;
-              break;
+            // ストリーミング対応のプロバイダーはストリーミングで生成
+            let accumulatedContent = '';
+            if (summaryProvider.generateStream) {
+              try {
+                const summaryResponse = await summaryProvider.generateStream(
+                  { prompt: summaryPrompt },
+                  (chunk: string) => {
+                    accumulatedContent += chunk;
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                      type: 'summary_chunk',
+                      chunk,
+                      accumulatedContent,
+                    })}\n\n`));
+                  }
+                );
+
+                if (!summaryResponse.error && summaryResponse.content) {
+                  summaryContent = summaryResponse.content;
+                  usedSummaryPrompt = summaryPrompt;
+                  break;
+                } else {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                    type: 'error',
+                    error: `Summary generation failed with ${participant.displayName}: ${summaryResponse.error}`,
+                  })}\n\n`));
+                }
+              } catch (streamError) {
+                console.error('Streaming error:', streamError);
+                // ストリーミングに失敗した場合は通常の生成にフォールバック
+                const summaryResponse = await summaryProvider.generate({ prompt: summaryPrompt });
+                if (!summaryResponse.error && summaryResponse.content) {
+                  summaryContent = summaryResponse.content;
+                  usedSummaryPrompt = summaryPrompt;
+                  break;
+                }
+              }
             } else {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                type: 'error',
-                error: `Summary generation failed with ${participant.displayName}: ${summaryResponse.error}`,
-              })}\n\n`));
+              // ストリーミング非対応の場合は従来の方法で生成
+              const summaryResponse = await summaryProvider.generate({ prompt: summaryPrompt });
+
+              if (!summaryResponse.error && summaryResponse.content) {
+                summaryContent = summaryResponse.content;
+                usedSummaryPrompt = summaryPrompt;
+                break;
+              } else {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                  type: 'error',
+                  error: `Summary generation failed with ${participant.displayName}: ${summaryResponse.error}`,
+                })}\n\n`));
+              }
             }
           }
 
@@ -115,28 +155,6 @@ export async function POST(request: NextRequest) {
               finalAnswer: summaryContent,
               summaryPrompt: usedSummaryPrompt,
             })}\n\n`));
-
-            // フォローアップ質問を生成
-            try {
-              const followUpProvider = successfulParticipants[0];
-              if (followUpProvider) {
-                const provider = createProvider(followUpProvider.provider, followUpProvider.model);
-                const followUpPromptText = createFollowUpPrompt(topic, summaryContent, userProfile);
-                const followUpResponse = await provider.generate({ prompt: followUpPromptText });
-
-                if (!followUpResponse.error && followUpResponse.content) {
-                  const followUpQuestions = parseFollowUpResponse(followUpResponse.content);
-                  if (followUpQuestions.length > 0) {
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
-                      type: 'followups',
-                      suggestedFollowUps: followUpQuestions,
-                    })}\n\n`));
-                  }
-                }
-              }
-            } catch (error) {
-              console.error('Failed to generate follow-up questions:', error);
-            }
           } else {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({
               type: 'error',

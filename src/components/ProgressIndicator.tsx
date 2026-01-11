@@ -179,8 +179,8 @@ export function ProgressIndicator({
             currentProviderIndex={currentProviderIndex}
             totalProviders={totalProviders}
           />
-          {/* 中断ボタン */}
-          {onInterrupt && !isSummarizing && !isSearching && (
+          {/* 中断ボタン（全ての処理で中断可能） */}
+          {onInterrupt && (
             <InterruptButton
               isInterrupting={isInterrupting}
               onInterrupt={handleInterrupt}
