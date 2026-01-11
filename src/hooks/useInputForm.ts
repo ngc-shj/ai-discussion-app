@@ -88,6 +88,8 @@ export function useInputForm({
 
   // Enterキーでキーワード追加
   const handleKeywordKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // IME入力中（日本語変換中など）はスキップ
+    if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddKeyword();
@@ -116,6 +118,8 @@ export function useInputForm({
 
   // Enterキーで終了キーワード追加
   const handleTermKeywordKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // IME入力中（日本語変換中など）はスキップ
+    if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddTermKeyword();

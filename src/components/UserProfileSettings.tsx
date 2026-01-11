@@ -146,7 +146,7 @@ export function UserProfileSettings({ profile, onProfileChange, disabled }: User
                 type="text"
                 value={newInterest}
                 onChange={(e) => setNewInterest(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addInterest())}
+                onKeyDown={(e) => !e.nativeEvent.isComposing && e.key === 'Enter' && (e.preventDefault(), addInterest())}
                 placeholder="例: AI、Web開発、セキュリティ"
                 disabled={disabled}
                 className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
