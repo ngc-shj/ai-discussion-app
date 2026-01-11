@@ -65,6 +65,7 @@ export default function Home() {
     startDiscussion,
     resumeDiscussion,
     generateSummary,
+    generateFollowUps,
     streamingMessage,
   } = useDiscussion();
 
@@ -395,6 +396,19 @@ export default function Home() {
     });
   }, [participants, userProfile, discussionMode, discussionDepth, directionGuide, searchConfig, currentSessionRef, setInterruptedState, updateAndSaveSession, generateSummary]);
 
+  // フォローアップ質問を生成
+  const handleGenerateFollowUps = useCallback(async (turnId: string, topic: string, finalAnswer: string) => {
+    await generateFollowUps({
+      turnId,
+      topic,
+      finalAnswer,
+      participants,
+      userProfile,
+      currentSessionRef,
+      updateAndSaveSession,
+    });
+  }, [participants, userProfile, currentSessionRef, updateAndSaveSession, generateFollowUps]);
+
   // 中断した議論を再開
   const handleResumeDiscussion = useCallback(async () => {
     if (!interruptedState) return;
@@ -609,6 +623,7 @@ export default function Home() {
           onDeepDive={handleDeepDive}
           onCounterargument={handleCounterargument}
           onFork={handleFork}
+          onGenerateFollowUps={handleGenerateFollowUps}
           messageVotes={messageVotes}
           onVote={handleVote}
           suggestedFollowUps={suggestedFollowUps}

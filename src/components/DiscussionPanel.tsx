@@ -19,6 +19,7 @@ interface DiscussionPanelProps {
   onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
   onCounterargument?: (topic: string, previousAnswer: string) => void;
   onFork?: (turnId: string, topic: string, previousAnswer: string, label: string, perspective: string) => void;
+  onGenerateFollowUps?: (turnId: string, topic: string, finalAnswer: string) => void;
   messageVotes?: MessageVote[];
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   suggestedFollowUps?: FollowUpQuestion[];
@@ -41,6 +42,7 @@ export function DiscussionPanel({
   onDeepDive,
   onCounterargument,
   onFork,
+  onGenerateFollowUps,
   messageVotes,
   onVote,
   suggestedFollowUps,
@@ -81,7 +83,9 @@ export function DiscussionPanel({
           onDeepDive={onDeepDive}
           onCounterargument={onCounterargument}
           onFork={onFork}
+          onGenerateFollowUps={onGenerateFollowUps}
           disabled={isLoading}
+          isGeneratingFollowUps={isGeneratingFollowUps}
           messageVotes={messageVotes}
           onVote={onVote}
         />

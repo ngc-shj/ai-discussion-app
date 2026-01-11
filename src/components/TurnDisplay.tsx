@@ -19,7 +19,9 @@ interface TurnDisplayProps {
   onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
   onCounterargument?: (topic: string, previousAnswer: string) => void;
   onFork?: (turnId: string, topic: string, previousAnswer: string, label: string, perspective: string) => void;
+  onGenerateFollowUps?: (turnId: string, topic: string, finalAnswer: string) => void;
   disabled?: boolean;
+  isGeneratingFollowUps?: boolean;
   messageVotes?: MessageVote[];
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
 }
@@ -32,7 +34,9 @@ export function TurnDisplay({
   onDeepDive,
   onCounterargument,
   onFork,
+  onGenerateFollowUps,
   disabled,
+  isGeneratingFollowUps,
   messageVotes,
   onVote,
 }: TurnDisplayProps) {
@@ -272,12 +276,41 @@ export function TurnDisplay({
               />
             )}
             {/* フォローアップ質問候補 */}
-            {turn.suggestedFollowUps && turn.suggestedFollowUps.length > 0 && onFollowUp && (
+            {turn.suggestedFollowUps && turn.suggestedFollowUps.length > 0 && onFollowUp ? (
               <FollowUpSuggestions
                 questions={turn.suggestedFollowUps}
                 onSelect={(question) => onFollowUp(question, turn.finalAnswer)}
                 disabled={disabled}
               />
+            ) : onGenerateFollowUps && onFollowUp && (
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onGenerateFollowUps(turn.id, turn.topic, turn.finalAnswer)}
+                  disabled={disabled || isGeneratingFollowUps}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs md:text-sm text-gray-300 hover:text-white bg-gray-700/50 hover:bg-gray-600/50 border border-gray-600/50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="フォローアップ質問を生成"
+                >
+                  {isGeneratingFollowUps ? (
+                    <>
+                      <div className="animate-spin w-3.5 h-3.5 border-2 border-gray-500 border-t-blue-400 rounded-full" />
+                      <span>生成中...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>フォローアップを生成</span>
+                    </>
+                  )}
+                </button>
+                {!isGeneratingFollowUps && (
+                  <span className="text-xs text-gray-500">
+                    この議論に関する追加の質問を生成します
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </div>

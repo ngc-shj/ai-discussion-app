@@ -43,6 +43,12 @@ export interface SSEMessageChunkEvent {
   round: number;
 }
 
+export interface SSESummaryChunkEvent {
+  type: 'summary_chunk';
+  chunk: string;
+  accumulatedContent: string;
+}
+
 export interface SSESummaryEvent {
   type: 'summary';
   finalAnswer: string;
@@ -81,6 +87,7 @@ export type SSEEvent =
   | SSEProgressEvent
   | SSEMessageEvent
   | SSEMessageChunkEvent
+  | SSESummaryChunkEvent
   | SSESummaryEvent
   | SSEFollowupsEvent
   | SSEErrorEvent
@@ -94,6 +101,7 @@ export interface SSEEventHandlers {
   onProgress?: (progress: SSEProgressEvent['progress']) => void;
   onMessage?: (message: DiscussionMessage) => void;
   onMessageChunk?: (messageId: string, chunk: string, accumulatedContent: string, provider: string, model: string | undefined, round: number) => void;
+  onSummaryChunk?: (chunk: string, accumulatedContent: string) => void;
   onSummary?: (finalAnswer: string, summaryPrompt?: string) => void;
   onFollowups?: (followups: FollowUpQuestion[]) => void;
   onError?: (error: string) => void;
@@ -122,6 +130,9 @@ export function parseSSELine(line: string, handlers: SSEEventHandlers): void {
         break;
       case 'message_chunk':
         handlers.onMessageChunk?.(event.messageId, event.chunk, event.accumulatedContent, event.provider, event.model, event.round);
+        break;
+      case 'summary_chunk':
+        handlers.onSummaryChunk?.(event.chunk, event.accumulatedContent);
         break;
       case 'summary':
         handlers.onSummary?.(event.finalAnswer, event.summaryPrompt);
