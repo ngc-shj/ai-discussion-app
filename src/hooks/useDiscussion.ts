@@ -901,6 +901,27 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         currentParticipant: participants[0],
       });
 
+      // 既存のセッションを取得、または新規作成
+      // セッション作成を検索前に移動（検索中の中断でも状態保存できるように）
+      let sessionAtStart = currentSessionRef.current;
+      const previousTurns = getPreviousTurns(sessionAtStart);
+
+      if (prevTopic && prevFinalAnswer) {
+        previousTurns.push({ topic: prevTopic, finalAnswer: prevFinalAnswer });
+      }
+
+      if (!sessionAtStart) {
+        const newSession = createNewSession(
+          topic.slice(0, 50) + (topic.length > 50 ? '...' : ''),
+          participants,
+          terminationConfig.maxRounds
+        );
+        await saveSession(newSession);
+        setCurrentSession(newSession);
+        setSessions((prev) => [newSession, ...prev]);
+        sessionAtStart = newSession;
+      }
+
       // 検索（開始時）
       let searchResults: SearchResult[] = [];
       let collectedSearchKeywords: SearchKeywordInfo[] = [];
@@ -951,6 +972,11 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 engines: searchConfig.engines,
                 fetchFullContent: searchConfig.fetchFullContent,
                 fullContentLimit: searchConfig.fullContentMaxResults,
+                // 関連性フィルタリング用パラメータ
+                topic,
+                relevanceFilter: searchConfig.relevanceFilter,
+                defaultAIProvider: participants[0]?.provider,
+                defaultAIModel: participants[0]?.model,
               }),
               signal: abortControllerRef.current.signal,
             });
@@ -977,25 +1003,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         } finally {
           setIsSearching(false);
         }
-      }
-
-      let sessionAtStart = currentSessionRef.current;
-      const previousTurns = getPreviousTurns(sessionAtStart);
-
-      if (prevTopic && prevFinalAnswer) {
-        previousTurns.push({ topic: prevTopic, finalAnswer: prevFinalAnswer });
-      }
-
-      if (!sessionAtStart) {
-        const newSession = createNewSession(
-          topic.slice(0, 50) + (topic.length > 50 ? '...' : ''),
-          participants,
-          terminationConfig.maxRounds
-        );
-        await saveSession(newSession);
-        setCurrentSession(newSession);
-        setSessions((prev) => [newSession, ...prev]);
-        sessionAtStart = newSession;
       }
 
       // 収集用のref
@@ -1248,6 +1255,107 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         setCurrentTerminationConfig(interruptedState.terminationConfig);
       }
 
+      // 検索が有効で、まだ検索が完了していない場合は検索を実行
+      // （検索中に中断された場合の対応）
+      let searchResults = interruptedState.searchResults || [];
+      let collectedSearchKeywords = interruptedState.searchKeywords || [];
+      const searchConfig = interruptedState.searchConfig;
+      const timing = searchConfig?.timing || { onStart: true, beforeSummary: false, onDemand: false };
+
+      // 検索が必要かどうかを判定:
+      // - 検索が有効で開始時検索が設定されている
+      // - まだメッセージがない（議論が始まっていない）
+      // - キーワードがない、または検索結果がない
+      const needsSearch = searchConfig?.enabled &&
+        timing.onStart &&
+        interruptedState.messages.length === 0 &&
+        (collectedSearchKeywords.length === 0 || searchResults.length === 0);
+
+      if (needsSearch) {
+        setIsSearching(true);
+        try {
+          // キーワードがまだない場合のみ生成
+          let searchKeywordsList: string[] = [];
+          if (collectedSearchKeywords.length > 0 && collectedSearchKeywords[0].keywords.length > 0) {
+            // 既存のキーワードを使用
+            searchKeywordsList = collectedSearchKeywords[0].keywords;
+            setCurrentSearchKeywords(collectedSearchKeywords);
+          } else {
+            // AIにキーワードを生成させる
+            const keywordsResponse = await fetch('/api/generate-search-keywords', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                topic: interruptedState.topic,
+                timing: 'start',
+                participant: interruptedState.participants[0],
+              }),
+              signal: abortControllerRef.current.signal,
+            });
+
+            searchKeywordsList = [interruptedState.topic]; // フォールバック
+            if (keywordsResponse.ok) {
+              const keywordsData = await keywordsResponse.json();
+              if (keywordsData.keywords && keywordsData.keywords.length > 0) {
+                searchKeywordsList = keywordsData.keywords;
+              }
+            }
+
+            // 検索キーワード情報を保存
+            const keywordInfo: SearchKeywordInfo = {
+              timing: 'start',
+              keywords: searchKeywordsList,
+              timestamp: new Date(),
+            };
+            collectedSearchKeywords = [keywordInfo];
+            setCurrentSearchKeywords([keywordInfo]);
+          }
+
+          // 検索結果がまだない場合のみ検索を実行
+          if (searchResults.length === 0) {
+            for (const keyword of searchKeywordsList) {
+              const searchResponse = await fetch('/api/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  query: keyword,
+                  type: searchConfig.searchType,
+                  limit: Math.ceil(searchConfig.maxResults / searchKeywordsList.length),
+                  language: searchConfig.language || 'ja',
+                  provider: searchConfig.provider,
+                  engines: searchConfig.engines,
+                  fetchFullContent: searchConfig.fetchFullContent,
+                  fullContentLimit: searchConfig.fullContentMaxResults,
+                  topic: interruptedState.topic,
+                  relevanceFilter: searchConfig.relevanceFilter,
+                  defaultAIProvider: interruptedState.participants[0]?.provider,
+                  defaultAIModel: interruptedState.participants[0]?.model,
+                }),
+                signal: abortControllerRef.current.signal,
+              });
+              if (searchResponse.ok) {
+                const searchData = await searchResponse.json();
+                const newResults = searchData.results || [];
+                const existingUrls = new Set(searchResults.map(r => r.url));
+                const uniqueResults = newResults.filter((r: SearchResult) => !existingUrls.has(r.url));
+                searchResults = [...searchResults, ...uniqueResults];
+              }
+            }
+            searchResults = searchResults.slice(0, searchConfig.maxResults);
+            setCurrentSearchResults(searchResults);
+          }
+        } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            setIsSearching(false);
+            setIsLoading(false);
+            return;
+          }
+          console.error('Search failed:', err);
+        } finally {
+          setIsSearching(false);
+        }
+      }
+
       const previousTurns = getPreviousTurns(session || currentSessionRef.current);
       const resumeSession = currentSessionRef.current;
 
@@ -1255,7 +1363,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       const collectedMessagesRef = { current: [...interruptedState.messages] };
       const collectedFinalAnswerRef = { current: '' };
       const collectedSummaryPromptRef = { current: '' };
-      const collectedSearchKeywordsRef = { current: interruptedState.searchKeywords || [] };
+      const collectedSearchKeywordsRef = { current: collectedSearchKeywords };
       const currentProgressStateRef = {
         current: {
           currentRound: interruptedState.currentRound,
@@ -1267,8 +1375,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         topic: interruptedState.topic,
         participants: interruptedState.participants,
         totalRounds: interruptedState.totalRounds,
-        searchResults: interruptedState.searchResults,
-        searchKeywords: interruptedState.searchKeywords,
+        searchResults: searchResults.length > 0 ? searchResults : undefined,
+        searchKeywords: collectedSearchKeywords.length > 0 ? collectedSearchKeywords : undefined,
         userProfile: interruptedState.userProfile,
         discussionMode: interruptedState.discussionMode,
         discussionDepth: interruptedState.discussionDepth,
@@ -1287,7 +1395,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             participants: interruptedState.participants,
             rounds: interruptedState.totalRounds,
             previousTurns,
-            searchResults: interruptedState.searchResults,
+            searchResults: searchResults.length > 0 ? searchResults : undefined,
             searchConfig: interruptedState.searchConfig,
             userProfile: interruptedState.userProfile,
             discussionMode: interruptedState.discussionMode,

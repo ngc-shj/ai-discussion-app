@@ -6,6 +6,13 @@ export interface SearchResult {
   engine?: string;
   publishedDate?: string;
   fullContent?: string;  // Jina Readerで取得した詳細コンテンツ
+  // 関連性フィルタリング結果
+  relevance?: {
+    score: number;       // 関連性スコア（0-1）
+    reason?: string;     // 判定理由
+    isExtracted?: boolean; // コンテンツが抽出されたか
+  };
+  filtered?: boolean;    // 関連性フィルタで除外されたか（表示用）
 }
 
 // 検索キーワード情報
@@ -27,6 +34,14 @@ export interface SearchTiming {
 // 検索プロバイダーの種類
 export type SearchProviderType = 'searxng' | 'tavily' | 'duckduckgo' | 'brave' | 'serper';
 
+// 関連性フィルタリング設定
+export interface RelevanceFilterConfig {
+  enabled: boolean;       // フィルタリングを有効にするか
+  threshold?: number;     // 関連性スコアの閾値（0-1、デフォルト0.5）
+  aiProvider?: string;    // AIプロバイダー（claude, openai等）
+  aiModel?: string;       // 使用するモデル
+}
+
 // 検索設定
 export interface SearchConfig {
   enabled: boolean;
@@ -39,6 +54,7 @@ export interface SearchConfig {
   timing: SearchTiming; // 検索タイミング
   fetchFullContent?: boolean; // 詳細コンテンツを取得するか
   fullContentMaxResults?: number; // 詳細取得する最大数（デフォルト3）
+  relevanceFilter?: RelevanceFilterConfig; // 関連性フィルタリング設定
 }
 
 // 検索エンジンのプリセット

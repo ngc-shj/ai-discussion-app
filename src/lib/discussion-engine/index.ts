@@ -3,7 +3,7 @@ import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFoll
 import { createSearchKeywordPrompt, SearchKeywordTiming } from '../ai-providers/prompt-formatters';
 import { DiscussionProgress, DiscussionRequest, getProviderDisplayName } from './types';
 import { checkConsensus, checkTerminationKeywords } from './termination';
-import { performSearch, mergeSearchResults } from '../search';
+import { performSearch, mergeSearchResults, DefaultAIConfig } from '../search';
 import { logger } from '@/lib/logger';
 
 const log = logger.discussion;
@@ -191,9 +191,14 @@ export async function* runDiscussion(
         },
       };
 
-      // 各キーワードで検索
+      // 各キーワードで検索（topicを渡して関連性フィルタリングを有効化）
+      // 関連性フィルタリング用のデフォルトAI設定（最初の参加者のプロバイダー/モデルを使用）
+      const defaultAI: DefaultAIConfig = {
+        provider: participants[0].provider,
+        model: participants[0].model,
+      };
       for (const keyword of searchKeywords) {
-        const { results: newResults } = await performSearch(keyword, searchConfig);
+        const { results: newResults } = await performSearch(keyword, searchConfig, topic, defaultAI);
         if (newResults.length > 0) {
           currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
         }
@@ -319,9 +324,14 @@ export async function* runDiscussion(
             searchResults: currentSearchResults,
           };
 
-          // 各クエリで検索を実行
+          // 各クエリで検索を実行（topicを渡して関連性フィルタリングを有効化）
+          // 関連性フィルタリング用のデフォルトAI設定（最初の参加者のプロバイダー/モデルを使用）
+          const onDemandDefaultAI: DefaultAIConfig = {
+            provider: participants[0].provider,
+            model: participants[0].model,
+          };
           for (const query of searchQueries) {
-            const { results: newResults } = await performSearch(query, searchConfig);
+            const { results: newResults } = await performSearch(query, searchConfig, topic, onDemandDefaultAI);
             if (newResults.length > 0) {
               currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
             }

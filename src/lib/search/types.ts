@@ -28,7 +28,8 @@ export type SearchWarningType =
   | 'no_results'    // 検索結果が0件
   | 'rate_limited'  // レートリミット (HTTP 429)
   | 'timeout'       // タイムアウト
-  | 'api_error';    // その他のAPIエラー
+  | 'api_error'     // その他のAPIエラー
+  | 'low_relevance'; // 関連性が低い結果がフィルタされた
 
 // 警告の詳細情報
 export interface SearchWarning {

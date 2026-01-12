@@ -53,6 +53,22 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
   const currentSessionRef = useRef<DiscussionSession | null>(null);
   currentSessionRef.current = currentSession;
 
+  // setCurrentSessionをラップして、refも同時に更新する
+  const setCurrentSessionWithRef = useCallback((
+    value: DiscussionSession | null | ((prev: DiscussionSession | null) => DiscussionSession | null)
+  ) => {
+    if (typeof value === 'function') {
+      setCurrentSession((prev) => {
+        const newValue = value(prev);
+        currentSessionRef.current = newValue;
+        return newValue;
+      });
+    } else {
+      currentSessionRef.current = value;
+      setCurrentSession(value);
+    }
+  }, []);
+
   // セッション一覧を読み込み
   const loadSessions = useCallback(async () => {
     try {
@@ -97,6 +113,8 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
           currentParticipantIndex: turn.currentParticipantIndex,
           totalRounds: turn.totalRounds,
           searchResults: turn.searchResults,
+          searchKeywords: turn.searchKeywords,
+          searchConfig: turn.searchConfig,
           userProfile: turn.userProfile,
           discussionMode: turn.discussionMode,
           discussionDepth: turn.discussionDepth,
@@ -133,6 +151,8 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
         currentParticipantIndex: turn.currentParticipantIndex,
         totalRounds: turn.totalRounds,
         searchResults: turn.searchResults,
+        searchKeywords: turn.searchKeywords,
+        searchConfig: turn.searchConfig,
         userProfile: turn.userProfile,
         discussionMode: turn.discussionMode,
         discussionDepth: turn.discussionDepth,
@@ -263,7 +283,7 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
     isInitialLoadComplete,
     // Low-level setters
     setSessions,
-    setCurrentSession,
+    setCurrentSession: setCurrentSessionWithRef,
     setInterruptedState,
     // High-level actions
     loadSessions,
