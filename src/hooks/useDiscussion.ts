@@ -930,6 +930,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       // 検索（開始時）
       let searchResults: SearchResult[] = [];
       let collectedSearchKeywords: SearchKeywordInfo[] = [];
+      let lastCompletedKeywordIndex = -1; // 完了した検索キーワードのインデックス（中断時の再開用）
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
       if (searchConfig.enabled && timing.onStart) {
         setIsSearching(true);
@@ -984,6 +985,9 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
 
           // 警告を収集
           const collectedWarnings: SearchWarning[] = [];
+
+          // 完了したキーワードのインデックスを追跡（中断時の再開用）
+          let lastCompletedKeywordIndex = -1;
 
           // 生成されたキーワードで検索（逐次表示）
           for (let i = 0; i < searchKeywords.length; i++) {
@@ -1040,6 +1044,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             }
 
             // 進捗を更新（完了したキーワードを追加、警告も含む）
+            lastCompletedKeywordIndex = i;
             setSearchProgress((prev) => prev ? {
               ...prev,
               completedKeywords: [...prev.completedKeywords, keyword],
@@ -1057,7 +1062,41 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           });
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
-            // 中断された場合は正常終了
+            // 中断された場合：検索進捗を保存してセッションに記録
+            const latestSession = currentSessionRef.current || sessionAtStart;
+            if (latestSession && collectedSearchKeywords.length > 0) {
+              const interruptedTurn: InterruptedTurnState = {
+                topic,
+                participants,
+                messages: [],
+                currentRound: 1,
+                currentParticipantIndex: 0,
+                totalRounds: terminationConfig.maxRounds,
+                searchResults: searchResults.length > 0 ? searchResults : undefined,
+                searchKeywords: collectedSearchKeywords,
+                completedSearchKeywordIndex: lastCompletedKeywordIndex,
+                searchConfig,
+                userProfile,
+                discussionMode,
+                discussionDepth,
+                directionGuide,
+                terminationConfig,
+                interruptedAt: new Date(),
+                summaryState: 'idle',
+              };
+              const updatedSession: DiscussionSession = {
+                ...latestSession,
+                interruptedTurn,
+                updatedAt: new Date(),
+              };
+              saveSession(updatedSession).catch((err) =>
+                console.error('Failed to save interrupted search state:', err)
+              );
+              setCurrentSession(updatedSession);
+              setSessions((prev) =>
+                prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+              );
+            }
             setIsSearching(false);
             setSearchProgress(null);
             setIsLoading(false);
@@ -1330,11 +1369,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       // 検索が必要かどうかを判定:
       // - 検索が有効で開始時検索が設定されている
       // - まだメッセージがない（議論が始まっていない）
-      // - キーワードがない、または検索結果がない
+      // - キーワードがない、または検索が完了していない（途中で中断された）
+      const completedKeywordIndex = interruptedState.completedSearchKeywordIndex ?? -1;
+      const hasMoreKeywordsToSearch = collectedSearchKeywords.length > 0 &&
+        collectedSearchKeywords[0].keywords.length > completedKeywordIndex + 1;
       const needsSearch = searchConfig?.enabled &&
         timing.onStart &&
         interruptedState.messages.length === 0 &&
-        (collectedSearchKeywords.length === 0 || searchResults.length === 0);
+        (collectedSearchKeywords.length === 0 || hasMoreKeywordsToSearch);
 
       if (needsSearch) {
         setIsSearching(true);
@@ -1385,22 +1427,26 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             setCurrentSearchKeywords([keywordInfo]);
           }
 
+          // 途中から再開する場合の開始インデックス
+          const startIndex = completedKeywordIndex + 1;
+          const completedKeywordsList = searchKeywordsList.slice(0, startIndex);
+
           // 進捗を更新（検索フェーズへ）
           setSearchProgress({
             phase: 'searching',
-            currentKeywordIndex: 0,
+            currentKeywordIndex: startIndex,
             totalKeywords: searchKeywordsList.length,
-            currentKeyword: searchKeywordsList[0],
-            completedKeywords: [],
+            currentKeyword: searchKeywordsList[startIndex],
+            completedKeywords: completedKeywordsList,
             warnings: [],
           });
 
           // 警告を収集
           const collectedWarnings: SearchWarning[] = [];
 
-          // 検索結果がまだない場合のみ検索を実行
-          if (searchResults.length === 0) {
-            for (let i = 0; i < searchKeywordsList.length; i++) {
+          // 未完了のキーワードから検索を実行
+          if (startIndex < searchKeywordsList.length) {
+            for (let i = startIndex; i < searchKeywordsList.length; i++) {
               const keyword = searchKeywordsList[i];
 
               // 進捗を更新

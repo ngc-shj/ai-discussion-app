@@ -77,6 +77,7 @@ export interface InterruptedTurnState {
   totalRounds: number;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[]; // 検索キーワード
+  completedSearchKeywordIndex?: number; // 完了した検索キーワードのインデックス（再開時に続きから検索）
   searchConfig?: SearchConfig; // 検索設定（再開時に検索を実行するために必要）
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
@@ -116,6 +117,7 @@ export interface InterruptedDiscussionState {
   totalRounds: number;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[]; // 検索キーワード
+  completedSearchKeywordIndex?: number; // 完了した検索キーワードのインデックス（再開時に続きから検索）
   searchConfig?: SearchConfig;
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
