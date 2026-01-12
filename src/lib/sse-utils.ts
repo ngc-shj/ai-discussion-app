@@ -91,6 +91,16 @@ export interface SSESearchKeywordsEvent {
   searchKeywords: SearchKeywordInfo;
 }
 
+export interface SSESearchProgressEvent {
+  type: 'search_progress';
+  searchProgress: {
+    currentKeywordIndex: number;
+    totalKeywords: number;
+    currentKeyword: string;
+    completedKeyword?: string;
+  };
+}
+
 export type SSEEvent =
   | SSEProgressEvent
   | SSEMessageEvent
@@ -103,7 +113,8 @@ export type SSEEvent =
   | SSECompleteEvent
   | SSESearchingEvent
   | SSESearchResultsEvent
-  | SSESearchKeywordsEvent;
+  | SSESearchKeywordsEvent
+  | SSESearchProgressEvent;
 
 // イベントハンドラのインターフェース
 export interface SSEEventHandlers {
@@ -119,6 +130,7 @@ export interface SSEEventHandlers {
   onSearching?: (searchResults?: SearchResult[]) => void;
   onSearchResults?: (searchResults: SearchResult[]) => void;
   onSearchKeywords?: (searchKeywords: SearchKeywordInfo) => void;
+  onSearchProgress?: (searchProgress: SSESearchProgressEvent['searchProgress']) => void;
 }
 
 /**
@@ -167,6 +179,9 @@ export function parseSSELine(line: string, handlers: SSEEventHandlers): void {
         break;
       case 'search_keywords':
         handlers.onSearchKeywords?.(event.searchKeywords);
+        break;
+      case 'search_progress':
+        handlers.onSearchProgress?.(event.searchProgress);
         break;
     }
   } catch {

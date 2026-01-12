@@ -22,6 +22,7 @@ export interface SearchKeywordInfo {
   keywords: string[];                      // 生成されたキーワード
   timestamp: Date;                         // 生成時刻
   prompt?: string;                         // AIに渡されたプロンプト（確認用）
+  results?: SearchResult[];               // このタイミングで取得した検索結果
 }
 
 // 検索進捗状態

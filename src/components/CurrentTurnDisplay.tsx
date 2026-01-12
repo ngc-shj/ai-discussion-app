@@ -8,9 +8,8 @@ import { FollowUpSuggestions } from './FollowUpSuggestions';
 import { DeepDiveModal } from './DeepDiveModal';
 import { ExtendDiscussionModal } from './ExtendDiscussionModal';
 import { CounterargumentButton } from './CounterargumentButton';
-import { SearchResultsDisplay } from './SearchResultsDisplay';
-import { SearchKeywordsDisplay } from './SearchKeywordsDisplay';
 import { MessageList } from './MessageList';
+import { SearchKeywordItem } from './SearchKeywordItem';
 
 interface CurrentTurnDisplayProps {
   topic: string;
@@ -19,7 +18,6 @@ interface CurrentTurnDisplayProps {
   finalAnswer?: string;
   summaryPrompt?: string;
   isLoading: boolean;
-  isSearching?: boolean; // 検索中かどうか
   summaryState?: SummaryState;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
@@ -49,9 +47,8 @@ export function CurrentTurnDisplay({
   finalAnswer,
   summaryPrompt,
   isLoading,
-  isSearching,
   summaryState,
-  searchResults,
+  searchResults: _searchResults, // 後方互換のため保持、searchKeywordsに統合済み
   searchKeywords,
   searchProgress,
   onFollowUp,
@@ -136,117 +133,6 @@ export function CurrentTurnDisplay({
         </div>
       </div>
 
-      {/* 検索キーワードを表示（検索中はプレースホルダー表示） */}
-      {searchKeywords && searchKeywords.length > 0 ? (
-        <SearchKeywordsDisplay keywords={searchKeywords} />
-      ) : isSearching ? (
-        <div className="ml-10 md:ml-13 mb-2 md:mb-3">
-          <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-gray-500">
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <span>検索キーワードを生成中...</span>
-          </div>
-        </div>
-      ) : null}
-
-      {/* 検索結果を表示（検索中はプレースホルダー表示） */}
-      {searchResults && searchResults.length > 0 && (
-        <SearchResultsDisplay results={searchResults} />
-      )}
-      {/* 検索結果が0件の場合の表示（警告情報含む） */}
-      {!isSearching && searchKeywords && searchKeywords.length > 0 && (!searchResults || searchResults.length === 0) && (
-        <div className="ml-10 md:ml-13 mb-2 md:mb-3">
-          <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-yellow-400 text-xs md:text-sm">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span>検索結果が見つかりませんでした</span>
-            </div>
-            {/* 警告の詳細を表示 */}
-            {searchProgress?.warnings && searchProgress.warnings.length > 0 ? (
-              <div className="mt-2 ml-6 space-y-1">
-                {searchProgress.warnings.some(w => w.type === 'rate_limited') && (
-                  <p className="text-xs text-orange-400">
-                    ⚠ 検索プロバイダーのレートリミットに達しました。しばらく待ってから再試行してください。
-                  </p>
-                )}
-                {searchProgress.warnings.some(w => w.type === 'timeout') && (
-                  <p className="text-xs text-orange-400">
-                    ⚠ 検索がタイムアウトしました。ネットワーク接続を確認してください。
-                  </p>
-                )}
-                {searchProgress.warnings.some(w => w.type === 'api_error') && (
-                  <p className="text-xs text-orange-400">
-                    ⚠ 検索APIでエラーが発生しました。
-                  </p>
-                )}
-                {searchProgress.warnings.every(w => w.type === 'no_results') && (
-                  <p className="text-xs text-gray-400">
-                    指定されたキーワードに該当する結果がありませんでした。
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="mt-1 text-xs text-gray-400 ml-6">
-                検索キーワードを変更するか、別のトピックで試してみてください。
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-      {isSearching && searchProgress && searchProgress.phase === 'searching' && (
-        <div className="ml-10 md:ml-13 mb-2 md:mb-3">
-          <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <svg className="w-4 h-4 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <span className="text-xs md:text-sm text-gray-300">
-                Web検索中... ({searchProgress.currentKeywordIndex + 1}/{searchProgress.totalKeywords})
-              </span>
-            </div>
-            {/* 進捗バー */}
-            <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
-              <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${((searchProgress.currentKeywordIndex + 1) / searchProgress.totalKeywords) * 100}%` }}
-              />
-            </div>
-            {/* 現在検索中のキーワード */}
-            {searchProgress.currentKeyword && (
-              <div className="text-xs text-gray-400">
-                検索中: <span className="text-blue-400">{searchProgress.currentKeyword}</span>
-              </div>
-            )}
-            {/* 完了したキーワード（警告があればマーク表示） */}
-            {searchProgress.completedKeywords.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {searchProgress.completedKeywords.map((kw, i) => {
-                  const hasWarning = searchProgress.warnings?.some(w => w.keyword === kw);
-                  return (
-                    <span
-                      key={i}
-                      className={`text-xs px-2 py-0.5 rounded ${
-                        hasWarning
-                          ? 'bg-yellow-900/30 text-yellow-400'
-                          : 'bg-green-900/30 text-green-400'
-                      }`}
-                      title={hasWarning ? '結果なし' : ''}
-                    >
-                      {hasWarning ? '⚠' : '✓'} {kw}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* AIの議論（折りたたみ） */}
       {(messages.length > 0 || isLoading) && (
         <div className="ml-10 md:ml-13 mb-2 md:mb-3">
@@ -312,11 +198,13 @@ export function CurrentTurnDisplay({
                 participants={participants}
                 startMarker={startMarker}
                 extensionMarkers={extensionMarkers}
+                searchKeywords={searchKeywords}
                 messageVotes={messageVotes}
                 onVote={onVote}
                 streamingMessage={streamingMessage}
                 isLoading={isLoading}
                 bottomRef={bottomRef}
+                searchProgress={searchProgress}
               />
             </div>
           )}
@@ -383,6 +271,13 @@ export function CurrentTurnDisplay({
               />
             )}
           </div>
+        </div>
+      )}
+
+      {/* 統合前の検索結果 */}
+      {searchKeywords?.find(kw => kw.timing === 'summary') && (
+        <div className="ml-10 md:ml-13 mb-2 md:mb-3">
+          <SearchKeywordItem keyword={searchKeywords.find(kw => kw.timing === 'summary')!} />
         </div>
       )}
 

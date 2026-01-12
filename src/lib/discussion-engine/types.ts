@@ -18,7 +18,7 @@ import {
  * 議論の進捗情報
  */
 export interface DiscussionProgress {
-  type: 'message' | 'message_chunk' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'search_results' | 'search_keywords' | 'terminated' | 'followups' | 'ready_for_summary';
+  type: 'message' | 'message_chunk' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'search_results' | 'search_keywords' | 'search_progress' | 'terminated' | 'followups' | 'ready_for_summary';
   message?: DiscussionMessage;
   messageId?: string;
   chunk?: string;
@@ -28,6 +28,12 @@ export interface DiscussionProgress {
   error?: string;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo; // 検索キーワード情報
+  searchProgress?: {
+    currentKeywordIndex: number;
+    totalKeywords: number;
+    currentKeyword: string;
+    completedKeyword?: string;
+  };
   terminationReason?: string;
   suggestedFollowUps?: FollowUpQuestion[];
   messages?: DiscussionMessage[]; // ready_for_summary時に議論メッセージを含める
