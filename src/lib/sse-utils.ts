@@ -253,6 +253,7 @@ export interface CreateInterruptedStateParams {
   totalRounds: number;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
+  completedSearchKeywordIndex?: number; // 完了した検索キーワードのインデックス（再開時に続きから検索）
   searchConfig?: SearchConfig;
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
@@ -281,6 +282,7 @@ export function createInterruptedState(
     totalRounds: params.totalRounds,
     searchResults: params.searchResults,
     searchKeywords: params.searchKeywords,
+    completedSearchKeywordIndex: params.completedSearchKeywordIndex,
     searchConfig: params.searchConfig,
     userProfile: params.userProfile,
     discussionMode: params.discussionMode,

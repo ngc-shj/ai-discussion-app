@@ -26,6 +26,9 @@ interface CacheEntry {
 // インメモリキャッシュ
 const contentCache = new Map<string, CacheEntry>();
 
+// 進行中のリクエストを追跡（同じURLへの重複リクエストを防止）
+const inFlightRequests = new Map<string, Promise<JinaReaderResult>>();
+
 /**
  * キャッシュからコンテンツを取得
  */
@@ -182,67 +185,86 @@ export async function fetchPageContent(
     };
   }
 
-  const jinaUrl = `${JINA_READER_BASE_URL}/${url}`;
-  const headers: HeadersInit = {
-    'Accept': 'text/plain',
-  };
-  if (apiKey) {
-    headers['Authorization'] = `Bearer ${apiKey}`;
+  // 同じURLへの進行中リクエストがあれば、その結果を待つ
+  const inFlightRequest = inFlightRequests.get(url);
+  if (inFlightRequest) {
+    log.info('Waiting for in-flight request', { url });
+    return inFlightRequest;
   }
 
-  let lastError: { error: string; status?: number } | null = null;
-
-  // リトライループ
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    if (attempt > 0) {
-      log.debug('Retrying fetch', { url, attempt, maxRetries });
-      await sleep(RETRY_DELAY_MS);
+  // 実際のフェッチを実行する内部関数
+  const doFetch = async (): Promise<JinaReaderResult> => {
+    const jinaUrl = `${JINA_READER_BASE_URL}/${url}`;
+    const headers: HeadersInit = {
+      'Accept': 'text/plain',
+    };
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
-    log.debug('Fetching page content', { url, timeout, attempt });
+    let lastError: { error: string; status?: number } | null = null;
 
-    const result = await attemptFetch(jinaUrl, headers, timeout);
+    // リトライループ
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        log.debug('Retrying fetch', { url, attempt, maxRetries });
+        await sleep(RETRY_DELAY_MS);
+      }
 
-    if (result.success) {
-      const duration = Date.now() - startTime;
-      setToCache(url, result.content);
-      log.info('Fetch completed', { url, contentLength: result.content.length, duration, attempts: attempt + 1 });
-      return {
-        url,
-        content: result.content,
-        success: true,
-      };
+      log.debug('Fetching page content', { url, timeout, attempt });
+
+      const result = await attemptFetch(jinaUrl, headers, timeout);
+
+      if (result.success) {
+        const duration = Date.now() - startTime;
+        setToCache(url, result.content);
+        log.info('Fetch completed', { url, contentLength: result.content.length, duration, attempts: attempt + 1 });
+        return {
+          url,
+          content: result.content,
+          success: true,
+        };
+      }
+
+      lastError = { error: result.error, status: result.status };
+
+      // リトライ不可能なエラーの場合は即座に終了
+      if (!result.retryable) {
+        log.warn('Fetch failed (not retryable)', { url, error: result.error, status: result.status, attempt });
+        break;
+      }
+
+      log.debug('Fetch attempt failed', { url, error: result.error, attempt, willRetry: attempt < maxRetries });
     }
 
-    lastError = { error: result.error, status: result.status };
+    // 全リトライ失敗
+    const duration = Date.now() - startTime;
+    const isTimeout = lastError?.error === 'Request timeout';
+    const warning = lastError?.status
+      ? createWarningFromHttpStatus(lastError.status)
+      : isTimeout
+        ? createAbortWarning()
+        : createJinaErrorWarning(lastError?.error || 'Unknown error');
 
-    // リトライ不可能なエラーの場合は即座に終了
-    if (!result.retryable) {
-      log.warn('Fetch failed (not retryable)', { url, error: result.error, status: result.status, attempt });
-      break;
-    }
+    log.warn('Fetch failed after retries', { url, duration, attempts: maxRetries + 1, warning: warning.type, error: lastError?.error });
 
-    log.debug('Fetch attempt failed', { url, error: result.error, attempt, willRetry: attempt < maxRetries });
-  }
-
-  // 全リトライ失敗
-  const duration = Date.now() - startTime;
-  const isTimeout = lastError?.error === 'Request timeout';
-  const warning = lastError?.status
-    ? createWarningFromHttpStatus(lastError.status)
-    : isTimeout
-      ? createAbortWarning()
-      : createJinaErrorWarning(lastError?.error || 'Unknown error');
-
-  log.warn('Fetch failed after retries', { url, duration, attempts: maxRetries + 1, warning: warning.type, error: lastError?.error });
-
-  return {
-    url,
-    content: '',
-    success: false,
-    error: lastError?.error || 'Unknown error',
-    warning,
+    return {
+      url,
+      content: '',
+      success: false,
+      error: lastError?.error || 'Unknown error',
+      warning,
+    };
   };
+
+  // リクエストを登録して実行
+  const fetchPromise = doFetch().finally(() => {
+    // 完了後にin-flightリストから削除
+    inFlightRequests.delete(url);
+  });
+  inFlightRequests.set(url, fetchPromise);
+
+  return fetchPromise;
 }
 
 /**
