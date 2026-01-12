@@ -219,9 +219,14 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
                     key={provider.id}
                     type="button"
                     onClick={() => {
+                      // DuckDuckGoはニュース検索非対応のため、自動的にwebに切り替え
+                      const newSearchType = provider.id === 'duckduckgo' && searchConfig.searchType === 'news'
+                        ? 'web'
+                        : searchConfig.searchType;
                       onSearchConfigChange({
                         ...searchConfig,
-                        provider: provider.id
+                        provider: provider.id,
+                        searchType: newSearchType
                       });
                     }}
                     disabled={disabled}
@@ -287,34 +292,52 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
             </div>
           )}
 
-          {/* 検索タイプと結果数 */}
-          <div className="flex items-center gap-2">
-            <select
-              value={searchConfig.searchType}
-              onChange={(e) => onSearchConfigChange({
-                ...searchConfig,
-                searchType: e.target.value as 'web' | 'news' | 'images'
-              })}
-              disabled={disabled}
-              title="検索タイプを選択"
-              className="px-2 py-1 bg-gray-600 text-white text-xs rounded border border-gray-500 focus:outline-none focus:border-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="web">Web検索</option>
-              <option value="news">ニュース</option>
-            </select>
-            <span className="text-xs text-gray-400">結果数: {searchConfig.maxResults}</span>
+          {/* 検索タイプ */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-gray-400">検索タイプ</label>
+            <div className="flex items-center gap-2">
+              <select
+                value={searchConfig.provider === 'duckduckgo' ? 'web' : searchConfig.searchType}
+                onChange={(e) => onSearchConfigChange({
+                  ...searchConfig,
+                  searchType: e.target.value as 'web' | 'news' | 'images'
+                })}
+                disabled={disabled || searchConfig.provider === 'duckduckgo'}
+                title={searchConfig.provider === 'duckduckgo' ? 'DuckDuckGoはWeb検索のみ対応' : '検索タイプを選択'}
+                className="px-2 py-1 bg-gray-600 text-white text-xs rounded border border-gray-500 focus:outline-none focus:border-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="web">Web検索</option>
+                <option value="news" disabled={searchConfig.provider === 'duckduckgo'}>ニュース</option>
+              </select>
+              {searchConfig.provider === 'duckduckgo' && (
+                <span className="text-xs text-red-400">Web検索のみ</span>
+              )}
+            </div>
+          </div>
+
+          {/* 検索結果数 */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-gray-400">検索結果数</label>
+              <span className="text-xs text-green-400">{searchConfig.maxResults}件</span>
+            </div>
             <input
               type="range"
               min="3"
               max="10"
               value={searchConfig.maxResults}
-              onChange={(e) => onSearchConfigChange({
-                ...searchConfig,
-                maxResults: Number(e.target.value)
-              })}
+              onChange={(e) => {
+                const newMaxResults = Number(e.target.value);
+                const currentFullContent = searchConfig.fullContentMaxResults || 3;
+                onSearchConfigChange({
+                  ...searchConfig,
+                  maxResults: newMaxResults,
+                  fullContentMaxResults: Math.min(currentFullContent, newMaxResults)
+                });
+              }}
               disabled={disabled}
               title={`検索結果数: ${searchConfig.maxResults}`}
-              className={`flex-1 h-1.5 bg-gray-600 rounded-lg appearance-none accent-green-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+              className={`w-full h-1.5 bg-gray-600 rounded-lg appearance-none accent-green-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
             />
           </div>
 
@@ -366,15 +389,15 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
             </div>
           </div>
 
-          {/* 詳細コンテンツ取得 */}
+          {/* ページ詳細取得（Jina Reader） */}
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-gray-400">ページ詳細取得</label>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-400 shrink-0">ページ全文取得</label>
               <button
                 type="button"
                 onClick={() => onSearchConfigChange({ ...searchConfig, fetchFullContent: !searchConfig.fetchFullContent })}
                 disabled={disabled}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
                   searchConfig.fetchFullContent ? 'bg-green-600' : 'bg-gray-600'
                 } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                 aria-label="ページ詳細取得を切り替え"
@@ -385,28 +408,29 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
                   }`}
                 />
               </button>
+              {searchConfig.fetchFullContent && (
+                <>
+                  <input
+                    type="range"
+                    min="1"
+                    max={searchConfig.maxResults}
+                    value={Math.min(searchConfig.fullContentMaxResults || 3, searchConfig.maxResults)}
+                    onChange={(e) => onSearchConfigChange({
+                      ...searchConfig,
+                      fullContentMaxResults: Number(e.target.value)
+                    })}
+                    disabled={disabled}
+                    title={`上位${Math.min(searchConfig.fullContentMaxResults || 3, searchConfig.maxResults)}件の全文を取得`}
+                    className={`flex-1 h-1.5 bg-gray-600 rounded-lg appearance-none accent-green-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                  />
+                  <span className="text-xs text-green-400 shrink-0">{Math.min(searchConfig.fullContentMaxResults || 3, searchConfig.maxResults)}件</span>
+                </>
+              )}
             </div>
-            {searchConfig.fetchFullContent && (
-              <div className="flex items-center gap-2 pl-2">
-                <span className="text-xs text-gray-400">取得数:</span>
-                <input
-                  type="range"
-                  min="1"
-                  max="5"
-                  value={searchConfig.fullContentMaxResults || 3}
-                  onChange={(e) => onSearchConfigChange({
-                    ...searchConfig,
-                    fullContentMaxResults: Number(e.target.value)
-                  })}
-                  disabled={disabled}
-                  title={`詳細取得数: ${searchConfig.fullContentMaxResults || 3}`}
-                  className={`flex-1 h-1.5 bg-gray-600 rounded-lg appearance-none accent-green-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-                />
-                <span className="text-xs text-green-400 w-4">{searchConfig.fullContentMaxResults || 3}</span>
-              </div>
-            )}
             <p className="text-xs text-gray-500">
-              {searchConfig.fetchFullContent ? 'Jina Readerでページ全文を取得' : '検索スニペットのみ使用'}
+              {searchConfig.fetchFullContent
+                ? `Jina Readerで上位${Math.min(searchConfig.fullContentMaxResults || 3, searchConfig.maxResults)}件の全文を取得`
+                : 'スニペットのみ（高速）'}
             </p>
           </div>
         </div>
