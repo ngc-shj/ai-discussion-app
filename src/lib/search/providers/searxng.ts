@@ -7,7 +7,13 @@ import {
   SearchProviderParams,
   SearchProviderResponse,
   SearchProviderResult,
+  SearchWarning,
 } from '../types';
+import {
+  createWarningFromHttpStatus,
+  createWarningFromError,
+  createNoResultsWarning,
+} from '../warning-utils';
 import { logger } from '@/lib/logger';
 
 const SEARXNG_BASE_URL = process.env.SEARXNG_BASE_URL || 'http://localhost:8080';
@@ -72,8 +78,11 @@ export class SearXNGProvider implements ISearchProvider {
       });
 
       if (!response.ok) {
-        log.error('HTTP error', new Error(`Status ${response.status}`), { query, status: response.status });
-        throw new Error(`SearXNG returned status ${response.status}`);
+        const warning = createWarningFromHttpStatus(response.status);
+        log.warn('HTTP error', { query, status: response.status, warning: warning.type });
+        const error = new Error(`SearXNG returned status ${response.status}`);
+        (error as Error & { warning: SearchWarning }).warning = warning;
+        throw error;
       }
 
       const data: SearXNGResponse = await response.json();
@@ -88,17 +97,28 @@ export class SearXNGProvider implements ISearchProvider {
           publishedDate: result.publishedDate,
         }));
 
+      const warnings: SearchWarning[] = [];
+      if (results.length === 0) {
+        const warning = createNoResultsWarning();
+        warnings.push(warning);
+        log.warn('No search results', { query, duration });
+      }
+
       log.info('Search completed', { query, resultCount: results.length, totalResults: data.number_of_results, duration });
 
       return {
         results,
         query: data.query,
         provider: this.name,
+        warnings: warnings.length > 0 ? warnings : undefined,
       };
     } catch (error) {
       const duration = Date.now() - startTime;
-      log.error('Search failed', error, { query, duration });
-      throw error;
+      const warning = (error as Error & { warning?: SearchWarning }).warning || createWarningFromError(error);
+      log.error('Search failed', error, { query, duration, warning: warning.type });
+      const searchError = error instanceof Error ? error : new Error(String(error));
+      (searchError as Error & { warning: SearchWarning }).warning = warning;
+      throw searchError;
     }
   }
 }

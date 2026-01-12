@@ -23,11 +23,27 @@ export interface SearchProviderParams {
   searchType?: 'web' | 'news' | 'images';
 }
 
+// 警告の種類
+export type SearchWarningType =
+  | 'no_results'    // 検索結果が0件
+  | 'rate_limited'  // レートリミット (HTTP 429)
+  | 'timeout'       // タイムアウト
+  | 'api_error';    // その他のAPIエラー
+
+// 警告の詳細情報
+export interface SearchWarning {
+  type: SearchWarningType;
+  message: string;
+  code?: string;
+  retryable: boolean;
+}
+
 // 検索レスポンスの共通インターフェース
 export interface SearchProviderResponse {
   results: SearchProviderResult[];
   query: string;
   provider: SearchProvider;
+  warnings?: SearchWarning[];
 }
 
 // 検索プロバイダーのインターフェース

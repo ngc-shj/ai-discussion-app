@@ -55,7 +55,11 @@ export async function GET(request: NextRequest) {
     }
 
     const duration = Date.now() - startTime;
-    log.info('Search completed', { query, resultCount: result.results.length, duration });
+    if (result.warnings && result.warnings.length > 0) {
+      log.warn('Search completed with warnings', { query, resultCount: result.results.length, duration, warnings: result.warnings.map(w => w.type) });
+    } else {
+      log.info('Search completed', { query, resultCount: result.results.length, duration });
+    }
     return NextResponse.json(result);
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -122,7 +126,11 @@ export async function POST(request: NextRequest) {
     }
 
     const duration = Date.now() - startTime;
-    log.info('Search completed', { query, resultCount: result.results.length, duration });
+    if (result.warnings && result.warnings.length > 0) {
+      log.warn('Search completed with warnings', { query, resultCount: result.results.length, duration, warnings: result.warnings.map(w => w.type) });
+    } else {
+      log.info('Search completed', { query, resultCount: result.results.length, duration });
+    }
     return NextResponse.json(result);
   } catch (error) {
     const duration = Date.now() - startTime;
