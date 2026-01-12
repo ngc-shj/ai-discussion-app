@@ -101,13 +101,13 @@ export interface RestoreDiscussionStateParams {
 }
 
 export interface DiscussionActions {
-  setCurrentMessages: React.Dispatch<React.SetStateAction<DiscussionMessage[]>>;
+  setCurrentMessages: (updater: DiscussionMessage[] | ((prev: DiscussionMessage[]) => DiscussionMessage[])) => void;
   setCurrentFinalAnswer: (updater: string | ((prev: string) => string)) => void;
-  setCurrentTopic: React.Dispatch<React.SetStateAction<string>>;
+  setCurrentTopic: (updater: string | ((prev: string) => string)) => void;
   setCurrentSearchResults: (updater: SearchResult[] | ((prev: SearchResult[]) => SearchResult[])) => void;
   setCurrentSearchKeywords: (updater: SearchKeywordInfo[] | ((prev: SearchKeywordInfo[]) => SearchKeywordInfo[])) => void;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
-  setMessageVotes: React.Dispatch<React.SetStateAction<MessageVote[]>>;
+  setError: (updater: string | null | ((prev: string | null) => string | null)) => void;
+  setMessageVotes: (updater: MessageVote[] | ((prev: MessageVote[]) => MessageVote[])) => void;
   handleVote: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   clearCurrentTurnState: () => void;
   restoreDiscussionState: (params: RestoreDiscussionStateParams) => void;
