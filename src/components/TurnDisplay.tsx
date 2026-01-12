@@ -92,14 +92,14 @@ export function TurnDisplay({
         </div>
       </div>
 
-      {/* 検索結果を表示（過去のターン） */}
-      {turn.searchResults && turn.searchResults.length > 0 && (
-        <SearchResultsDisplay results={turn.searchResults} />
-      )}
-
       {/* 検索キーワードを表示（過去のターン） */}
       {turn.searchKeywords && turn.searchKeywords.length > 0 && (
         <SearchKeywordsDisplay keywords={turn.searchKeywords} />
+      )}
+
+      {/* 検索結果を表示（過去のターン） */}
+      {turn.searchResults && turn.searchResults.length > 0 && (
+        <SearchResultsDisplay results={turn.searchResults} />
       )}
 
       {/* AIの議論（折りたたみ） */}
