@@ -24,7 +24,7 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 - **Round-Robin Format**: Each AI speaks in turn for the specified number of rounds
 - **Integrated Answer Generation**: Automatically generates an answer integrating all opinions after the discussion
 - **Real-time Streaming**: Display each AI's response in real-time
-- **Web Search Integration**: Search for the latest information using SearXNG and reflect it in the discussion
+- **Web Search Integration**: Search for the latest information using multiple providers (Tavily, SearXNG, DuckDuckGo, Brave, Serper) and reflect it in the discussion
 - **Progress Visualization**: Visual display of selected models and their execution status (pending/active/completed)
 - **Session Management**: Save discussion history to IndexedDB, manage multiple sessions
 - **Responsive Design**: UI compatible with both PC and mobile devices
@@ -113,8 +113,16 @@ GOOGLE_AI_API_KEY=xxxxx
 # Ollama (default: localhost:11434)
 OLLAMA_BASE_URL=http://localhost:11434
 
-# SearXNG (optional, for web search feature)
-SEARXNG_BASE_URL=http://localhost:8080
+# Search Providers (at least one recommended)
+# Priority: Tavily > SearXNG > Serper > Brave > DuckDuckGo
+TAVILY_API_KEY=tvly-xxxxx          # Tavily (AI-optimized search)
+SEARXNG_BASE_URL=http://localhost:8080  # SearXNG (self-hosted)
+SERPER_API_KEY=xxxxx               # Serper (Google results)
+BRAVE_SEARCH_API_KEY=xxxxx         # Brave Search
+# DuckDuckGo: No API key required (fallback)
+
+# Jina Reader (optional, for full page content)
+JINA_API_KEY=jina_xxxxx            # Optional: 500 RPM with key, 20 RPM without
 ```
 
 > **Note**: You only need to configure the providers you plan to use.
@@ -145,9 +153,26 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
    ollama serve
    ```
 
-### SearXNG (Web Search)
+### Web Search Providers
 
-To use the web search feature, set up a SearXNG instance with JSON format enabled.
+The app supports multiple search providers. At least one is recommended for the web search feature.
+
+| Provider | Type | API Key | Notes |
+|----------|------|---------|-------|
+| **Tavily** | Cloud API | Required | AI-optimized search, recommended |
+| **SearXNG** | Self-hosted | Not required | Privacy-focused meta search |
+| **Serper** | Cloud API | Required | Google search results via API |
+| **Brave** | Cloud API | Required | Independent index, privacy-focused |
+| **DuckDuckGo** | Public | Not required | Always available as fallback |
+
+**Priority**: When multiple providers are configured, the app automatically selects by priority: Tavily > SearXNG > Serper > Brave > DuckDuckGo. You can also manually select a provider in the UI.
+
+#### Tavily (Recommended)
+
+1. Get an API key from [tavily.com](https://tavily.com/)
+2. Set `TAVILY_API_KEY` in your `.env.local`
+
+#### SearXNG (Self-hosted)
 
 **Recommended**: Use the pre-configured Docker setup from [ngc-shj/searxng-mcp-server](https://github.com/ngc-shj/searxng-mcp-server):
 
@@ -161,21 +186,13 @@ docker run -d \
   searxng/searxng
 ```
 
-This setup uses a custom settings file with JSON format output already enabled.
+Set `SEARXNG_BASE_URL` in your `.env.local`.
 
-**Manual Setup** (if you prefer):
+#### Other Providers
 
-1. Using Docker:
-
-   ```bash
-   docker run -d -p 8080:8080 searxng/searxng
-   ```
-
-2. Configure SearXNG to enable JSON format output:
-   - Edit `settings.yml` in your SearXNG instance
-   - Under `search.formats`, enable `json`
-
-3. Set `SEARXNG_BASE_URL` in your `.env.local`
+- **Serper**: Get API key from [serper.dev](https://serper.dev/)
+- **Brave**: Get API key from [brave.com/search/api](https://brave.com/search/api/)
+- **DuckDuckGo**: No configuration needed, always available
 
 ## Usage
 
@@ -189,8 +206,10 @@ This setup uses a custom settings file with JSON format output already enabled.
 
 When enabled, the app searches for relevant information and provides it to AI participants:
 
+- **Search Provider**: Select from Tavily, SearXNG, DuckDuckGo, Brave, or Serper
 - **Search Type**: Web search or News search
 - **Result Count**: 3-10 search results
+- **Full Content**: Optionally fetch full page content using Jina Reader
 - **Search Timing**:
   - **Before Only**: Search once before the discussion starts (default)
   - **Each Round**: Search at the beginning of each round for updated context
@@ -277,9 +296,10 @@ ai-discussion-app/
 
 ### Web Search Not Working
 
-- Ensure SearXNG is running and accessible
-- Check that JSON format is enabled in SearXNG settings
-- Verify `SEARXNG_BASE_URL` is correctly configured
+- **DuckDuckGo**: Should always work as fallback (no configuration needed)
+- **SearXNG**: Ensure it's running and JSON format is enabled in settings
+- **API-based providers**: Verify API keys are correctly set in `.env.local`
+- Check the browser console and server logs for detailed error messages
 
 ## License
 
