@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
   DiscussionMode,
   DISCUSSION_MODE_PRESETS,
@@ -10,7 +11,17 @@ import {
   TERMINATION_PRESETS,
   SearchConfig,
   SEARCH_ENGINE_PRESETS,
+  SearchProviderType,
 } from '@/types';
+
+// 検索プロバイダー情報
+interface SearchProviderInfo {
+  id: SearchProviderType;
+  name: string;
+  description: string;
+  requiresApiKey: boolean;
+  available: boolean;
+}
 
 interface DiscussionOptionsPanelProps {
   disabled?: boolean;
@@ -150,12 +161,30 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
   // timing のデフォルト値を確保
   const timing = searchConfig.timing || { onStart: true, eachRound: false, beforeSummary: false, onDemand: false };
 
+  // 検索プロバイダー情報を取得
+  const [providers, setProviders] = useState<SearchProviderInfo[]>([]);
+  const [defaultProvider, setDefaultProvider] = useState<SearchProviderType>('duckduckgo');
+
+  useEffect(() => {
+    fetch('/api/search-providers')
+      .then(res => res.json())
+      .then(data => {
+        setProviders(data.providers || []);
+        setDefaultProvider(data.defaultProvider || 'duckduckgo');
+      })
+      .catch(console.error);
+  }, []);
+
   const handleTimingChange = (key: 'onStart' | 'eachRound' | 'beforeSummary' | 'onDemand', value: boolean) => {
     onSearchConfigChange({
       ...searchConfig,
       timing: { ...timing, [key]: value }
     });
   };
+
+  // 現在のプロバイダー（未設定の場合はデフォルト）
+  const currentProvider = searchConfig.provider || defaultProvider;
+  const isSearXNG = currentProvider === 'searxng';
 
   return (
     <div className="space-y-2">
@@ -179,48 +208,84 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
       </div>
       {searchConfig.enabled && (
         <div className="space-y-3 pl-2 border-l-2 border-green-600/30">
-          {/* 検索エンジン選択 */}
+          {/* 検索プロバイダー選択 */}
           <div className="space-y-1.5">
-            <label className="text-xs text-gray-400">検索エンジン</label>
+            <label className="text-xs text-gray-400">検索プロバイダー</label>
             <div className="flex flex-wrap gap-1.5">
-              {SEARCH_ENGINE_PRESETS.map((engine) => {
-                const isSelected = searchConfig.engines?.includes(engine.id) ?? (engine.id === 'google');
+              {providers.filter(p => p.available).map((provider) => {
+                const isSelected = currentProvider === provider.id;
                 return (
                   <button
-                    key={engine.id}
+                    key={provider.id}
                     type="button"
                     onClick={() => {
-                      const currentEngines = searchConfig.engines ?? ['google'];
-                      let newEngines: string[];
-                      if (isSelected) {
-                        // 最低1つは選択されている必要がある
-                        if (currentEngines.length > 1) {
-                          newEngines = currentEngines.filter(e => e !== engine.id);
-                        } else {
-                          return; // 1つしかない場合は解除不可
-                        }
-                      } else {
-                        newEngines = [...currentEngines, engine.id];
-                      }
                       onSearchConfigChange({
                         ...searchConfig,
-                        engines: newEngines
+                        provider: provider.id
                       });
                     }}
                     disabled={disabled}
-                    title={engine.description}
+                    title={provider.description}
                     className={`px-2 py-1 text-xs rounded border transition-colors ${
                       isSelected
                         ? 'bg-green-600 border-green-500 text-white'
                         : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500'
                     } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                   >
-                    {engine.name}
+                    {provider.name}
                   </button>
                 );
               })}
             </div>
+            {providers.length === 0 && (
+              <p className="text-xs text-gray-500">プロバイダーを読み込み中...</p>
+            )}
           </div>
+
+          {/* SearXNG用: 検索エンジン選択 */}
+          {isSearXNG && (
+            <div className="space-y-1.5">
+              <label className="text-xs text-gray-400">SearXNGエンジン</label>
+              <div className="flex flex-wrap gap-1.5">
+                {SEARCH_ENGINE_PRESETS.map((engine) => {
+                  const isSelected = searchConfig.engines?.includes(engine.id) ?? (engine.id === 'google');
+                  return (
+                    <button
+                      key={engine.id}
+                      type="button"
+                      onClick={() => {
+                        const currentEngines = searchConfig.engines ?? ['google'];
+                        let newEngines: string[];
+                        if (isSelected) {
+                          // 最低1つは選択されている必要がある
+                          if (currentEngines.length > 1) {
+                            newEngines = currentEngines.filter(e => e !== engine.id);
+                          } else {
+                            return; // 1つしかない場合は解除不可
+                          }
+                        } else {
+                          newEngines = [...currentEngines, engine.id];
+                        }
+                        onSearchConfigChange({
+                          ...searchConfig,
+                          engines: newEngines
+                        });
+                      }}
+                      disabled={disabled}
+                      title={engine.description}
+                      className={`px-2 py-1 text-xs rounded border transition-colors ${
+                        isSelected
+                          ? 'bg-green-600 border-green-500 text-white'
+                          : 'bg-gray-700 border-gray-600 text-gray-300 hover:border-gray-500'
+                      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      {engine.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 検索タイプと結果数 */}
           <div className="flex items-center gap-2">

@@ -24,14 +24,18 @@ export interface SearchTiming {
   onDemand: boolean;       // AIが要求した時に検索（[[SEARCH:query]]パターン）
 }
 
+// 検索プロバイダーの種類
+export type SearchProviderType = 'searxng' | 'tavily' | 'duckduckgo' | 'brave' | 'serper';
+
 // 検索設定
 export interface SearchConfig {
   enabled: boolean;
+  provider?: SearchProviderType; // 検索プロバイダー（未指定時は自動選択）
   query?: string; // カスタム検索クエリ（空の場合はトピックを使用）
   maxResults: number;
   searchType: 'web' | 'news' | 'images';
   language?: string;
-  engines?: string[]; // 使用する検索エンジン
+  engines?: string[]; // SearXNG用: 使用する検索エンジン
   timing: SearchTiming; // 検索タイミング
   fetchFullContent?: boolean; // 詳細コンテンツを取得するか
   fullContentMaxResults?: number; // 詳細取得する最大数（デフォルト3）
