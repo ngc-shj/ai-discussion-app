@@ -1,6 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { AIRequest, AIResponse } from '@/types';
 import { AIProvider, ModelInfo } from './types';
+import { logger } from '@/lib/logger';
+
+const log = logger.ai.child({ provider: 'claude' });
 
 export class ClaudeProvider implements AIProvider {
   readonly type = 'claude' as const;
@@ -41,7 +44,7 @@ export class ClaudeProvider implements AIProvider {
         .sort((a, b) => b.createdAt - a.createdAt)
         .map(({ id, name }) => ({ id, name }));
     } catch (error) {
-      console.error('Failed to list Claude models:', error);
+      log.error('Failed to list models', error);
       return [];
     }
   }
@@ -54,6 +57,9 @@ export class ClaudeProvider implements AIProvider {
         error: 'ANTHROPIC_API_KEY is not configured',
       };
     }
+
+    const startTime = Date.now();
+    log.info('Generate started', { model: this.model });
 
     try {
       const message = await this.client.messages.create({
@@ -69,13 +75,18 @@ export class ClaudeProvider implements AIProvider {
 
       const textBlock = message.content.find((block) => block.type === 'text');
       const content = textBlock && 'text' in textBlock ? textBlock.text : '';
+      const duration = Date.now() - startTime;
+
+      log.info('Generate completed', { model: this.model, contentLength: content.length, duration });
 
       return {
         content,
         provider: this.type,
       };
     } catch (error) {
+      const duration = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      log.error('Generate failed', error, { model: this.model, duration });
       return {
         content: '',
         provider: this.type,

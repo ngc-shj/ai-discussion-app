@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createProvider } from '@/lib/ai-providers';
 import { createSearchKeywordPrompt, SearchKeywordTiming } from '@/lib/ai-providers/prompt-formatters';
 import { DiscussionParticipant } from '@/types';
+import { logger } from '@/lib/logger';
+
+const log = logger.api.child({ route: '/api/generate-search-keywords' });
 
 interface GenerateKeywordsRequest {
   topic: string;
@@ -39,16 +42,21 @@ function parseKeywordsResponse(content: string): string[] {
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+
   try {
     const body: GenerateKeywordsRequest = await request.json();
     const { topic, messages, timing, participant } = body;
 
     if (!topic) {
+      log.warn('Missing topic parameter');
       return NextResponse.json(
         { error: 'トピックが指定されていません' },
         { status: 400 }
       );
     }
+
+    log.info('Generate keywords request received', { topic, timing });
 
     // プロンプトを生成
     const prompt = createSearchKeywordPrompt(topic, messages, timing);
@@ -88,13 +96,17 @@ export async function POST(request: NextRequest) {
     }
 
     const keywords = parseKeywordsResponse(response.content);
+    const duration = Date.now() - startTime;
+
+    log.info('Keywords generated', { topic, keywordCount: keywords.length, duration });
 
     return NextResponse.json({
       keywords,
       rawResponse: response.content,
     });
   } catch (error) {
-    console.error('Generate search keywords error:', error);
+    const duration = Date.now() - startTime;
+    log.error('Generate keywords failed', error, { duration });
     return NextResponse.json(
       {
         error: '検索キーワードの生成に失敗しました',

@@ -1,16 +1,22 @@
 import { NextRequest } from 'next/server';
 import { runDiscussion, DiscussionRequest } from '@/lib/discussion-engine';
+import { logger } from '@/lib/logger';
+
+const log = logger.api.child({ route: '/api/discuss' });
 
 export async function POST(request: NextRequest) {
   try {
     const body: DiscussionRequest = await request.json();
 
     if (!body.topic || !body.participants || body.participants.length === 0) {
+      log.warn('Missing required parameters', { hasTopic: !!body.topic, participantCount: body.participants?.length || 0 });
       return Response.json(
         { error: 'Topic and at least one participant are required' },
         { status: 400 }
       );
     }
+
+    log.info('Discussion request received', { topic: body.topic, participantCount: body.participants.length, rounds: body.rounds || 2 });
 
     const rounds = body.rounds || 2;
 
@@ -77,6 +83,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    log.error('Discussion request failed', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return Response.json({ error: errorMessage }, { status: 500 });
   }

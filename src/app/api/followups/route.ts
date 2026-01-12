@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server';
 import { DiscussionParticipant, UserProfile } from '@/types';
 import { createProvider, createFollowUpPrompt, parseFollowUpResponse } from '@/lib/ai-providers';
+import { logger } from '@/lib/logger';
+
+const log = logger.api.child({ route: '/api/followups' });
 
 interface FollowupsRequest {
   topic: string;
@@ -14,6 +17,7 @@ export async function POST(request: NextRequest) {
     const body: FollowupsRequest = await request.json();
 
     if (!body.topic || !body.finalAnswer || !body.participants || body.participants.length === 0) {
+      log.warn('Missing required parameters');
       return Response.json(
         { error: 'Topic, finalAnswer, and participants are required' },
         { status: 400 }
@@ -21,6 +25,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { topic, finalAnswer, participants, userProfile } = body;
+
+    log.info('Followups request received', { topic, participantCount: participants.length });
 
     // Server-Sent Events を使用してリアルタイム更新
     const encoder = new TextEncoder();
@@ -70,6 +76,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    log.error('Followups request failed', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return Response.json({ error: errorMessage }, { status: 500 });
   }

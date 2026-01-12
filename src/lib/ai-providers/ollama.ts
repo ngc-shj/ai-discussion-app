@@ -1,5 +1,8 @@
 import { AIRequest, AIResponse } from '@/types';
 import { AIProvider, ModelInfo, StreamChunkCallback } from './types';
+import { logger } from '@/lib/logger';
+
+const log = logger.ai.child({ provider: 'ollama' });
 
 export class OllamaProvider implements AIProvider {
   readonly type = 'ollama' as const;
@@ -50,7 +53,7 @@ export class OllamaProvider implements AIProvider {
         .sort((a: { modifiedAt: number }, b: { modifiedAt: number }) => b.modifiedAt - a.modifiedAt)
         .map(({ id, name }: { id: string; name: string }) => ({ id, name }));
     } catch (error) {
-      console.error('Failed to list Ollama models:', error);
+      log.error('Failed to list models', error);
       return [];
     }
   }
@@ -64,6 +67,9 @@ export class OllamaProvider implements AIProvider {
     request: AIRequest,
     onChunk: StreamChunkCallback
   ): Promise<AIResponse> {
+    const startTime = Date.now();
+    log.info('Generate started', { model: this.model, baseUrl: this.baseUrl });
+
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
@@ -137,12 +143,18 @@ export class OllamaProvider implements AIProvider {
 
       // responseが空でthinkingがある場合、thinkingをフォールバックとして使用
       const finalContent = content || thinking;
+      const duration = Date.now() - startTime;
+
+      log.info('Generate completed', { model: this.model, contentLength: finalContent.length, duration });
+
       return {
         content: finalContent,
         provider: this.type,
       };
     } catch (error) {
+      const duration = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      log.error('Generate failed', error, { model: this.model, duration });
       return {
         content: '',
         provider: this.type,
