@@ -4,13 +4,86 @@
  */
 
 import { logger } from '@/lib/logger';
+import { SearchWarning } from './types';
+import { createWarningFromHttpStatus } from './warning-utils';
 
 const log = logger.search.child({ component: 'jina-reader' });
 const JINA_READER_BASE_URL = 'https://r.jina.ai';
 
+// キャッシュの設定
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30分
+const MAX_CACHE_SIZE = 100; // 最大キャッシュ数
+
+// リトライの設定
+const DEFAULT_MAX_RETRIES = 2; // 最大リトライ回数（計3回試行）
+const RETRY_DELAY_MS = 1000; // リトライ間隔
+
+interface CacheEntry {
+  content: string;
+  timestamp: number;
+}
+
+// インメモリキャッシュ
+const contentCache = new Map<string, CacheEntry>();
+
+/**
+ * キャッシュからコンテンツを取得
+ */
+function getFromCache(url: string): string | null {
+  const entry = contentCache.get(url);
+  if (!entry) return null;
+
+  // TTLチェック
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    contentCache.delete(url);
+    log.debug('Cache expired', { url });
+    return null;
+  }
+
+  log.debug('Cache hit', { url });
+  return entry.content;
+}
+
+/**
+ * キャッシュにコンテンツを保存
+ */
+function setToCache(url: string, content: string): void {
+  // キャッシュサイズ制限を超えた場合、古いエントリを削除
+  if (contentCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = contentCache.keys().next().value;
+    if (oldestKey) {
+      contentCache.delete(oldestKey);
+      log.debug('Cache evicted oldest entry', { url: oldestKey });
+    }
+  }
+
+  contentCache.set(url, {
+    content,
+    timestamp: Date.now(),
+  });
+  log.debug('Cache set', { url, cacheSize: contentCache.size });
+}
+
+/**
+ * キャッシュをクリア
+ */
+export function clearContentCache(): void {
+  const size = contentCache.size;
+  contentCache.clear();
+  log.info('Cache cleared', { previousSize: size });
+}
+
 export interface JinaReaderOptions {
   apiKey?: string;  // APIキーがあると500 RPM、なしで20 RPM
   timeout?: number; // タイムアウト（ms）、デフォルト15秒
+  maxRetries?: number; // 最大リトライ回数、デフォルト2
+}
+
+/**
+ * 指定時間待機
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 export interface JinaReaderResult {
@@ -18,34 +91,43 @@ export interface JinaReaderResult {
   content: string;
   success: boolean;
   error?: string;
+  warning?: SearchWarning;
 }
 
 /**
- * Jina Readerを使用してURLのコンテンツをMarkdownで取得
+ * AbortErrorから警告を生成（クライアント側タイムアウト）
  */
-export async function fetchPageContent(
-  url: string,
-  options: JinaReaderOptions = {}
-): Promise<JinaReaderResult> {
-  const { apiKey, timeout = 15000 } = options;
-  const startTime = Date.now();
+function createAbortWarning(): SearchWarning {
+  return {
+    type: 'timeout',
+    message: 'リクエストがタイムアウトしました（クライアント側で中断）',
+    retryable: true,
+  };
+}
 
-  log.debug('Fetching page content', { url, timeout });
+/**
+ * 一般的なエラーから警告を生成
+ */
+function createJinaErrorWarning(errorMessage: string): SearchWarning {
+  return {
+    type: 'api_error',
+    message: `Jina Reader エラー: ${errorMessage}`,
+    retryable: true,
+  };
+}
+
+/**
+ * 単一のfetch試行を実行
+ */
+async function attemptFetch(
+  jinaUrl: string,
+  headers: HeadersInit,
+  timeout: number
+): Promise<{ success: true; content: string } | { success: false; error: string; retryable: boolean; status?: number }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const jinaUrl = `${JINA_READER_BASE_URL}/${url}`;
-
-    const headers: HeadersInit = {
-      'Accept': 'text/plain',
-    };
-
-    if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
     const response = await fetch(jinaUrl, {
       method: 'GET',
       headers,
@@ -55,38 +137,112 @@ export async function fetchPageContent(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const duration = Date.now() - startTime;
-      log.warn('Fetch failed with HTTP error', { url, status: response.status, duration });
+      // 4xx エラーはリトライしない、5xx はリトライ可能
+      const retryable = response.status >= 500;
       return {
-        url,
-        content: '',
         success: false,
         error: `Jina Reader returned status ${response.status}`,
+        retryable,
+        status: response.status,
       };
     }
 
     const content = await response.text();
-    const duration = Date.now() - startTime;
-
-    log.info('Fetch completed', { url, contentLength: content.length, duration });
-
-    return {
-      url,
-      content,
-      success: true,
-    };
+    return { success: true, content };
   } catch (error) {
-    const duration = Date.now() - startTime;
+    clearTimeout(timeoutId);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const isTimeout = errorMessage.includes('abort');
-    log.error('Fetch failed', error, { url, duration, isTimeout });
+    const isAborted = errorMessage.includes('abort');
     return {
-      url,
-      content: '',
       success: false,
-      error: isTimeout ? 'Request timeout' : errorMessage,
+      error: isAborted ? 'Request timeout' : errorMessage,
+      retryable: true, // タイムアウトやネットワークエラーはリトライ可能
     };
   }
+}
+
+/**
+ * Jina Readerを使用してURLのコンテンツをMarkdownで取得
+ */
+export async function fetchPageContent(
+  url: string,
+  options: JinaReaderOptions = {}
+): Promise<JinaReaderResult> {
+  const { apiKey, timeout = 15000, maxRetries = DEFAULT_MAX_RETRIES } = options;
+  const startTime = Date.now();
+
+  // キャッシュをチェック
+  const cachedContent = getFromCache(url);
+  if (cachedContent) {
+    log.info('Cache hit', { url, contentLength: cachedContent.length });
+    return {
+      url,
+      content: cachedContent,
+      success: true,
+    };
+  }
+
+  const jinaUrl = `${JINA_READER_BASE_URL}/${url}`;
+  const headers: HeadersInit = {
+    'Accept': 'text/plain',
+  };
+  if (apiKey) {
+    headers['Authorization'] = `Bearer ${apiKey}`;
+  }
+
+  let lastError: { error: string; status?: number } | null = null;
+
+  // リトライループ
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      log.debug('Retrying fetch', { url, attempt, maxRetries });
+      await sleep(RETRY_DELAY_MS);
+    }
+
+    log.debug('Fetching page content', { url, timeout, attempt });
+
+    const result = await attemptFetch(jinaUrl, headers, timeout);
+
+    if (result.success) {
+      const duration = Date.now() - startTime;
+      setToCache(url, result.content);
+      log.info('Fetch completed', { url, contentLength: result.content.length, duration, attempts: attempt + 1 });
+      return {
+        url,
+        content: result.content,
+        success: true,
+      };
+    }
+
+    lastError = { error: result.error, status: result.status };
+
+    // リトライ不可能なエラーの場合は即座に終了
+    if (!result.retryable) {
+      log.warn('Fetch failed (not retryable)', { url, error: result.error, status: result.status, attempt });
+      break;
+    }
+
+    log.debug('Fetch attempt failed', { url, error: result.error, attempt, willRetry: attempt < maxRetries });
+  }
+
+  // 全リトライ失敗
+  const duration = Date.now() - startTime;
+  const isTimeout = lastError?.error === 'Request timeout';
+  const warning = lastError?.status
+    ? createWarningFromHttpStatus(lastError.status)
+    : isTimeout
+      ? createAbortWarning()
+      : createJinaErrorWarning(lastError?.error || 'Unknown error');
+
+  log.warn('Fetch failed after retries', { url, duration, attempts: maxRetries + 1, warning: warning.type, error: lastError?.error });
+
+  return {
+    url,
+    content: '',
+    success: false,
+    error: lastError?.error || 'Unknown error',
+    warning,
+  };
 }
 
 /**
