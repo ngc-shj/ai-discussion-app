@@ -25,10 +25,10 @@ interface ProgressIndicatorProps {
   currentParticipant: DiscussionParticipant | null;
   totalProviders: number;
   currentProviderIndex: number;
-  isSummarizing: boolean;
+  /** 検索中かどうか（searchProgress !== null から派生） */
   isSearching?: boolean;
+  /** メッセージストリーミング中かどうか */
   isStreaming?: boolean;
-  isSummaryStreaming?: boolean;
   isGeneratingFollowUps?: boolean;
   summaryState?: SummaryStateType;
   participants?: DiscussionParticipant[];
@@ -44,16 +44,17 @@ export function ProgressIndicator({
   currentParticipant,
   totalProviders,
   currentProviderIndex,
-  isSummarizing,
   isSearching = false,
   isStreaming = false,
-  isSummaryStreaming = false,
   isGeneratingFollowUps = false,
   summaryState = 'idle',
   participants = [],
   completedParticipants = new Set(),
   onInterrupt,
 }: ProgressIndicatorProps) {
+  // summaryStateとisStreamingから派生
+  const isSummarizing = summaryState === 'generating' && !isStreaming;
+  const isSummaryStreaming = summaryState === 'generating' && isStreaming;
   const [isInterrupting, setIsInterrupting] = useState(false);
 
   // 参加者のキーを生成

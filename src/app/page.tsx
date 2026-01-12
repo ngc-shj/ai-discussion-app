@@ -729,8 +729,6 @@ export default function Home() {
           currentParticipant={progress.currentParticipant}
           totalProviders={progress.totalParticipants}
           currentProviderIndex={progress.currentParticipantIndex}
-          isSummarizing={summaryState === 'generating' && !streamingMessage}
-          isSummaryStreaming={summaryState === 'generating' && !!streamingMessage}
           isSearching={isSearching}
           isStreaming={!!streamingMessage}
           isGeneratingFollowUps={isGeneratingFollowUps}

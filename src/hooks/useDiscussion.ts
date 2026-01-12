@@ -64,6 +64,7 @@ export interface DiscussionState {
   currentSearchResults: SearchResult[];
   currentSearchKeywords: SearchKeywordInfo[];
   isLoading: boolean;
+  /** 検索中かどうか（searchProgress !== null から派生） */
   isSearching: boolean;
   isGeneratingFollowUps: boolean;
   isProcessing: boolean;
@@ -228,7 +229,7 @@ interface CreateSSEHandlersParams {
   setIsGeneratingFollowUps: React.Dispatch<React.SetStateAction<boolean>>;
   setSummaryState?: React.Dispatch<React.SetStateAction<SummaryState>>;
   setIsLoading?: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsSearching?: React.Dispatch<React.SetStateAction<boolean>>;
+  // isSearchingは不要（searchProgressから派生）
   setSearchProgress?: React.Dispatch<React.SetStateAction<SearchProgress | null>>;
   setCurrentSearchResults?: React.Dispatch<React.SetStateAction<SearchResult[]>>;
   setCurrentSearchKeywords?: React.Dispatch<React.SetStateAction<SearchKeywordInfo[]>>;
@@ -257,7 +258,6 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     setIsGeneratingFollowUps,
     setSummaryState,
     setIsLoading,
-    setIsSearching,
     setSearchProgress,
     setCurrentSearchResults,
     setCurrentSearchKeywords,
@@ -440,7 +440,6 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       // generateSummaryの場合: onSummaryで'idle'に設定されるので、ここでは不要
     },
     onSearching: () => {
-      setIsSearching?.(true);
       // 検索開始時はキーワード生成中フェーズとして表示
       setSearchProgress?.({
         phase: 'keywords',
@@ -450,7 +449,6 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       });
     },
     onSearchResults: (searchResults) => {
-      setIsSearching?.(false);
       setSearchProgress?.(null);
       setCurrentSearchResults?.(searchResults);
       // 最後に追加されたSearchKeywordInfoに結果を紐付け
@@ -507,7 +505,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [currentTopic, setCurrentTopic] = useState<string>('');
   const [currentSearchResults, setCurrentSearchResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [searchProgress, setSearchProgress] = useState<SearchProgress | null>(null);
   const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
   const [summaryState, setSummaryState] = useState<SummaryState>('idle');
@@ -554,7 +551,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setCurrentSearchKeywords([]);
     // ローディング・進行状況
     setIsLoading(false);
-    setIsSearching(false);
     setIsGeneratingFollowUps(false);
     setSummaryState('idle');
     setProgress(INITIAL_PROGRESS);
@@ -644,7 +640,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       let summarySearchResults = currentSearchResults;
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
       if (searchConfig.enabled && timing.beforeSummary) {
-        setIsSearching(true);
+        setSearchProgress({
+          phase: 'searching',
+          currentKeywordIndex: 0,
+          totalKeywords: 1,
+          completedKeywords: [],
+        });
         try {
           // 議論内容をAIに渡してキーワードを生成
           const messagesForKeywords = currentMessages.map(m => ({
@@ -712,13 +713,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
             // 中断された場合は正常終了
-            setIsSearching(false);
             setSummaryState('idle');
             return;
           }
           console.error('beforeSummary search failed:', err);
         } finally {
-          setIsSearching(false);
+          setSearchProgress(null);
         }
       }
 
@@ -994,7 +994,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       let lastCompletedKeywordIndex = -1; // 完了した検索キーワードのインデックス（中断時の再開用）
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
       if (searchConfig.enabled && timing.onStart) {
-        setIsSearching(true);
         setSearchProgress({
           phase: 'keywords',
           currentKeywordIndex: 0,
@@ -1168,14 +1167,11 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
               );
             }
-            setIsSearching(false);
-            setSearchProgress(null);
             setIsLoading(false);
             return;
           }
           console.error('Search failed:', err);
         } finally {
-          setIsSearching(false);
           setSearchProgress(null);
         }
       }
@@ -1251,7 +1247,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setIsGeneratingFollowUps,
           setSummaryState,
           setIsLoading,
-          setIsSearching,
           setSearchProgress,
           setCurrentSearchResults,
           setCurrentSearchKeywords,
@@ -1348,8 +1343,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
           // 中断された場合は正常終了
-          setIsSearching(false);
-          setSearchProgress(null);
           return;
         }
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -1357,7 +1350,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         // AbortControllerをクリア
         abortControllerRef.current = null;
         setIsLoading(false);
-        setIsSearching(false);
         setSearchProgress(null);
       }
     },
@@ -1490,7 +1482,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           existingSearchResults: searchResults.length,
         });
 
-        setIsSearching(true);
         setSearchProgress({
           phase: 'keywords',
           currentKeywordIndex: 0,
@@ -1677,14 +1668,11 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
               );
             }
-            setIsSearching(false);
-            setSearchProgress(null);
             setIsLoading(false);
             return;
           }
           console.error('Search failed:', err);
         } finally {
-          setIsSearching(false);
           setSearchProgress(null);
         }
       }
@@ -1764,7 +1752,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setIsGeneratingFollowUps,
           setSummaryState,
           setIsLoading,
-          setIsSearching,
           setSearchProgress,
           setCurrentSearchResults,
           setCurrentSearchKeywords,
@@ -1852,8 +1839,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
           // 中断された場合は正常終了
-          setIsSearching(false);
-          setSearchProgress(null);
           return;
         }
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -1861,7 +1846,6 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         // AbortControllerをクリア
         abortControllerRef.current = null;
         setIsLoading(false);
-        setIsSearching(false);
         setSearchProgress(null);
       }
     },
@@ -2090,8 +2074,13 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     ]
   );
 
-  // 処理中フラグ（議論実行中、検索中、統合回答生成中、フォローアップ生成中）
-  const isProcessing = isLoading || isSearching || summaryState === 'generating' || isGeneratingFollowUps;
+  // isSearchingはsearchProgressから派生
+  // 注: 検索中は必ずisLoadingもtrueなので、isProcessingには不要
+  const isSearching = searchProgress !== null;
+
+  // 処理中フラグ（議論実行中、統合回答生成中、フォローアップ生成中）
+  // 検索中はisLoadingがtrueなのでisSearchingは不要
+  const isProcessing = isLoading || summaryState === 'generating' || isGeneratingFollowUps;
 
   return {
     currentMessages,
