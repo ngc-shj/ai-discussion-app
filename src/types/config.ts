@@ -27,12 +27,27 @@ export interface SearchKeywordInfo {
 // 検索進捗状態
 export type SearchPhase = 'keywords' | 'searching' | 'filtering' | 'done';
 
+// 検索警告の種類
+export type SearchWarningType =
+  | 'no_results'    // 検索結果が0件
+  | 'rate_limited'  // レートリミット (HTTP 429)
+  | 'timeout'       // タイムアウト
+  | 'api_error';    // その他のAPIエラー
+
+// 検索警告
+export interface SearchWarning {
+  type: SearchWarningType;
+  keyword?: string;                        // 警告が発生したキーワード
+  message?: string;                        // 詳細メッセージ
+}
+
 export interface SearchProgress {
   phase: SearchPhase;                      // 現在のフェーズ
   currentKeywordIndex: number;             // 現在処理中のキーワードインデックス
   totalKeywords: number;                   // 総キーワード数
   currentKeyword?: string;                 // 現在検索中のキーワード
   completedKeywords: string[];             // 完了したキーワード
+  warnings?: SearchWarning[];              // 検索中に発生した警告
 }
 
 // 検索タイミング設定

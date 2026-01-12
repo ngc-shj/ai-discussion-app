@@ -31,6 +31,8 @@ export type {
   SearchKeywordInfo,
   SearchPhase,
   SearchProgress,
+  SearchWarningType,
+  SearchWarning,
   SearchProviderType,
   SearchConfig,
   SearchEnginePreset,

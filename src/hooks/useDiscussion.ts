@@ -8,6 +8,7 @@ import {
   SearchResult,
   SearchKeywordInfo,
   SearchProgress,
+  SearchWarning,
   MessageVote,
   FollowUpQuestion,
   InterruptedDiscussionState,
@@ -978,7 +979,11 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             totalKeywords: searchKeywords.length,
             currentKeyword: searchKeywords[0],
             completedKeywords: [],
+            warnings: [],
           });
+
+          // 警告を収集
+          const collectedWarnings: SearchWarning[] = [];
 
           // 生成されたキーワードで検索（逐次表示）
           for (let i = 0; i < searchKeywords.length; i++) {
@@ -1022,12 +1027,23 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
               // 結果を即座に表示（最大件数に制限）
               const limitedResults = searchResults.slice(0, searchConfig.maxResults);
               setCurrentSearchResults(limitedResults);
+
+              // 警告を収集
+              if (searchData.warnings && searchData.warnings.length > 0) {
+                for (const warnType of searchData.warnings) {
+                  collectedWarnings.push({
+                    type: warnType,
+                    keyword,
+                  });
+                }
+              }
             }
 
-            // 進捗を更新（完了したキーワードを追加）
+            // 進捗を更新（完了したキーワードを追加、警告も含む）
             setSearchProgress((prev) => prev ? {
               ...prev,
               completedKeywords: [...prev.completedKeywords, keyword],
+              warnings: [...collectedWarnings],
             } : null);
           }
 
@@ -1037,6 +1053,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             currentKeywordIndex: searchKeywords.length,
             totalKeywords: searchKeywords.length,
             completedKeywords: searchKeywords,
+            warnings: collectedWarnings.length > 0 ? collectedWarnings : undefined,
           });
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
@@ -1375,7 +1392,11 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             totalKeywords: searchKeywordsList.length,
             currentKeyword: searchKeywordsList[0],
             completedKeywords: [],
+            warnings: [],
           });
+
+          // 警告を収集
+          const collectedWarnings: SearchWarning[] = [];
 
           // 検索結果がまだない場合のみ検索を実行
           if (searchResults.length === 0) {
@@ -1418,12 +1439,23 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 // 結果を即座に表示（最大件数に制限）
                 const limitedResults = searchResults.slice(0, searchConfig.maxResults);
                 setCurrentSearchResults(limitedResults);
+
+                // 警告を収集
+                if (searchData.warnings && searchData.warnings.length > 0) {
+                  for (const warnType of searchData.warnings) {
+                    collectedWarnings.push({
+                      type: warnType,
+                      keyword,
+                    });
+                  }
+                }
               }
 
-              // 進捗を更新（完了したキーワードを追加）
+              // 進捗を更新（完了したキーワードを追加、警告も含む）
               setSearchProgress((prev) => prev ? {
                 ...prev,
                 completedKeywords: [...prev.completedKeywords, keyword],
+                warnings: [...collectedWarnings],
               } : null);
             }
           }
@@ -1434,6 +1466,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             currentKeywordIndex: searchKeywordsList.length,
             totalKeywords: searchKeywordsList.length,
             completedKeywords: searchKeywordsList,
+            warnings: collectedWarnings.length > 0 ? collectedWarnings : undefined,
           });
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
