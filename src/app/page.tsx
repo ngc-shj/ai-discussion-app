@@ -696,7 +696,6 @@ export default function Home() {
           currentFinalAnswer={currentFinalAnswer}
           currentSummaryPrompt={currentSummaryPrompt}
           isLoading={isLoading}
-          isSearching={isSearching}
           summaryState={summaryState}
           searchResults={currentSearchResults}
           searchKeywords={currentSearchKeywords}

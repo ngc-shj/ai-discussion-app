@@ -229,6 +229,7 @@ interface CreateSSEHandlersParams {
   setSummaryState?: React.Dispatch<React.SetStateAction<SummaryState>>;
   setIsLoading?: React.Dispatch<React.SetStateAction<boolean>>;
   setIsSearching?: React.Dispatch<React.SetStateAction<boolean>>;
+  setSearchProgress?: React.Dispatch<React.SetStateAction<SearchProgress | null>>;
   setCurrentSearchResults?: React.Dispatch<React.SetStateAction<SearchResult[]>>;
   setCurrentSearchKeywords?: React.Dispatch<React.SetStateAction<SearchKeywordInfo[]>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
@@ -257,6 +258,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     setSummaryState,
     setIsLoading,
     setIsSearching,
+    setSearchProgress,
     setCurrentSearchResults,
     setCurrentSearchKeywords,
     setError,
@@ -439,10 +441,27 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     },
     onSearching: () => {
       setIsSearching?.(true);
+      // 検索開始時はキーワード生成中フェーズとして表示
+      setSearchProgress?.({
+        phase: 'keywords',
+        currentKeywordIndex: 0,
+        totalKeywords: 0,
+        completedKeywords: [],
+      });
     },
     onSearchResults: (searchResults) => {
       setIsSearching?.(false);
+      setSearchProgress?.(null);
       setCurrentSearchResults?.(searchResults);
+      // 最後に追加されたSearchKeywordInfoに結果を紐付け
+      if (collectedSearchKeywordsRef && collectedSearchKeywordsRef.current.length > 0) {
+        const lastIndex = collectedSearchKeywordsRef.current.length - 1;
+        collectedSearchKeywordsRef.current[lastIndex] = {
+          ...collectedSearchKeywordsRef.current[lastIndex],
+          results: searchResults,
+        };
+        setCurrentSearchKeywords?.([...collectedSearchKeywordsRef.current]);
+      }
     },
     onSearchKeywords: (searchKeywords) => {
       setCurrentSearchKeywords?.(prev => [...prev, searchKeywords]);
@@ -450,6 +469,30 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       if (collectedSearchKeywordsRef) {
         collectedSearchKeywordsRef.current = [...collectedSearchKeywordsRef.current, searchKeywords];
       }
+      // 検索進捗を更新（キーワードが確定したので検索フェーズへ）
+      setSearchProgress?.({
+        phase: 'searching',
+        currentKeywordIndex: 0,
+        totalKeywords: searchKeywords.keywords.length,
+        currentKeyword: searchKeywords.keywords[0],
+        completedKeywords: [],
+      });
+    },
+    onSearchProgress: (progress) => {
+      // 検索進捗を更新
+      setSearchProgress?.((prev) => {
+        if (!prev) return prev;
+        const newState = {
+          ...prev,
+          currentKeywordIndex: progress.currentKeywordIndex,
+          currentKeyword: progress.currentKeyword,
+        };
+        // キーワードが完了した場合、completedKeywordsに追加
+        if (progress.completedKeyword && !prev.completedKeywords.includes(progress.completedKeyword)) {
+          newState.completedKeywords = [...prev.completedKeywords, progress.completedKeyword];
+        }
+        return newState;
+      });
     },
   };
 }
@@ -1075,6 +1118,16 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             completedKeywords: searchKeywords,
             warnings: collectedWarnings.length > 0 ? collectedWarnings : undefined,
           });
+
+          // 検索結果をSearchKeywordInfoに紐付け
+          const limitedResults = searchResults.slice(0, searchConfig.maxResults);
+          if (collectedSearchKeywords.length > 0) {
+            collectedSearchKeywords[0] = {
+              ...collectedSearchKeywords[0],
+              results: limitedResults,
+            };
+            setCurrentSearchKeywords([...collectedSearchKeywords]);
+          }
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
             // 中断された場合：検索進捗を保存してセッションに記録
@@ -1199,6 +1252,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setSummaryState,
           setIsLoading,
           setIsSearching,
+          setSearchProgress,
           setCurrentSearchResults,
           setCurrentSearchKeywords,
           setError,
@@ -1422,6 +1476,11 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         interruptedState.messages.length === 0 &&
         (collectedSearchKeywords.length === 0 || hasMoreKeywordsToSearch);
 
+      // 検索が不要でも、既存の検索キーワードがあれば状態に設定
+      if (!needsSearch && collectedSearchKeywords.length > 0) {
+        setCurrentSearchKeywords(collectedSearchKeywords);
+      }
+
       if (needsSearch) {
         console.log('[resumeDiscussion] Resuming search:', {
           hasExistingKeywords: collectedSearchKeywords.length > 0,
@@ -1569,6 +1628,16 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             completedKeywords: searchKeywordsList,
             warnings: collectedWarnings.length > 0 ? collectedWarnings : undefined,
           });
+
+          // 検索結果をSearchKeywordInfoに紐付け
+          const limitedResults = searchResults.slice(0, searchConfig.maxResults);
+          if (collectedSearchKeywords.length > 0) {
+            collectedSearchKeywords[0] = {
+              ...collectedSearchKeywords[0],
+              results: limitedResults,
+            };
+            setCurrentSearchKeywords([...collectedSearchKeywords]);
+          }
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
             // 中断された場合：検索進捗を保存してセッションに記録
@@ -1696,6 +1765,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setSummaryState,
           setIsLoading,
           setIsSearching,
+          setSearchProgress,
           setCurrentSearchResults,
           setCurrentSearchKeywords,
           setError,

@@ -8,9 +8,8 @@ import { DeepDiveModal } from './DeepDiveModal';
 import { CounterargumentButton } from './CounterargumentButton';
 import { ForkButton } from './ForkButton';
 import { ForkModal } from './ForkModal';
-import { SearchResultsDisplay } from './SearchResultsDisplay';
-import { SearchKeywordsDisplay } from './SearchKeywordsDisplay';
 import { MessageList } from './MessageList';
+import { SearchKeywordItem } from './SearchKeywordItem';
 
 interface TurnDisplayProps {
   turn: DiscussionTurn;
@@ -92,29 +91,6 @@ export function TurnDisplay({
         </div>
       </div>
 
-      {/* 検索キーワードを表示（過去のターン） */}
-      {turn.searchKeywords && turn.searchKeywords.length > 0 && (
-        <SearchKeywordsDisplay keywords={turn.searchKeywords} />
-      )}
-
-      {/* 検索結果を表示（過去のターン） */}
-      {turn.searchResults && turn.searchResults.length > 0 && (
-        <SearchResultsDisplay results={turn.searchResults} />
-      )}
-      {/* 検索結果が0件の場合の表示（過去のターン） */}
-      {turn.searchKeywords && turn.searchKeywords.length > 0 && (!turn.searchResults || turn.searchResults.length === 0) && (
-        <div className="ml-10 md:ml-13 mb-2 md:mb-3">
-          <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-2 md:p-3">
-            <div className="flex items-center gap-2 text-yellow-400/70 text-xs md:text-sm">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span>検索結果が見つかりませんでした</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* AIの議論（折りたたみ） */}
       {turn.messages.length > 0 && (
         <div className="ml-10 md:ml-13 mb-2 md:mb-3">
@@ -172,11 +148,19 @@ export function TurnDisplay({
                 messages={turn.messages}
                 startMarker={turn.startMarker}
                 extensionMarkers={turn.extensionMarkers}
+                searchKeywords={turn.searchKeywords}
                 messageVotes={messageVotes}
                 onVote={onVote}
               />
             </div>
           )}
+        </div>
+      )}
+
+      {/* 統合前の検索結果 */}
+      {turn.searchKeywords?.find(kw => kw.timing === 'summary') && (
+        <div className="ml-10 md:ml-13 mb-2 md:mb-3">
+          <SearchKeywordItem keyword={turn.searchKeywords.find(kw => kw.timing === 'summary')!} />
         </div>
       )}
 
