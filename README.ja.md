@@ -24,7 +24,7 @@
 - **ラウンドロビン形式**: 指定したラウンド数だけ各AIが順番に発言
 - **統合回答生成**: 議論終了後、全ての意見を統合した回答を自動生成
 - **リアルタイムストリーミング**: 各AIの回答をリアルタイムで表示
-- **Web検索統合**: SearXNGを使用して最新情報を検索し、議論に反映
+- **Web検索統合**: 複数のプロバイダー（Tavily、SearXNG、DuckDuckGo、Brave、Serper）を使用して最新情報を検索し、議論に反映
 - **進捗の可視化**: 選択したモデルと実行状態（待機中/実行中/完了）を視覚的に表示
 - **セッション管理**: 議論履歴をIndexedDBに保存、複数セッションの管理が可能
 - **レスポンシブ対応**: PC・モバイル両対応のUI
@@ -113,8 +113,16 @@ GOOGLE_AI_API_KEY=xxxxx
 # Ollama (デフォルト: localhost:11434)
 OLLAMA_BASE_URL=http://localhost:11434
 
-# SearXNG (オプション、Web検索機能用)
-SEARXNG_BASE_URL=http://localhost:8080
+# 検索プロバイダー（少なくとも1つを推奨）
+# 優先順位: Tavily > SearXNG > Serper > Brave > DuckDuckGo
+TAVILY_API_KEY=tvly-xxxxx          # Tavily（AI最適化検索）
+SEARXNG_BASE_URL=http://localhost:8080  # SearXNG（セルフホスト）
+SERPER_API_KEY=xxxxx               # Serper（Google検索結果）
+BRAVE_SEARCH_API_KEY=xxxxx         # Brave Search
+# DuckDuckGo: APIキー不要（フォールバック）
+
+# Jina Reader（オプション、ページ全文取得用）
+JINA_API_KEY=jina_xxxxx            # オプション: キーあり500 RPM、なし20 RPM
 ```
 
 > **注意**: 使用するプロバイダーのみ設定すれば大丈夫です。
@@ -147,9 +155,26 @@ npm run dev
    ollama serve
    ```
 
-### SearXNG（Web検索）
+### Web検索プロバイダー
 
-Web検索機能を使用するには、JSON形式出力が有効なSearXNGインスタンスをセットアップします。
+複数の検索プロバイダーに対応しています。Web検索機能を使用するには、少なくとも1つの設定を推奨します。
+
+| プロバイダー | タイプ | APIキー | 備考 |
+| --- | --- | --- | --- |
+| **Tavily** | クラウドAPI | 必要 | AI最適化検索、推奨 |
+| **SearXNG** | セルフホスト | 不要 | プライバシー重視のメタ検索 |
+| **Serper** | クラウドAPI | 必要 | Google検索結果をAPI経由で取得 |
+| **Brave** | クラウドAPI | 必要 | 独自インデックス、プライバシー重視 |
+| **DuckDuckGo** | パブリック | 不要 | 常にフォールバックとして利用可能 |
+
+**優先順位**: 複数のプロバイダーが設定されている場合、自動的に優先順位で選択: Tavily > SearXNG > Serper > Brave > DuckDuckGo。UIから手動で選択することも可能です。
+
+#### Tavily（推奨）
+
+1. [tavily.com](https://tavily.com/) からAPIキーを取得
+2. `.env.local`に`TAVILY_API_KEY`を設定
+
+#### SearXNG（セルフホスト）
 
 **推奨**: [ngc-shj/searxng-mcp-server](https://github.com/ngc-shj/searxng-mcp-server)の設定済みDockerセットアップを使用:
 
@@ -163,21 +188,13 @@ docker run -d \
   searxng/searxng
 ```
 
-このセットアップではJSON形式出力が有効な設定ファイルを使用します。
+`.env.local`に`SEARXNG_BASE_URL`を設定。
 
-**手動セットアップ**（必要に応じて）:
+#### その他のプロバイダー
 
-1. Dockerを使用:
-
-   ```bash
-   docker run -d -p 8080:8080 searxng/searxng
-   ```
-
-2. SearXNGでJSON形式の出力を有効化:
-   - SearXNGインスタンスの`settings.yml`を編集
-   - `search.formats`で`json`を有効化
-
-3. `.env.local`に`SEARXNG_BASE_URL`を設定
+- **Serper**: [serper.dev](https://serper.dev/) からAPIキーを取得
+- **Brave**: [brave.com/search/api](https://brave.com/search/api/) からAPIキーを取得
+- **DuckDuckGo**: 設定不要、常に利用可能
 
 ## 使い方
 
@@ -191,8 +208,10 @@ docker run -d \
 
 有効にすると、関連情報を検索してAI参加者に提供:
 
+- **検索プロバイダー**: Tavily、SearXNG、DuckDuckGo、Brave、Serperから選択
 - **検索タイプ**: Web検索またはニュース検索
 - **検索結果数**: 3〜10件の検索結果
+- **詳細取得**: Jina Readerでページ全文をオプションで取得
 - **検索タイミング**:
   - **議論開始前のみ**: 議論開始前に1回検索（デフォルト）
   - **各ラウンド開始時**: 各ラウンドの開始時に最新情報を検索
@@ -279,9 +298,10 @@ ai-discussion-app/
 
 ### Web検索が動作しない
 
-- SearXNGが起動中でアクセス可能か確認
-- SearXNGの設定でJSON形式が有効か確認
-- `SEARXNG_BASE_URL`が正しく設定されているか確認
+- **DuckDuckGo**: フォールバックとして常に動作するはず（設定不要）
+- **SearXNG**: 起動中でJSON形式が有効か確認
+- **APIベースのプロバイダー**: `.env.local`でAPIキーが正しく設定されているか確認
+- ブラウザコンソールとサーバーログで詳細なエラーメッセージを確認
 
 ## ライセンス
 

@@ -1,7 +1,7 @@
 /**
  * DuckDuckGo検索プロバイダー
  * APIキー不要で使用可能
- * DuckDuckGo Instant Answer APIを使用
+ * DuckDuckGo HTML版をスクレイピング
  */
 
 import {
@@ -11,23 +11,7 @@ import {
   SearchProviderResult,
 } from '../types';
 
-const DDG_API_URL = 'https://api.duckduckgo.com/';
 const DDG_HTML_URL = 'https://html.duckduckgo.com/html/';
-
-interface DDGRelatedTopic {
-  Text?: string;
-  FirstURL?: string;
-  Result?: string;
-}
-
-interface DDGResponse {
-  Abstract?: string;
-  AbstractURL?: string;
-  AbstractText?: string;
-  Heading?: string;
-  RelatedTopics?: DDGRelatedTopic[];
-  Results?: DDGRelatedTopic[];
-}
 
 export class DuckDuckGoProvider implements ISearchProvider {
   readonly name = 'duckduckgo' as const;
@@ -35,83 +19,100 @@ export class DuckDuckGoProvider implements ISearchProvider {
   readonly requiresApiKey = false;
 
   isAvailable(): boolean {
-    return true; // 常に利用可能
+    return true;
   }
 
   async search(params: SearchProviderParams): Promise<SearchProviderResponse> {
     const { query, maxResults = 5 } = params;
 
-    // DuckDuckGo Instant Answer APIを試す
-    const url = new URL(DDG_API_URL);
-    url.searchParams.set('q', query);
-    url.searchParams.set('format', 'json');
-    url.searchParams.set('no_html', '1');
-    url.searchParams.set('skip_disambig', '1');
+    const formData = new URLSearchParams();
+    formData.append('q', query);
 
-    const response = await fetch(url.toString(), {
+    const response = await fetch(DDG_HTML_URL, {
+      method: 'POST',
       headers: {
-        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (compatible; AIDiscussionApp/1.0)',
       },
+      body: formData.toString(),
     });
 
     if (!response.ok) {
       throw new Error(`DuckDuckGo returned status ${response.status}`);
     }
 
-    const data: DDGResponse = await response.json();
-
-    const results: SearchProviderResult[] = [];
-
-    // Abstract（メインの回答）があれば追加
-    if (data.Abstract && data.AbstractURL) {
-      results.push({
-        title: data.Heading || query,
-        url: data.AbstractURL,
-        content: data.AbstractText || data.Abstract,
-      });
-    }
-
-    // RelatedTopicsから結果を追加
-    if (data.RelatedTopics) {
-      for (const topic of data.RelatedTopics) {
-        if (results.length >= maxResults) break;
-        if (topic.Text && topic.FirstURL) {
-          results.push({
-            title: this.extractTitle(topic.Text),
-            url: topic.FirstURL,
-            content: topic.Text,
-          });
-        }
-      }
-    }
-
-    // Resultsから結果を追加
-    if (data.Results) {
-      for (const result of data.Results) {
-        if (results.length >= maxResults) break;
-        if (result.Text && result.FirstURL) {
-          results.push({
-            title: this.extractTitle(result.Text),
-            url: result.FirstURL,
-            content: result.Text,
-          });
-        }
-      }
-    }
+    const html = await response.text();
+    const results = this.parseResults(html, maxResults);
 
     return {
-      results: results.slice(0, maxResults),
+      results,
       query,
       provider: this.name,
     };
   }
 
-  private extractTitle(text: string): string {
-    // テキストの最初の部分をタイトルとして抽出
-    const dash = text.indexOf(' - ');
-    if (dash > 0 && dash < 100) {
-      return text.substring(0, dash);
+  private parseResults(html: string, maxResults: number): SearchProviderResult[] {
+    const results: SearchProviderResult[] = [];
+
+    // 各検索結果ブロックを抽出
+    const resultBlocks = html.split('class="result ');
+
+    for (let i = 1; i < resultBlocks.length && results.length < maxResults; i++) {
+      const block = resultBlocks[i];
+
+      // URLを抽出 (href="//duckduckgo.com/l/?uddg=..." 形式)
+      const urlMatch = block.match(/class="result__a"[^>]+href="([^"]+)"/);
+      if (!urlMatch) continue;
+
+      const url = this.decodeRedirectUrl(urlMatch[1]);
+      if (!url || !url.startsWith('http')) continue;
+
+      // タイトルを抽出
+      const titleMatch = block.match(/class="result__a"[^>]*>([^<]+)<\/a>/);
+      const title = titleMatch ? this.decodeHtmlEntities(titleMatch[1].trim()) : '';
+      if (!title) continue;
+
+      // スニペットを抽出
+      const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
+      let content = '';
+      if (snippetMatch) {
+        content = this.decodeHtmlEntities(this.stripHtml(snippetMatch[1])).trim();
+      }
+
+      // 重複チェック
+      if (results.some(r => r.url === url)) continue;
+
+      results.push({ title, url, content });
     }
-    return text.substring(0, Math.min(text.length, 60));
+
+    return results;
+  }
+
+  private decodeRedirectUrl(url: string): string {
+    if (url.includes('uddg=')) {
+      const match = url.match(/uddg=([^&]+)/);
+      if (match) {
+        try {
+          return decodeURIComponent(match[1]);
+        } catch {
+          return url;
+        }
+      }
+    }
+    return url;
+  }
+
+  private stripHtml(html: string): string {
+    return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  }
+
+  private decodeHtmlEntities(text: string): string {
+    return text
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ');
   }
 }
