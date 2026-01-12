@@ -12,6 +12,7 @@ export interface SearchResult {
     reason?: string;     // 判定理由
     isExtracted?: boolean; // コンテンツが抽出されたか
   };
+  filtered?: boolean;    // 関連性フィルタで除外されたか（表示用）
 }
 
 // 検索キーワード情報

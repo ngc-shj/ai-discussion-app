@@ -77,6 +77,7 @@ export interface InterruptedTurnState {
   totalRounds: number;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[]; // 検索キーワード
+  searchConfig?: SearchConfig; // 検索設定（再開時に検索を実行するために必要）
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
   discussionDepth?: DiscussionDepth;

@@ -158,17 +158,31 @@ export async function fetchSearchResults(params: SearchParams): Promise<{
 }
 
 /**
+ * 関連性フィルタリングで使用するAIのデフォルト設定
+ */
+export interface DefaultAIConfig {
+  provider: string;
+  model?: string;
+}
+
+/**
  * SearchConfigを使用してWeb検索を実行（discussion-engine用）
  *
  * 処理順序:
  * 1. 検索プロバイダーで検索
  * 2. Jinaで詳細コンテンツを取得（fetchFullContent: trueの場合）
  * 3. AIで関連性フィルタリング+コンテンツ抽出（relevanceFilter.enabled: trueの場合）
+ *
+ * @param query 検索クエリ
+ * @param config 検索設定
+ * @param topic 関連性フィルタリング用のトピック
+ * @param defaultAI 関連性フィルタリング用のデフォルトAI設定（最初の参加者のプロバイダー/モデルを使用）
  */
 export async function performSearch(
   query: string,
   config: SearchConfig,
-  topic?: string  // 関連性フィルタリング用のトピック
+  topic?: string,
+  defaultAI?: DefaultAIConfig
 ): Promise<{ results: SearchResult[]; warnings?: SearchWarning[] }> {
   try {
     const { results, warnings = [] } = await fetchSearchResults({
@@ -196,10 +210,14 @@ export async function performSearch(
     // Step 2: 関連性フィルタリング（AIベース）
     // fullContentがある場合はそれを使って判定し、関連部分のみを抽出
     if (config.relevanceFilter?.enabled && topic && processedResults.length > 0) {
+      // AIプロバイダー: config > defaultAI > 'claude' の優先順位
+      const aiProvider = (config.relevanceFilter.aiProvider || defaultAI?.provider || 'claude') as 'claude' | 'openai' | 'ollama' | 'gemini';
+      const aiModel = config.relevanceFilter.aiModel || defaultAI?.model;
+
       const filterResult = await filterByRelevance(processedResults, topic, {
         threshold: config.relevanceFilter.threshold,
-        aiProvider: config.relevanceFilter.aiProvider as 'claude' | 'openai' | 'ollama' | 'gemini' | undefined,
-        aiModel: config.relevanceFilter.aiModel,
+        aiProvider,
+        aiModel,
       });
       processedResults = filterResult.results;
       if (filterResult.warning) {

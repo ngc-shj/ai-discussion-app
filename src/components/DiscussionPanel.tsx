@@ -14,6 +14,7 @@ interface DiscussionPanelProps {
   currentFinalAnswer?: string;
   currentSummaryPrompt?: string;
   isLoading: boolean;
+  isSearching?: boolean; // 検索中かどうか
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
   onFollowUp?: (topic: string, previousAnswer: string) => void;
@@ -45,6 +46,7 @@ export function DiscussionPanel({
   currentFinalAnswer,
   currentSummaryPrompt,
   isLoading,
+  isSearching,
   searchResults,
   searchKeywords,
   onFollowUp,
@@ -116,6 +118,7 @@ export function DiscussionPanel({
           finalAnswer={currentFinalAnswer}
           summaryPrompt={currentSummaryPrompt}
           isLoading={isLoading}
+          isSearching={isSearching}
           summaryState={summaryState}
           searchResults={searchResults}
           searchKeywords={searchKeywords}

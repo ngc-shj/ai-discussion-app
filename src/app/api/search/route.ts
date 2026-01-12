@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchSearchResults } from '@/lib/search';
+import { fetchSearchResults, performSearch, DefaultAIConfig } from '@/lib/search';
 import { enrichSearchResultsWithContent } from '@/lib/search/jina-reader';
-import { SearchProviderType } from '@/types';
+import { SearchProviderType, SearchConfig } from '@/types';
 import { logger } from '@/lib/logger';
 
 const log = logger.api.child({ route: '/api/search' });
@@ -88,6 +88,11 @@ export async function POST(request: NextRequest) {
       provider,
       fetchFullContent = false,
       fullContentLimit = 3,
+      // 関連性フィルタリング用パラメータ
+      topic,
+      relevanceFilter,
+      defaultAIProvider,
+      defaultAIModel,
     } = body;
 
     if (!query) {
@@ -98,8 +103,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    log.info('Search request received', { method: 'POST', query, searchType: type, maxResults: limit, provider, fetchFullContent });
+    log.info('Search request received', {
+      method: 'POST',
+      query,
+      searchType: type,
+      maxResults: limit,
+      provider,
+      fetchFullContent,
+      relevanceFilterEnabled: relevanceFilter?.enabled,
+    });
 
+    // 関連性フィルタリングが有効な場合はperformSearchを使用
+    if (relevanceFilter?.enabled && topic) {
+      const searchConfig: SearchConfig = {
+        enabled: true,
+        provider: provider as SearchProviderType | undefined,
+        maxResults: limit,
+        searchType: type as 'web' | 'news' | 'images',
+        language,
+        engines: engines?.split?.(',').filter(Boolean) || engines,
+        timing: { onStart: false, eachRound: false, beforeSummary: false, onDemand: false },
+        fetchFullContent,
+        fullContentMaxResults: fullContentLimit,
+        relevanceFilter,
+      };
+
+      const defaultAI: DefaultAIConfig | undefined = defaultAIProvider
+        ? { provider: defaultAIProvider, model: defaultAIModel }
+        : undefined;
+
+      const { results, warnings } = await performSearch(query, searchConfig, topic, defaultAI);
+
+      // filteredCountをwarningから抽出
+      const lowRelevanceWarning = warnings?.find(w => w.type === 'low_relevance');
+      const filteredCount = lowRelevanceWarning
+        ? parseInt(lowRelevanceWarning.message.match(/（(\d+)件除外）/)?.[1] || '0', 10)
+        : 0;
+
+      const duration = Date.now() - startTime;
+      if (warnings && warnings.length > 0) {
+        log.warn('Search completed with warnings', { query, resultCount: results.length, duration, filteredCount, warnings: warnings.map(w => w.type) });
+      } else {
+        log.info('Search completed with relevance filtering', { query, resultCount: results.length, duration, filteredCount });
+      }
+      return NextResponse.json({
+        results,
+        query,
+        totalResults: results.length,
+        provider: provider || 'default',
+        warnings,
+        filteredCount, // フィルタで除外された件数
+      });
+    }
+
+    // 従来の検索処理
     const result = await fetchSearchResults({
       query,
       searchType: type as 'web' | 'news' | 'images',

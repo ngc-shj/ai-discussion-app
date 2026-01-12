@@ -119,7 +119,7 @@ export async function filterByRelevance(
   options: RelevanceFilterOptions = {}
 ): Promise<RelevanceFilterResult> {
   const {
-    aiProvider = 'claude',
+    aiProvider = 'claude',  // デフォルトはclaude（呼び出し側で最初の参加者のプロバイダーを渡すことを推奨）
     aiModel,
     threshold = 0.5,
   } = options;
@@ -136,7 +136,7 @@ export async function filterByRelevance(
     hasFullContent: results.some(r => !!r.fullContent),
   });
 
-  const filteredResults: SearchResult[] = [];
+  const allResults: SearchResult[] = [];
   let filteredCount = 0;
 
   // 各結果を順次処理（並列だとレートリミットにかかりやすい）
@@ -151,45 +151,47 @@ export async function filterByRelevance(
       hasExtracted: !!judgment.extractedContent,
     });
 
-    if (judgment.score >= threshold && judgment.relevant) {
-      // 関連している場合、抽出されたコンテンツがあれば使用
-      const filteredResult: SearchResult = {
-        ...result,
-        // 関連性情報を追加
-        relevance: {
-          score: judgment.score,
-          reason: judgment.reason,
-          isExtracted: !!judgment.extractedContent,
-        },
-      };
+    const isFiltered = !(judgment.score >= threshold && judgment.relevant);
 
-      // 抽出されたコンテンツがある場合はfullContentを置き換え
-      if (judgment.extractedContent) {
-        filteredResult.fullContent = judgment.extractedContent;
-      }
+    // すべての結果に関連性情報を追加（除外されたものも含む）
+    const processedResult: SearchResult = {
+      ...result,
+      relevance: {
+        score: judgment.score,
+        reason: judgment.reason,
+        isExtracted: !!judgment.extractedContent,
+      },
+      filtered: isFiltered, // 除外フラグ
+    };
 
-      filteredResults.push(filteredResult);
-    } else {
+    // 関連している場合、抽出されたコンテンツがあれば使用
+    if (!isFiltered && judgment.extractedContent) {
+      processedResult.fullContent = judgment.extractedContent;
+    }
+
+    if (isFiltered) {
       filteredCount++;
-      log.info('Filtered out irrelevant result', {
+      log.info('Marked as low relevance', {
         title: result.title,
         url: result.url,
         score: judgment.score,
         reason: judgment.reason,
       });
     }
+
+    allResults.push(processedResult);
   }
 
   log.info('Relevance filtering completed', {
     originalCount: results.length,
     filteredCount,
-    remainingCount: filteredResults.length,
+    relevantCount: allResults.length - filteredCount,
   });
 
   const warning = filteredCount > 0 ? createLowRelevanceWarning(filteredCount) : undefined;
 
   return {
-    results: filteredResults,
+    results: allResults, // 除外されたものもfiltered: trueで含む
     filteredCount,
     warning,
   };

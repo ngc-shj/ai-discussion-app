@@ -159,7 +159,9 @@ export default function Home() {
   const handleNewSession = useCallback(() => {
     // 議論中の場合は中断状態を保存してからクリア
     // 注: isSearching は isLoading のサブステート（検索中は必ず isLoading も true）
-    if (isLoading && currentSession && currentTopic) {
+    // currentSessionRefを使用（Reactの状態更新が非同期のため、currentSessionがまだnullの場合がある）
+    const sessionToSave = currentSessionRef.current;
+    if (isLoading && sessionToSave && currentTopic) {
       // 中断フラグを立てる（SSEストリーム処理用）
       handleInterrupt();
       // 中断状態をセッションに即座に保存
@@ -173,6 +175,7 @@ export default function Home() {
         totalRounds: progress.totalRounds,
         searchResults: currentSearchResults.length > 0 ? currentSearchResults : undefined,
         searchKeywords: currentSearchKeywords.length > 0 ? currentSearchKeywords : undefined,
+        searchConfig,
         userProfile,
         discussionMode,
         discussionDepth,
@@ -189,11 +192,12 @@ export default function Home() {
     clearCurrentTurnState();
   }, [
     isLoading,
-    currentSession,
+    currentSessionRef,
     currentTopic,
     currentMessages,
     currentSearchResults,
     currentSearchKeywords,
+    searchConfig,
     discussionParticipants,
     participants,
     progress,
@@ -254,6 +258,7 @@ export default function Home() {
         totalRounds: turn.totalRounds,
         searchResults: turn.searchResults,
         searchKeywords: turn.searchKeywords,
+        searchConfig: turn.searchConfig,
         userProfile: turn.userProfile,
         discussionMode: turn.discussionMode,
         discussionDepth: turn.discussionDepth,
@@ -344,6 +349,57 @@ export default function Home() {
   const handleDiscardInterrupted = useCallback(() => {
     discardInterrupted();
   }, [discardInterrupted]);
+
+  // 中断ボタンが押されたときの処理（状態保存を含む）
+  const handleInterruptWithSave = useCallback(() => {
+    // 中断フラグを立てる（SSEストリーム処理用）
+    handleInterrupt();
+
+    // 現在のセッションに中断状態を保存
+    const sessionToSave = currentSessionRef.current;
+    if (sessionToSave && currentTopic) {
+      const interruptedTurn = {
+        topic: currentTopic,
+        participants: discussionParticipants.length > 0 ? discussionParticipants : participants,
+        messages: currentMessages,
+        currentRound: progress.currentRound,
+        currentParticipantIndex: progress.currentParticipantIndex,
+        totalRounds: progress.totalRounds,
+        searchResults: currentSearchResults.length > 0 ? currentSearchResults : undefined,
+        searchKeywords: currentSearchKeywords.length > 0 ? currentSearchKeywords : undefined,
+        searchConfig,
+        userProfile,
+        discussionMode,
+        discussionDepth,
+        directionGuide,
+        terminationConfig,
+        interruptedAt: new Date(),
+        summaryState: 'idle' as const,
+        startMarker: startMarker || undefined,
+        extensionMarkers: extensionMarkers.length > 0 ? extensionMarkers : undefined,
+      };
+      updateAndSaveSession({ interruptedTurn });
+    }
+  }, [
+    handleInterrupt,
+    currentSessionRef,
+    currentTopic,
+    currentMessages,
+    currentSearchResults,
+    currentSearchKeywords,
+    searchConfig,
+    discussionParticipants,
+    participants,
+    progress,
+    userProfile,
+    discussionMode,
+    discussionDepth,
+    directionGuide,
+    terminationConfig,
+    startMarker,
+    extensionMarkers,
+    updateAndSaveSession,
+  ]);
 
   // 現在の設定をプリセットとして保存
   const handleSaveAsPreset = useCallback((name: string, description?: string) => {
@@ -610,8 +666,9 @@ export default function Home() {
                   type="button"
                   onClick={handleDiscardInterrupted}
                   className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-500 text-gray-200 rounded transition-colors"
+                  title="再開情報を消去します（セッションは削除されません）"
                 >
-                  破棄
+                  閉じる
                 </button>
                 <button
                   type="button"
@@ -638,6 +695,7 @@ export default function Home() {
           currentFinalAnswer={currentFinalAnswer}
           currentSummaryPrompt={currentSummaryPrompt}
           isLoading={isLoading}
+          isSearching={isSearching}
           summaryState={summaryState}
           searchResults={currentSearchResults}
           searchKeywords={currentSearchKeywords}
@@ -678,7 +736,7 @@ export default function Home() {
           summaryState={summaryState}
           participants={isLoading || summaryState !== 'idle' ? discussionParticipants : participants}
           completedParticipants={completedParticipants}
-          onInterrupt={handleInterrupt}
+          onInterrupt={handleInterruptWithSave}
         />
 
         {/* 入力フォーム */}
