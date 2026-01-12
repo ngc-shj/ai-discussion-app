@@ -32,6 +32,7 @@ export type {
   SearchProviderType,
   SearchConfig,
   SearchEnginePreset,
+  RelevanceFilterConfig,
   TechLevel,
   ResponseStyle,
   UserProfile,

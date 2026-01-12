@@ -10,6 +10,7 @@ const WARNING_MESSAGES: Record<SearchWarningType, string> = {
   rate_limited: 'リクエスト制限に達しました。しばらくお待ちください',
   timeout: '検索がタイムアウトしました',
   api_error: '検索APIでエラーが発生しました',
+  low_relevance: 'トピックとの関連性が低い検索結果がフィルタされました',
 };
 
 /**
@@ -105,5 +106,16 @@ export function createNoResultsWarning(): SearchWarning {
     type: 'no_results',
     message: WARNING_MESSAGES.no_results,
     retryable: true,
+  };
+}
+
+/**
+ * 低関連性フィルタリングの警告を生成
+ */
+export function createLowRelevanceWarning(filteredCount: number): SearchWarning {
+  return {
+    type: 'low_relevance',
+    message: `${WARNING_MESSAGES.low_relevance}（${filteredCount}件除外）`,
+    retryable: false,
   };
 }

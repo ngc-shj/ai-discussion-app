@@ -8,6 +8,7 @@ import {
   SearchWarning,
 } from './types';
 import { createWarningFromError } from './warning-utils';
+import { filterByRelevance } from './relevance-filter';
 import {
   SearXNGProvider,
   TavilyProvider,
@@ -158,13 +159,19 @@ export async function fetchSearchResults(params: SearchParams): Promise<{
 
 /**
  * SearchConfigを使用してWeb検索を実行（discussion-engine用）
+ *
+ * 処理順序:
+ * 1. 検索プロバイダーで検索
+ * 2. Jinaで詳細コンテンツを取得（fetchFullContent: trueの場合）
+ * 3. AIで関連性フィルタリング+コンテンツ抽出（relevanceFilter.enabled: trueの場合）
  */
 export async function performSearch(
   query: string,
-  config: SearchConfig
+  config: SearchConfig,
+  topic?: string  // 関連性フィルタリング用のトピック
 ): Promise<{ results: SearchResult[]; warnings?: SearchWarning[] }> {
   try {
-    const { results, warnings } = await fetchSearchResults({
+    const { results, warnings = [] } = await fetchSearchResults({
       query,
       searchType: config.searchType,
       maxResults: config.maxResults,
@@ -173,17 +180,34 @@ export async function performSearch(
       provider: config.provider,
     });
 
-    // 詳細コンテンツを取得
-    if (config.fetchFullContent && results.length > 0) {
-      const enrichedResults = await enrichSearchResultsWithContent(
-        results,
+    let processedResults = results;
+    const allWarnings = [...warnings];
+
+    // Step 1: 詳細コンテンツを取得（Jina Reader）
+    // 関連性フィルタリングで詳細コンテンツを使いたいので先に取得
+    if (config.fetchFullContent && processedResults.length > 0) {
+      processedResults = await enrichSearchResultsWithContent(
+        processedResults,
         { apiKey: process.env.JINA_API_KEY },
         config.fullContentMaxResults || 3
       );
-      return { results: enrichedResults, warnings };
     }
 
-    return { results, warnings };
+    // Step 2: 関連性フィルタリング（AIベース）
+    // fullContentがある場合はそれを使って判定し、関連部分のみを抽出
+    if (config.relevanceFilter?.enabled && topic && processedResults.length > 0) {
+      const filterResult = await filterByRelevance(processedResults, topic, {
+        threshold: config.relevanceFilter.threshold,
+        aiProvider: config.relevanceFilter.aiProvider as 'claude' | 'openai' | 'ollama' | 'gemini' | undefined,
+        aiModel: config.relevanceFilter.aiModel,
+      });
+      processedResults = filterResult.results;
+      if (filterResult.warning) {
+        allWarnings.push(filterResult.warning);
+      }
+    }
+
+    return { results: processedResults, warnings: allWarnings.length > 0 ? allWarnings : undefined };
   } catch (error) {
     const warning = (error as Error & { warning?: SearchWarning }).warning || createWarningFromError(error);
     log.error('Search failed', error, { query, provider: config.provider, warning: warning.type });

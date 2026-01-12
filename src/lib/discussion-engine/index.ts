@@ -191,9 +191,9 @@ export async function* runDiscussion(
         },
       };
 
-      // 各キーワードで検索
+      // 各キーワードで検索（topicを渡して関連性フィルタリングを有効化）
       for (const keyword of searchKeywords) {
-        const { results: newResults } = await performSearch(keyword, searchConfig);
+        const { results: newResults } = await performSearch(keyword, searchConfig, topic);
         if (newResults.length > 0) {
           currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
         }
@@ -319,9 +319,9 @@ export async function* runDiscussion(
             searchResults: currentSearchResults,
           };
 
-          // 各クエリで検索を実行
+          // 各クエリで検索を実行（topicを渡して関連性フィルタリングを有効化）
           for (const query of searchQueries) {
-            const { results: newResults } = await performSearch(query, searchConfig);
+            const { results: newResults } = await performSearch(query, searchConfig, topic);
             if (newResults.length > 0) {
               currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
             }
