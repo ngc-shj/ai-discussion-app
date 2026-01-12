@@ -107,6 +107,7 @@ export async function enrichSearchResultsWithContent(
   maxResults: number = 3  // 詳細取得する最大数
 ): Promise<{ url: string; title: string; content: string; fullContent?: string }[]> {
   const urlsToFetch = searchResults.slice(0, maxResults).map(r => r.url);
+
   const contents = await fetchMultiplePageContents(urlsToFetch, options);
 
   return searchResults.map(result => {

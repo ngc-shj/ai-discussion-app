@@ -48,6 +48,8 @@ const DEFAULT_SEARCH_CONFIG: SearchConfig = {
     beforeSummary: false,
     onDemand: false,
   },
+  fetchFullContent: false,
+  fullContentMaxResults: 3,
 };
 
 export interface DiscussionSettingsState {

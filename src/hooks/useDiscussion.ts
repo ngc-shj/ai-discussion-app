@@ -610,6 +610,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 type: searchConfig.searchType,
                 limit: Math.ceil(searchConfig.maxResults / searchKeywords.length),
                 language: searchConfig.language || 'ja',
+                fetchFullContent: searchConfig.fetchFullContent,
+                fullContentLimit: searchConfig.fullContentMaxResults,
               }),
               signal: abortControllerRef.current.signal,
             });
@@ -939,6 +941,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 type: searchConfig.searchType,
                 limit: Math.ceil(searchConfig.maxResults / searchKeywords.length),
                 language: searchConfig.language || 'ja',
+                fetchFullContent: searchConfig.fetchFullContent,
+                fullContentLimit: searchConfig.fullContentMaxResults,
               }),
               signal: abortControllerRef.current.signal,
             });
