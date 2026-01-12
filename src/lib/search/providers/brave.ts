@@ -10,9 +10,11 @@ import {
   SearchProviderResponse,
   SearchProviderResult,
 } from '../types';
+import { logger } from '@/lib/logger';
 
 const BRAVE_API_URL = 'https://api.search.brave.com/res/v1/web/search';
 const BRAVE_NEWS_API_URL = 'https://api.search.brave.com/res/v1/news/search';
+const log = logger.search.child({ provider: 'brave' });
 
 interface BraveWebResult {
   title: string;
@@ -66,8 +68,11 @@ export class BraveSearchProvider implements ISearchProvider {
     }
 
     const { query, maxResults = 5, language = 'ja', searchType = 'web' } = params;
-
+    const startTime = Date.now();
     const isNews = searchType === 'news';
+
+    log.info('Search started', { query, maxResults, language, searchType });
+
     const baseUrl = isNews ? BRAVE_NEWS_API_URL : BRAVE_API_URL;
 
     const url = new URL(baseUrl);
@@ -78,42 +83,52 @@ export class BraveSearchProvider implements ISearchProvider {
       url.searchParams.set('ui_lang', language);
     }
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        'Accept': 'application/json',
-        'X-Subscription-Token': this.apiKey,
-      },
-    });
+    try {
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Accept': 'application/json',
+          'X-Subscription-Token': this.apiKey,
+        },
+      });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Brave Search returned status ${response.status}: ${error}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        log.error('HTTP error', new Error(`Status ${response.status}`), { query, status: response.status, errorText });
+        throw new Error(`Brave Search returned status ${response.status}: ${errorText}`);
+      }
+
+      let results: SearchProviderResult[];
+
+      if (isNews) {
+        const data: BraveNewsResponse = await response.json();
+        results = (data.results || []).map((result) => ({
+          title: result.title,
+          url: result.url,
+          content: result.description,
+          publishedDate: result.age,
+        }));
+      } else {
+        const data: BraveWebResponse = await response.json();
+        results = (data.web?.results || []).map((result) => ({
+          title: result.title,
+          url: result.url,
+          content: result.description,
+          publishedDate: result.age || result.page_age,
+        }));
+      }
+
+      const duration = Date.now() - startTime;
+      log.info('Search completed', { query, resultCount: results.length, duration });
+
+      return {
+        results: results.slice(0, maxResults),
+        query,
+        provider: this.name,
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      log.error('Search failed', error, { query, duration });
+      throw error;
     }
-
-    let results: SearchProviderResult[];
-
-    if (isNews) {
-      const data: BraveNewsResponse = await response.json();
-      results = (data.results || []).map((result) => ({
-        title: result.title,
-        url: result.url,
-        content: result.description,
-        publishedDate: result.age,
-      }));
-    } else {
-      const data: BraveWebResponse = await response.json();
-      results = (data.web?.results || []).map((result) => ({
-        title: result.title,
-        url: result.url,
-        content: result.description,
-        publishedDate: result.age || result.page_age,
-      }));
-    }
-
-    return {
-      results: results.slice(0, maxResults),
-      query,
-      provider: this.name,
-    };
   }
 }

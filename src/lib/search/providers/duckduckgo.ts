@@ -10,8 +10,10 @@ import {
   SearchProviderResponse,
   SearchProviderResult,
 } from '../types';
+import { logger } from '@/lib/logger';
 
 const DDG_HTML_URL = 'https://html.duckduckgo.com/html/';
+const log = logger.search.child({ provider: 'duckduckgo' });
 
 export class DuckDuckGoProvider implements ISearchProvider {
   readonly name = 'duckduckgo' as const;
@@ -24,31 +26,44 @@ export class DuckDuckGoProvider implements ISearchProvider {
 
   async search(params: SearchProviderParams): Promise<SearchProviderResponse> {
     const { query, maxResults = 5 } = params;
+    const startTime = Date.now();
+
+    log.info('Search started', { query, maxResults });
 
     const formData = new URLSearchParams();
     formData.append('q', query);
 
-    const response = await fetch(DDG_HTML_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': 'Mozilla/5.0 (compatible; AIDiscussionApp/1.0)',
-      },
-      body: formData.toString(),
-    });
+    try {
+      const response = await fetch(DDG_HTML_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (compatible; AIDiscussionApp/1.0)',
+        },
+        body: formData.toString(),
+      });
 
-    if (!response.ok) {
-      throw new Error(`DuckDuckGo returned status ${response.status}`);
+      if (!response.ok) {
+        log.error('HTTP error', new Error(`Status ${response.status}`), { query, status: response.status });
+        throw new Error(`DuckDuckGo returned status ${response.status}`);
+      }
+
+      const html = await response.text();
+      const results = this.parseResults(html, maxResults);
+      const duration = Date.now() - startTime;
+
+      log.info('Search completed', { query, resultCount: results.length, duration });
+
+      return {
+        results,
+        query,
+        provider: this.name,
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      log.error('Search failed', error, { query, duration });
+      throw error;
     }
-
-    const html = await response.text();
-    const results = this.parseResults(html, maxResults);
-
-    return {
-      results,
-      query,
-      provider: this.name,
-    };
   }
 
   private parseResults(html: string, maxResults: number): SearchProviderResult[] {
