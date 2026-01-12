@@ -477,48 +477,58 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     });
   }, []);
 
-  const clearCurrentTurnState = useCallback(() => {
+  // 全ての状態を初期値にリセット
+  const resetAllState = useCallback(() => {
+    // メッセージ・回答関連
     setCurrentMessages([]);
     setCurrentFinalAnswer('');
     setCurrentSummaryPrompt('');
     setCurrentTopic('');
+    // 検索関連
     setCurrentSearchResults([]);
     setCurrentSearchKeywords([]);
-    setError(null);
-    // suggestedFollowUpsはクリアしない（次のアクション用に保持する必要がある）
-    // 新しい議論開始時やセッション切り替え時に個別にクリアする
-    setIsGeneratingFollowUps(false);
-    // ストリーミングメッセージをクリア（中断後の残留を防ぐ）
-    setStreamingMessage(null);
-    setSummaryState('idle');
-    // isLoading/isSearchingもリセットして、プログレスバーを非表示にする
+    // ローディング・進行状況
     setIsLoading(false);
     setIsSearching(false);
-    // 開始マーカー・延長マーカーもクリア
+    setIsGeneratingFollowUps(false);
+    setSummaryState('idle');
+    setProgress(INITIAL_PROGRESS);
+    setCompletedParticipants(new Set());
+    // フォローアップ・投票
+    setSuggestedFollowUps([]);
+    setMessageVotes([]);
+    // エラー・ストリーミング
+    setError(null);
+    setStreamingMessage(null);
+    // 参加者（意図的にクリアしない場合はコメントアウト）
+    // setDiscussionParticipants([]);
+    // マーカー
     setStartMarker(null);
     setExtensionMarkers([]);
-    // 現在の議論設定もクリア
+    // 議論設定
     setCurrentDiscussionMode(null);
     setCurrentDiscussionDepth(null);
     setCurrentDirectionGuide(null);
     setCurrentTerminationConfig(null);
-    // 注: discussionParticipantsはクリアしない
-    // セッション切り替え時にセッションの参加者が復元されるため
-    // 注: interruptRequestedRefはここでリセットしない
-    // SSEストリーム処理が中断を検出して状態を保存するまで維持する必要がある
   }, []);
 
+  const clearCurrentTurnState = useCallback(() => {
+    resetAllState();
+    // 注: suggestedFollowUpsはresetAllStateでクリアされる
+    // 注: discussionParticipantsはresetAllStateでクリアしない（セッション復元用に保持）
+    // 注: interruptRequestedRefはここでリセットしない
+    // SSEストリーム処理が中断を検出して状態を保存するまで維持する必要がある
+  }, [resetAllState]);
+
   const restoreDiscussionState = useCallback((params: RestoreDiscussionStateParams) => {
+    // 全状態を初期化してからパラメータで上書き
+    resetAllState();
+    // 固有の設定を上書き
     setCurrentTopic(params.topic);
     setCurrentMessages(params.messages);
     setCurrentSearchResults(params.searchResults || []);
     setCurrentSearchKeywords(params.searchKeywords || []);
     setSummaryState(params.summaryState || 'idle');
-    setCurrentFinalAnswer('');
-    setCurrentSummaryPrompt('');
-    setError(null);
-    setSuggestedFollowUps([]);
-    setIsGeneratingFollowUps(false);
     // マーカーと議論設定を復元
     setStartMarker(params.startMarker || null);
     setExtensionMarkers(params.extensionMarkers || []);
@@ -526,7 +536,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setCurrentDiscussionDepth(params.discussionDepth || null);
     setCurrentDirectionGuide(params.directionGuide || null);
     setCurrentTerminationConfig(params.terminationConfig || null);
-  }, []);
+  }, [resetAllState]);
 
   const handleInterrupt = useCallback(() => {
     interruptRequestedRef.current = true;
@@ -862,18 +872,9 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       const prevTopic = currentTopic;
       const prevFinalAnswer = currentFinalAnswer;
 
-      setCurrentMessages([]);
-      setCurrentFinalAnswer('');
-      setCurrentSummaryPrompt('');
-      setCurrentSearchResults([]);
-      setSuggestedFollowUps([]);
-      setIsGeneratingFollowUps(false);
-      // ストリーミングメッセージをクリア（前回の議論の残留を防ぐ）
-      setStreamingMessage(null);
-      // 新しい議論開始時にsummaryStateをリセット
-      // 前回の議論が'awaiting'や'generating'で終わっていた場合に備える
-      setSummaryState('idle');
-      // 新しい議論開始時に開始マーカーを設定、延長マーカーをクリア
+      // 全状態を初期化してから固有の設定を上書き
+      resetAllState();
+      // 新しい議論開始時に開始マーカーを設定
       setStartMarker({
         totalRounds: terminationConfig.maxRounds,
         mode: discussionMode,
@@ -881,17 +882,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         keywords: directionGuide.keywords?.length ? directionGuide.keywords : undefined,
         timestamp: new Date(),
       });
-      setExtensionMarkers([]);
       // 現在の議論設定を保存（延長時に参照するため）
       setCurrentDiscussionMode(discussionMode);
       setCurrentDiscussionDepth(discussionDepth);
       setCurrentDirectionGuide(directionGuide);
       setCurrentTerminationConfig(terminationConfig);
-      setError(null);
       setIsLoading(true);
       setCurrentTopic(topic);
       setDiscussionParticipants(participants);
-      setCompletedParticipants(new Set());
       interruptRequestedRef.current = false;
       // AbortControllerを初期化
       abortControllerRef.current = new AbortController();
@@ -1169,7 +1167,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         setIsLoading(false);
       }
     },
-    [currentTopic, currentFinalAnswer, messageVotes, clearCurrentTurnState]
+    [currentTopic, currentFinalAnswer, messageVotes, clearCurrentTurnState, resetAllState]
   );
 
   // 中断した議論を再開
