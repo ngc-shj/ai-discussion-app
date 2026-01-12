@@ -104,8 +104,8 @@ export interface DiscussionActions {
   setCurrentMessages: React.Dispatch<React.SetStateAction<DiscussionMessage[]>>;
   setCurrentFinalAnswer: React.Dispatch<React.SetStateAction<string>>;
   setCurrentTopic: React.Dispatch<React.SetStateAction<string>>;
-  setCurrentSearchResults: React.Dispatch<React.SetStateAction<SearchResult[]>>;
-  setCurrentSearchKeywords: React.Dispatch<React.SetStateAction<SearchKeywordInfo[]>>;
+  setCurrentSearchResults: (updater: SearchResult[] | ((prev: SearchResult[]) => SearchResult[])) => void;
+  setCurrentSearchKeywords: (updater: SearchKeywordInfo[] | ((prev: SearchKeywordInfo[]) => SearchKeywordInfo[])) => void;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setMessageVotes: React.Dispatch<React.SetStateAction<MessageVote[]>>;
   handleVote: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
@@ -194,6 +194,32 @@ const INITIAL_PROGRESS: ProgressState = {
   currentParticipant: null,
 };
 
+// 議論設定の統合型
+export interface CurrentSettings {
+  discussionMode: DiscussionMode | null;
+  discussionDepth: DiscussionDepth | null;
+  directionGuide: DirectionGuide | null;
+  terminationConfig: TerminationConfig | null;
+}
+
+const INITIAL_SETTINGS: CurrentSettings = {
+  discussionMode: null,
+  discussionDepth: null,
+  directionGuide: null,
+  terminationConfig: null,
+};
+
+// 検索データの統合型
+export interface SearchData {
+  results: SearchResult[];
+  keywords: SearchKeywordInfo[];
+}
+
+const INITIAL_SEARCH_DATA: SearchData = {
+  results: [],
+  keywords: [],
+};
+
 // ============================================
 // 共通のディスカッションコンテキスト型
 // ============================================
@@ -231,8 +257,8 @@ interface CreateSSEHandlersParams {
   setIsLoading?: React.Dispatch<React.SetStateAction<boolean>>;
   // isSearchingは不要（searchProgressから派生）
   setSearchProgress?: React.Dispatch<React.SetStateAction<SearchProgress | null>>;
-  setCurrentSearchResults?: React.Dispatch<React.SetStateAction<SearchResult[]>>;
-  setCurrentSearchKeywords?: React.Dispatch<React.SetStateAction<SearchKeywordInfo[]>>;
+  setCurrentSearchResults?: (updater: SearchResult[] | ((prev: SearchResult[]) => SearchResult[])) => void;
+  setCurrentSearchKeywords?: (updater: SearchKeywordInfo[] | ((prev: SearchKeywordInfo[]) => SearchKeywordInfo[])) => void;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setStreamingMessage?: React.Dispatch<React.SetStateAction<StreamingMessage | null>>;
   collectedMessagesRef: { current: DiscussionMessage[] };
@@ -503,7 +529,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [currentFinalAnswer, setCurrentFinalAnswer] = useState<string>('');
   const [currentSummaryPrompt, setCurrentSummaryPrompt] = useState<string>('');
   const [currentTopic, setCurrentTopic] = useState<string>('');
-  const [currentSearchResults, setCurrentSearchResults] = useState<SearchResult[]>([]);
+  // 検索データ（結果とキーワード）- 統合
+  const [searchData, setSearchData] = useState<SearchData>(INITIAL_SEARCH_DATA);
   const [isLoading, setIsLoading] = useState(false);
   const [searchProgress, setSearchProgress] = useState<SearchProgress | null>(null);
   const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
@@ -517,15 +544,30 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [streamingMessage, setStreamingMessage] = useState<StreamingMessage | null>(null);
   const [startMarker, setStartMarker] = useState<StartMarker | null>(null);
   const [extensionMarkers, setExtensionMarkers] = useState<ExtensionMarker[]>([]);
-  const [currentSearchKeywords, setCurrentSearchKeywords] = useState<SearchKeywordInfo[]>([]);
-  // 現在の議論で使用中の設定（延長時に参照するため）
-  const [currentDiscussionMode, setCurrentDiscussionMode] = useState<DiscussionMode | null>(null);
-  const [currentDiscussionDepth, setCurrentDiscussionDepth] = useState<DiscussionDepth | null>(null);
-  const [currentDirectionGuide, setCurrentDirectionGuide] = useState<DirectionGuide | null>(null);
-  const [currentTerminationConfig, setCurrentTerminationConfig] = useState<TerminationConfig | null>(null);
+  // 現在の議論で使用中の設定（延長時に参照するため）- 統合
+  const [currentSettings, setCurrentSettings] = useState<CurrentSettings>(INITIAL_SETTINGS);
 
   const interruptRequestedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // searchDataから派生（後方互換）
+  const currentSearchResults = searchData.results;
+  const currentSearchKeywords = searchData.keywords;
+
+  // searchData更新用ヘルパー
+  const setCurrentSearchResults = useCallback((updater: SearchResult[] | ((prev: SearchResult[]) => SearchResult[])) => {
+    setSearchData(prev => ({
+      ...prev,
+      results: typeof updater === 'function' ? updater(prev.results) : updater,
+    }));
+  }, []);
+
+  const setCurrentSearchKeywords = useCallback((updater: SearchKeywordInfo[] | ((prev: SearchKeywordInfo[]) => SearchKeywordInfo[])) => {
+    setSearchData(prev => ({
+      ...prev,
+      keywords: typeof updater === 'function' ? updater(prev.keywords) : updater,
+    }));
+  }, []);
 
   const handleVote = useCallback((messageId: string, vote: 'agree' | 'disagree' | 'neutral') => {
     setMessageVotes((prev: MessageVote[]) => {
@@ -547,8 +589,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setCurrentSummaryPrompt('');
     setCurrentTopic('');
     // 検索関連
-    setCurrentSearchResults([]);
-    setCurrentSearchKeywords([]);
+    setSearchData(INITIAL_SEARCH_DATA);
     // ローディング・進行状況
     setIsLoading(false);
     setIsGeneratingFollowUps(false);
@@ -568,10 +609,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setStartMarker(null);
     setExtensionMarkers([]);
     // 議論設定
-    setCurrentDiscussionMode(null);
-    setCurrentDiscussionDepth(null);
-    setCurrentDirectionGuide(null);
-    setCurrentTerminationConfig(null);
+    setCurrentSettings(INITIAL_SETTINGS);
   }, []);
 
   const clearCurrentTurnState = useCallback(() => {
@@ -588,16 +626,20 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     // 固有の設定を上書き
     setCurrentTopic(params.topic);
     setCurrentMessages(params.messages);
-    setCurrentSearchResults(params.searchResults || []);
-    setCurrentSearchKeywords(params.searchKeywords || []);
+    setSearchData({
+      results: params.searchResults || [],
+      keywords: params.searchKeywords || [],
+    });
     setSummaryState(params.summaryState || 'idle');
     // マーカーと議論設定を復元
     setStartMarker(params.startMarker || null);
     setExtensionMarkers(params.extensionMarkers || []);
-    setCurrentDiscussionMode(params.discussionMode || null);
-    setCurrentDiscussionDepth(params.discussionDepth || null);
-    setCurrentDirectionGuide(params.directionGuide || null);
-    setCurrentTerminationConfig(params.terminationConfig || null);
+    setCurrentSettings({
+      discussionMode: params.discussionMode || null,
+      discussionDepth: params.discussionDepth || null,
+      directionGuide: params.directionGuide || null,
+      terminationConfig: params.terminationConfig || null,
+    });
   }, [resetAllState]);
 
   const handleInterrupt = useCallback(() => {
@@ -949,10 +991,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         timestamp: new Date(),
       });
       // 現在の議論設定を保存（延長時に参照するため）
-      setCurrentDiscussionMode(discussionMode);
-      setCurrentDiscussionDepth(discussionDepth);
-      setCurrentDirectionGuide(directionGuide);
-      setCurrentTerminationConfig(terminationConfig);
+      setCurrentSettings({
+        discussionMode,
+        discussionDepth,
+        directionGuide,
+        terminationConfig,
+      });
       setIsLoading(true);
       setCurrentTopic(topic);
       setDiscussionParticipants(participants);
@@ -1436,18 +1480,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         setExtensionMarkers(interruptedState.extensionMarkers);
       }
       // 中断状態から議論設定を復元（延長時に参照するため）
-      if (interruptedState.discussionMode) {
-        setCurrentDiscussionMode(interruptedState.discussionMode);
-      }
-      if (interruptedState.discussionDepth) {
-        setCurrentDiscussionDepth(interruptedState.discussionDepth);
-      }
-      if (interruptedState.directionGuide) {
-        setCurrentDirectionGuide(interruptedState.directionGuide);
-      }
-      if (interruptedState.terminationConfig) {
-        setCurrentTerminationConfig(interruptedState.terminationConfig);
-      }
+      setCurrentSettings({
+        discussionMode: interruptedState.discussionMode || null,
+        discussionDepth: interruptedState.discussionDepth || null,
+        directionGuide: interruptedState.directionGuide || null,
+        terminationConfig: interruptedState.terminationConfig || null,
+      });
 
       // 検索が有効で、まだ検索が完了していない場合は検索を実行
       // （検索中に中断された場合の対応）
@@ -1580,8 +1618,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 signal: abortControllerRef.current.signal,
               });
               if (searchResponse.ok) {
-                const searchData = await searchResponse.json();
-                const newResults = searchData.results || [];
+                const searchDataJson = await searchResponse.json();
+                const newResults = searchDataJson.results || [];
                 const existingUrls = new Set(searchResults.map(r => r.url));
                 const uniqueResults = newResults.filter((r: SearchResult) => !existingUrls.has(r.url));
                 searchResults = [...searchResults, ...uniqueResults];
@@ -1591,8 +1629,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 setCurrentSearchResults(limitedResults);
 
                 // 警告を収集
-                if (searchData.warnings && searchData.warnings.length > 0) {
-                  for (const warnType of searchData.warnings) {
+                if (searchDataJson.warnings && searchDataJson.warnings.length > 0) {
+                  for (const warnType of searchDataJson.warnings) {
                     collectedWarnings.push({
                       type: warnType,
                       keyword,
@@ -1955,10 +1993,10 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
 
       // 現在の議論設定を使用（フック内の状態から取得）
       // 1回目の延長で変更された設定が正しく引き継がれる
-      const discussionMode: DiscussionMode = currentDiscussionMode || 'free';
-      const discussionDepth: DiscussionDepth = currentDiscussionDepth || 2;
-      const directionGuide: DirectionGuide = currentDirectionGuide || { keywords: [] };
-      const terminationConfig: TerminationConfig = currentTerminationConfig || { condition: 'rounds', maxRounds: 2 };
+      const discussionMode: DiscussionMode = currentSettings.discussionMode || 'free';
+      const discussionDepth: DiscussionDepth = currentSettings.discussionDepth || 2;
+      const directionGuide: DirectionGuide = currentSettings.directionGuide || { keywords: [] };
+      const terminationConfig: TerminationConfig = currentSettings.terminationConfig || { condition: 'rounds', maxRounds: 2 };
 
       // メッセージから完了済みラウンド数を計算（最も信頼性が高い）
       const completedRounds = currentMessages.length > 0
@@ -2067,10 +2105,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       resumeDiscussion,
       startMarker,
       extensionMarkers,
-      currentDiscussionMode,
-      currentDiscussionDepth,
-      currentDirectionGuide,
-      currentTerminationConfig,
+      currentSettings,
     ]
   );
 
@@ -2104,10 +2139,10 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     streamingMessage,
     startMarker,
     extensionMarkers,
-    currentDiscussionMode,
-    currentDiscussionDepth,
-    currentDirectionGuide,
-    currentTerminationConfig,
+    currentDiscussionMode: currentSettings.discussionMode,
+    currentDiscussionDepth: currentSettings.discussionDepth,
+    currentDirectionGuide: currentSettings.directionGuide,
+    currentTerminationConfig: currentSettings.terminationConfig,
     setCurrentMessages,
     setCurrentFinalAnswer,
     setCurrentTopic,
