@@ -7,6 +7,7 @@ import {
   DiscussionSession,
   SearchResult,
   SearchKeywordInfo,
+  SearchProgress,
   MessageVote,
   FollowUpQuestion,
   InterruptedDiscussionState,
@@ -67,6 +68,7 @@ export interface DiscussionState {
   isProcessing: boolean;
   summaryState: SummaryState;
   progress: ProgressState;
+  searchProgress: SearchProgress | null;
   completedParticipants: Set<string>;
   suggestedFollowUps: FollowUpQuestion[];
   error: string | null;
@@ -444,6 +446,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [currentSearchResults, setCurrentSearchResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchProgress, setSearchProgress] = useState<SearchProgress | null>(null);
   const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
   const [summaryState, setSummaryState] = useState<SummaryState>('idle');
   const [progress, setProgress] = useState<ProgressState>(INITIAL_PROGRESS);
@@ -494,6 +497,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setSummaryState('idle');
     setProgress(INITIAL_PROGRESS);
     setCompletedParticipants(new Set());
+    setSearchProgress(null);
     // フォローアップ・投票
     setSuggestedFollowUps([]);
     setMessageVotes([]);
@@ -928,6 +932,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
       if (searchConfig.enabled && timing.onStart) {
         setIsSearching(true);
+        setSearchProgress({
+          phase: 'keywords',
+          currentKeywordIndex: 0,
+          totalKeywords: 0,
+          completedKeywords: [],
+        });
         try {
           // AIにキーワードを生成させる
           const keywordsResponse = await fetch('/api/generate-search-keywords', {
@@ -942,11 +952,13 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           });
 
           let searchKeywords: string[] = [topic]; // フォールバック
+          let keywordPrompt: string | undefined;
           if (keywordsResponse.ok) {
             const keywordsData = await keywordsResponse.json();
             if (keywordsData.keywords && keywordsData.keywords.length > 0) {
               searchKeywords = keywordsData.keywords;
             }
+            keywordPrompt = keywordsData.prompt;
           }
 
           // 検索キーワード情報を保存
@@ -954,12 +966,31 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             timing: 'start',
             keywords: searchKeywords,
             timestamp: new Date(),
+            prompt: keywordPrompt,
           };
           collectedSearchKeywords = [keywordInfo];
           setCurrentSearchKeywords([keywordInfo]);
 
-          // 生成されたキーワードで検索
-          for (const keyword of searchKeywords) {
+          // 進捗を更新（検索フェーズへ）
+          setSearchProgress({
+            phase: 'searching',
+            currentKeywordIndex: 0,
+            totalKeywords: searchKeywords.length,
+            currentKeyword: searchKeywords[0],
+            completedKeywords: [],
+          });
+
+          // 生成されたキーワードで検索（逐次表示）
+          for (let i = 0; i < searchKeywords.length; i++) {
+            const keyword = searchKeywords[i];
+
+            // 進捗を更新
+            setSearchProgress((prev) => prev ? {
+              ...prev,
+              currentKeywordIndex: i,
+              currentKeyword: keyword,
+            } : null);
+
             const searchResponse = await fetch('/api/search', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -987,21 +1018,38 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
               const existingUrls = new Set(searchResults.map(r => r.url));
               const uniqueResults = newResults.filter((r: SearchResult) => !existingUrls.has(r.url));
               searchResults = [...searchResults, ...uniqueResults];
+
+              // 結果を即座に表示（最大件数に制限）
+              const limitedResults = searchResults.slice(0, searchConfig.maxResults);
+              setCurrentSearchResults(limitedResults);
             }
+
+            // 進捗を更新（完了したキーワードを追加）
+            setSearchProgress((prev) => prev ? {
+              ...prev,
+              completedKeywords: [...prev.completedKeywords, keyword],
+            } : null);
           }
-          // 最大件数に制限
-          searchResults = searchResults.slice(0, searchConfig.maxResults);
-          setCurrentSearchResults(searchResults);
+
+          // 検索完了
+          setSearchProgress({
+            phase: 'done',
+            currentKeywordIndex: searchKeywords.length,
+            totalKeywords: searchKeywords.length,
+            completedKeywords: searchKeywords,
+          });
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
             // 中断された場合は正常終了
             setIsSearching(false);
+            setSearchProgress(null);
             setIsLoading(false);
             return;
           }
           console.error('Search failed:', err);
         } finally {
           setIsSearching(false);
+          setSearchProgress(null);
         }
       }
 
@@ -1273,6 +1321,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
 
       if (needsSearch) {
         setIsSearching(true);
+        setSearchProgress({
+          phase: 'keywords',
+          currentKeywordIndex: 0,
+          totalKeywords: 0,
+          completedKeywords: [],
+        });
         try {
           // キーワードがまだない場合のみ生成
           let searchKeywordsList: string[] = [];
@@ -1294,11 +1348,13 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             });
 
             searchKeywordsList = [interruptedState.topic]; // フォールバック
+            let keywordPrompt: string | undefined;
             if (keywordsResponse.ok) {
               const keywordsData = await keywordsResponse.json();
               if (keywordsData.keywords && keywordsData.keywords.length > 0) {
                 searchKeywordsList = keywordsData.keywords;
               }
+              keywordPrompt = keywordsData.prompt;
             }
 
             // 検索キーワード情報を保存
@@ -1306,14 +1362,33 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
               timing: 'start',
               keywords: searchKeywordsList,
               timestamp: new Date(),
+              prompt: keywordPrompt,
             };
             collectedSearchKeywords = [keywordInfo];
             setCurrentSearchKeywords([keywordInfo]);
           }
 
+          // 進捗を更新（検索フェーズへ）
+          setSearchProgress({
+            phase: 'searching',
+            currentKeywordIndex: 0,
+            totalKeywords: searchKeywordsList.length,
+            currentKeyword: searchKeywordsList[0],
+            completedKeywords: [],
+          });
+
           // 検索結果がまだない場合のみ検索を実行
           if (searchResults.length === 0) {
-            for (const keyword of searchKeywordsList) {
+            for (let i = 0; i < searchKeywordsList.length; i++) {
+              const keyword = searchKeywordsList[i];
+
+              // 進捗を更新
+              setSearchProgress((prev) => prev ? {
+                ...prev,
+                currentKeywordIndex: i,
+                currentKeyword: keyword,
+              } : null);
+
               const searchResponse = await fetch('/api/search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1339,20 +1414,38 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 const existingUrls = new Set(searchResults.map(r => r.url));
                 const uniqueResults = newResults.filter((r: SearchResult) => !existingUrls.has(r.url));
                 searchResults = [...searchResults, ...uniqueResults];
+
+                // 結果を即座に表示（最大件数に制限）
+                const limitedResults = searchResults.slice(0, searchConfig.maxResults);
+                setCurrentSearchResults(limitedResults);
               }
+
+              // 進捗を更新（完了したキーワードを追加）
+              setSearchProgress((prev) => prev ? {
+                ...prev,
+                completedKeywords: [...prev.completedKeywords, keyword],
+              } : null);
             }
-            searchResults = searchResults.slice(0, searchConfig.maxResults);
-            setCurrentSearchResults(searchResults);
           }
+
+          // 検索完了
+          setSearchProgress({
+            phase: 'done',
+            currentKeywordIndex: searchKeywordsList.length,
+            totalKeywords: searchKeywordsList.length,
+            completedKeywords: searchKeywordsList,
+          });
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
             setIsSearching(false);
+            setSearchProgress(null);
             setIsLoading(false);
             return;
           }
           console.error('Search failed:', err);
         } finally {
           setIsSearching(false);
+          setSearchProgress(null);
         }
       }
 
@@ -1762,6 +1855,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     isProcessing,
     summaryState,
     progress,
+    searchProgress,
     completedParticipants,
     suggestedFollowUps,
     error,

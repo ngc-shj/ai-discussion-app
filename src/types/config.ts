@@ -21,6 +21,18 @@ export interface SearchKeywordInfo {
   round?: number;                          // ラウンド番号（eachRound時）
   keywords: string[];                      // 生成されたキーワード
   timestamp: Date;                         // 生成時刻
+  prompt?: string;                         // AIに渡されたプロンプト（確認用）
+}
+
+// 検索進捗状態
+export type SearchPhase = 'keywords' | 'searching' | 'filtering' | 'done';
+
+export interface SearchProgress {
+  phase: SearchPhase;                      // 現在のフェーズ
+  currentKeywordIndex: number;             // 現在処理中のキーワードインデックス
+  totalKeywords: number;                   // 総キーワード数
+  currentKeyword?: string;                 // 現在検索中のキーワード
+  completedKeywords: string[];             // 完了したキーワード
 }
 
 // 検索タイミング設定

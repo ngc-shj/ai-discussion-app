@@ -15,6 +15,7 @@ const TIMING_LABELS: Record<SearchKeywordInfo['timing'], string> = {
 
 export function SearchKeywordsDisplay({ keywords }: SearchKeywordsDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showPromptIndex, setShowPromptIndex] = useState<number | null>(null);
 
   if (keywords.length === 0) return null;
 
@@ -47,7 +48,7 @@ export function SearchKeywordsDisplay({ keywords }: SearchKeywordsDisplayProps) 
               key={`${info.timing}-${info.round || 0}-${index}`}
               className="bg-purple-900/20 border border-purple-700/30 rounded-lg p-2 md:p-3"
             >
-              <div className="flex items-center gap-2 mb-1.5">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className="text-purple-400 text-xs font-medium bg-purple-700/30 px-2 py-0.5 rounded">
                   {TIMING_LABELS[info.timing]}
                   {info.timing === 'round' && info.round && ` ${info.round}`}
@@ -55,6 +56,23 @@ export function SearchKeywordsDisplay({ keywords }: SearchKeywordsDisplayProps) 
                 <span className="text-gray-500 text-xs">
                   {new Date(info.timestamp).toLocaleTimeString('ja-JP')}
                 </span>
+                {info.prompt && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPromptIndex(showPromptIndex === index ? null : index)}
+                    className={`flex items-center gap-1 px-1.5 py-0.5 text-xs rounded transition-colors ${
+                      showPromptIndex === index
+                        ? 'bg-purple-600 text-white'
+                        : 'text-gray-400 hover:text-purple-400 hover:bg-gray-700'
+                    }`}
+                    title="AIへのプロンプトを表示"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                    <span>Prompt</span>
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {info.keywords.map((keyword, kIndex) => (
@@ -66,6 +84,12 @@ export function SearchKeywordsDisplay({ keywords }: SearchKeywordsDisplayProps) 
                   </span>
                 ))}
               </div>
+              {/* プロンプト表示エリア */}
+              {showPromptIndex === index && info.prompt && (
+                <div className="mt-2 bg-gray-900 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
+                  {info.prompt}
+                </div>
+              )}
             </div>
           ))}
         </div>

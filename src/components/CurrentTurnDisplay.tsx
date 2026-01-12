@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, formatParticipantDisplayName, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, SearchProgress, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, formatParticipantDisplayName, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FollowUpSuggestions } from './FollowUpSuggestions';
@@ -23,6 +23,7 @@ interface CurrentTurnDisplayProps {
   summaryState?: SummaryState;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
+  searchProgress?: SearchProgress | null; // 検索進捗状態
   onFollowUp?: (topic: string, previousAnswer: string) => void;
   onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
   onCounterargument?: (topic: string, previousAnswer: string) => void;
@@ -52,6 +53,7 @@ export function CurrentTurnDisplay({
   summaryState,
   searchResults,
   searchKeywords,
+  searchProgress,
   onFollowUp,
   onDeepDive,
   onCounterargument,
@@ -150,19 +152,47 @@ export function CurrentTurnDisplay({
       ) : null}
 
       {/* 検索結果を表示（検索中はプレースホルダー表示） */}
-      {searchResults && searchResults.length > 0 ? (
+      {searchResults && searchResults.length > 0 && (
         <SearchResultsDisplay results={searchResults} />
-      ) : isSearching && searchKeywords && searchKeywords.length > 0 ? (
+      )}
+      {isSearching && searchProgress && searchProgress.phase === 'searching' && (
         <div className="ml-10 md:ml-13 mb-2 md:mb-3">
-          <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-gray-500">
-            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <span>Web検索中...</span>
+          <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <svg className="w-4 h-4 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span className="text-xs md:text-sm text-gray-300">
+                Web検索中... ({searchProgress.currentKeywordIndex + 1}/{searchProgress.totalKeywords})
+              </span>
+            </div>
+            {/* 進捗バー */}
+            <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+              <div
+                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${((searchProgress.currentKeywordIndex + 1) / searchProgress.totalKeywords) * 100}%` }}
+              />
+            </div>
+            {/* 現在検索中のキーワード */}
+            {searchProgress.currentKeyword && (
+              <div className="text-xs text-gray-400">
+                検索中: <span className="text-blue-400">{searchProgress.currentKeyword}</span>
+              </div>
+            )}
+            {/* 完了したキーワード */}
+            {searchProgress.completedKeywords.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {searchProgress.completedKeywords.map((kw, i) => (
+                  <span key={i} className="text-xs bg-green-900/30 text-green-400 px-2 py-0.5 rounded">
+                    ✓ {kw}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      ) : null}
+      )}
 
       {/* AIの議論（折りたたみ） */}
       {(messages.length > 0 || isLoading) && (
