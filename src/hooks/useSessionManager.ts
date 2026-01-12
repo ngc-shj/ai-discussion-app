@@ -104,6 +104,8 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
       if (sessionWithInterrupted) {
         setCurrentSession(sessionWithInterrupted);
         const turn = sessionWithInterrupted.interruptedTurn!;
+        // 注意: InterruptedTurnState/InterruptedDiscussionState にフィールドを追加した場合、
+        // ここと selectSession の両方で対応するフィールドを追加すること
         const interrupted: InterruptedDiscussionState = {
           sessionId: sessionWithInterrupted.id,
           topic: turn.topic,
@@ -114,6 +116,7 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
           totalRounds: turn.totalRounds,
           searchResults: turn.searchResults,
           searchKeywords: turn.searchKeywords,
+          completedSearchKeywordIndex: turn.completedSearchKeywordIndex,
           searchConfig: turn.searchConfig,
           userProfile: turn.userProfile,
           discussionMode: turn.discussionMode,
@@ -122,6 +125,8 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
           terminationConfig: turn.terminationConfig,
           interruptedAt: turn.interruptedAt,
           summaryState: turn.summaryState,
+          startMarker: turn.startMarker,
+          extensionMarkers: turn.extensionMarkers,
         };
         setInterruptedStateInternal(interrupted);
       }
@@ -142,6 +147,8 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
     // セッションに中断状態がある場合
     if (session.interruptedTurn) {
       const turn = session.interruptedTurn;
+      // 注意: InterruptedTurnState/InterruptedDiscussionState にフィールドを追加した場合、
+      // ここと初期ロード処理の両方で対応するフィールドを追加すること
       const interrupted: InterruptedDiscussionState = {
         sessionId: session.id,
         topic: turn.topic,
@@ -152,6 +159,7 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
         totalRounds: turn.totalRounds,
         searchResults: turn.searchResults,
         searchKeywords: turn.searchKeywords,
+        completedSearchKeywordIndex: turn.completedSearchKeywordIndex,
         searchConfig: turn.searchConfig,
         userProfile: turn.userProfile,
         discussionMode: turn.discussionMode,
@@ -160,6 +168,8 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
         terminationConfig: turn.terminationConfig,
         interruptedAt: turn.interruptedAt,
         summaryState: turn.summaryState,
+        startMarker: turn.startMarker,
+        extensionMarkers: turn.extensionMarkers,
       };
       setInterruptedStateInternal(interrupted);
     } else {
