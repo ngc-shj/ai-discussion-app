@@ -488,6 +488,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     // suggestedFollowUpsはクリアしない（次のアクション用に保持する必要がある）
     // 新しい議論開始時やセッション切り替え時に個別にクリアする
     setIsGeneratingFollowUps(false);
+    // ストリーミングメッセージをクリア（中断後の残留を防ぐ）
+    setStreamingMessage(null);
     setSummaryState('idle');
     // isLoading/isSearchingもリセットして、プログレスバーを非表示にする
     setIsLoading(false);
@@ -532,6 +534,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
+    // ストリーミングメッセージをクリア（中断時の残留を防ぐ）
+    setStreamingMessage(null);
   }, []);
 
   // 統合回答を生成
@@ -864,6 +868,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       setCurrentSearchResults([]);
       setSuggestedFollowUps([]);
       setIsGeneratingFollowUps(false);
+      // ストリーミングメッセージをクリア（前回の議論の残留を防ぐ）
+      setStreamingMessage(null);
       // 新しい議論開始時にsummaryStateをリセット
       // 前回の議論が'awaiting'や'generating'で終わっていた場合に備える
       setSummaryState('idle');
