@@ -15,6 +15,29 @@ import {
   isCustomRoleId,
 } from '@/types';
 
+// 全文コンテンツの最大文字数（1件あたり）
+const MAX_FULL_CONTENT_LENGTH = 3000;
+
+/**
+ * 全文コンテンツを適切な長さに切り詰める
+ */
+function truncateContent(content: string, maxLength: number): string {
+  if (content.length <= maxLength) {
+    return content;
+  }
+  // 文の途中で切れないように、最後の改行または句点で切る
+  const truncated = content.slice(0, maxLength);
+  const lastBreak = Math.max(
+    truncated.lastIndexOf('\n'),
+    truncated.lastIndexOf('。'),
+    truncated.lastIndexOf('. ')
+  );
+  if (lastBreak > maxLength * 0.7) {
+    return truncated.slice(0, lastBreak + 1) + '\n...（省略）';
+  }
+  return truncated + '...（省略）';
+}
+
 /**
  * 検索結果をフォーマット
  */
@@ -26,11 +49,15 @@ export function formatSearchResults(searchResults: SearchResult[]): string {
   const formattedResults = searchResults
     .map((result, i) => {
       let text = `${i + 1}. ${result.title}\n   URL: ${result.url}`;
-      if (result.content) {
-        text += `\n   内容: ${result.content}`;
-      }
       if (result.publishedDate) {
         text += `\n   日付: ${result.publishedDate}`;
+      }
+      // fullContentがあればそれを使用、なければcontentを使用
+      if (result.fullContent) {
+        const truncated = truncateContent(result.fullContent, MAX_FULL_CONTENT_LENGTH);
+        text += `\n   詳細:\n${truncated}`;
+      } else if (result.content) {
+        text += `\n   内容: ${result.content}`;
       }
       return text;
     })
