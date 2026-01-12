@@ -1294,6 +1294,21 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         updateAndSaveSession,
       } = params;
 
+      // 再開情報をログ出力
+      console.log('[resumeDiscussion] Resuming discussion:', {
+        sessionId: interruptedState.sessionId,
+        topic: interruptedState.topic,
+        currentRound: interruptedState.currentRound,
+        totalRounds: interruptedState.totalRounds,
+        currentParticipantIndex: interruptedState.currentParticipantIndex,
+        totalParticipants: interruptedState.participants.length,
+        messagesCount: interruptedState.messages.length,
+        searchResultsCount: interruptedState.searchResults?.length || 0,
+        searchKeywordsCount: interruptedState.searchKeywords?.length || 0,
+        completedSearchKeywordIndex: interruptedState.completedSearchKeywordIndex ?? -1,
+        interruptedAt: interruptedState.interruptedAt,
+      });
+
       clearInterruptedState();
       setInterruptedState(null);
 
@@ -1379,6 +1394,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         (collectedSearchKeywords.length === 0 || hasMoreKeywordsToSearch);
 
       if (needsSearch) {
+        console.log('[resumeDiscussion] Resuming search:', {
+          hasExistingKeywords: collectedSearchKeywords.length > 0,
+          totalKeywords: collectedSearchKeywords[0]?.keywords.length || 0,
+          completedKeywordIndex,
+          startingFromIndex: completedKeywordIndex + 1,
+          existingSearchResults: searchResults.length,
+        });
+
         setIsSearching(true);
         setSearchProgress({
           phase: 'keywords',
