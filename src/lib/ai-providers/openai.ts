@@ -1,6 +1,9 @@
 import OpenAI from 'openai';
 import { AIRequest, AIResponse } from '@/types';
 import { AIProvider, ModelInfo } from './types';
+import { logger } from '@/lib/logger';
+
+const log = logger.ai.child({ provider: 'openai' });
 
 export class OpenAIProvider implements AIProvider {
   readonly type = 'openai' as const;
@@ -52,7 +55,7 @@ export class OpenAIProvider implements AIProvider {
         })
         .map(({ id, name }) => ({ id, name }));
     } catch (error) {
-      console.error('Failed to list OpenAI models:', error);
+      log.error('Failed to list models', error);
       return [];
     }
   }
@@ -65,6 +68,9 @@ export class OpenAIProvider implements AIProvider {
         error: 'OPENAI_API_KEY is not configured',
       };
     }
+
+    const startTime = Date.now();
+    log.info('Generate started', { model: this.model });
 
     try {
       const completion = await this.client.chat.completions.create({
@@ -79,13 +85,18 @@ export class OpenAIProvider implements AIProvider {
       });
 
       const content = completion.choices[0]?.message?.content || '';
+      const duration = Date.now() - startTime;
+
+      log.info('Generate completed', { model: this.model, contentLength: content.length, duration });
 
       return {
         content,
         provider: this.type,
       };
     } catch (error) {
+      const duration = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      log.error('Generate failed', error, { model: this.model, duration });
       return {
         content: '',
         provider: this.type,

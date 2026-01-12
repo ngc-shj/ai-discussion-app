@@ -1,6 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AIRequest, AIResponse } from '@/types';
 import { AIProvider, ModelInfo } from './types';
+import { logger } from '@/lib/logger';
+
+const log = logger.ai.child({ provider: 'gemini' });
 
 export class GeminiProvider implements AIProvider {
   readonly type = 'gemini' as const;
@@ -69,7 +72,7 @@ export class GeminiProvider implements AIProvider {
         })
         .map(({ id, name }: { id: string; name: string }) => ({ id, name }));
     } catch (error) {
-      console.error('Failed to list Gemini models:', error);
+      log.error('Failed to list models', error);
       return [];
     }
   }
@@ -83,18 +86,26 @@ export class GeminiProvider implements AIProvider {
       };
     }
 
+    const startTime = Date.now();
+    log.info('Generate started', { model: this.model });
+
     try {
       const generativeModel = this.client.getGenerativeModel({ model: this.model });
       const result = await generativeModel.generateContent(request.prompt);
       const response = await result.response;
       const content = response.text();
+      const duration = Date.now() - startTime;
+
+      log.info('Generate completed', { model: this.model, contentLength: content.length, duration });
 
       return {
         content,
         provider: this.type,
       };
     } catch (error) {
+      const duration = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      log.error('Generate failed', error, { model: this.model, duration });
       return {
         content: '',
         provider: this.type,

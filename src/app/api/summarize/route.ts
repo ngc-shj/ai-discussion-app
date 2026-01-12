@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server';
 import { DiscussionMessage, DiscussionParticipant, PreviousTurnSummary, SearchResult, ROLE_PRESETS, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, MessageVote } from '@/types';
 import { createProvider, createDiscussionPrompt } from '@/lib/ai-providers';
+import { logger } from '@/lib/logger';
+
+const log = logger.api.child({ route: '/api/summarize' });
 
 interface SummarizeRequest {
   topic: string;
@@ -30,6 +33,7 @@ export async function POST(request: NextRequest) {
     const body: SummarizeRequest = await request.json();
 
     if (!body.topic || !body.participants || body.participants.length === 0 || !body.messages || body.messages.length === 0) {
+      log.warn('Missing required parameters');
       return Response.json(
         { error: 'Topic, participants, and messages are required' },
         { status: 400 }
@@ -37,6 +41,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { topic, participants, messages, previousTurns, searchResults, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes } = body;
+
+    log.info('Summarize request received', { topic, messageCount: messages.length, participantCount: participants.length });
 
     // 過去のターンの要約を準備（最新5件まで）
     const turnContext: PreviousTurnSummary[] | undefined = previousTurns?.slice(-5);
@@ -123,7 +129,7 @@ export async function POST(request: NextRequest) {
                   })}\n\n`));
                 }
               } catch (streamError) {
-                console.error('Streaming error:', streamError);
+                log.warn('Streaming failed, falling back to non-streaming', { error: streamError });
                 // ストリーミングに失敗した場合は通常の生成にフォールバック
                 const summaryResponse = await summaryProvider.generate({ prompt: summaryPrompt });
                 if (!summaryResponse.error && summaryResponse.content) {
@@ -182,6 +188,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    log.error('Summarize request failed', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return Response.json({ error: errorMessage }, { status: 500 });
   }

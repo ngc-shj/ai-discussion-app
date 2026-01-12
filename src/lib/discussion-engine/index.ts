@@ -4,6 +4,9 @@ import { createSearchKeywordPrompt, SearchKeywordTiming } from '../ai-providers/
 import { DiscussionProgress, DiscussionRequest, getProviderDisplayName } from './types';
 import { checkConsensus, checkTerminationKeywords } from './termination';
 import { performSearch, mergeSearchResults } from '../search';
+import { logger } from '@/lib/logger';
+
+const log = logger.discussion;
 
 // Re-export types
 export type { DiscussionProgress, ResumeFromState, DiscussionRequest } from './types';
@@ -93,7 +96,7 @@ async function generateSearchKeywords(
     const keywords = parseKeywordsResponse(response.content);
     return keywords.length > 0 ? keywords : [topic];
   } catch (error) {
-    console.error('Failed to generate search keywords:', error);
+    log.error('Failed to generate search keywords', error, { topic, timing });
     return [topic]; // フォールバック
   }
 }
@@ -120,6 +123,9 @@ export async function* runDiscussion(
     messageVotes,
     skipSummary,
   } = request;
+
+  const startTime = Date.now();
+  log.info('Discussion started', { topic, participantCount: participants.length, rounds, resumeFrom: !!resumeFrom });
 
   // 検索結果を動的に更新できるように変数化
   let currentSearchResults: SearchResult[] = initialSearchResults ? [...initialSearchResults] : [];
@@ -224,7 +230,7 @@ export async function* runDiscussion(
       const isAvailable = await provider.isAvailable();
 
       if (!isAvailable) {
-        console.error(`Provider not available: ${participant.displayName} (${participant.provider}/${participant.model})`);
+        log.warn('Provider not available', { participant: participant.displayName, provider: participant.provider, model: participant.model });
         yield {
           type: 'error',
           error: `${participant.displayName} is not available`,
@@ -377,7 +383,7 @@ export async function* runDiscussion(
   // メッセージがない場合は統合回答を生成しない
   if (messages.length === 0) {
     const providerNames = participants.map(p => p.displayName).join(', ');
-    console.error(`All providers failed. Attempted providers: ${providerNames}`);
+    log.error('All providers failed', new Error('No messages generated'), { providers: providerNames });
     yield {
       type: 'error',
       error: `No messages were generated. All providers failed (${providerNames}).`,
@@ -387,6 +393,8 @@ export async function* runDiscussion(
 
   // skipSummaryがtrueの場合、統合回答生成をスキップ
   if (skipSummary) {
+    const duration = Date.now() - startTime;
+    log.info('Discussion completed (skip summary)', { topic, messageCount: messages.length, duration });
     yield {
       type: 'ready_for_summary',
       messages: messages,
@@ -399,6 +407,9 @@ export async function* runDiscussion(
 
   // 統合回答を生成
   yield* generateSummary(messages, participants, topic, rounds, turnContext, currentSearchResults.length > 0 ? currentSearchResults : undefined, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes);
+
+  const duration = Date.now() - startTime;
+  log.info('Discussion completed', { topic, messageCount: messages.length, duration });
 }
 
 /**
@@ -561,6 +572,6 @@ async function* generateFollowUps(
     }
   } catch (error) {
     // フォローアップ質問の生成に失敗しても議論は完了とする
-    console.error('Failed to generate follow-up questions:', error);
+    log.warn('Failed to generate follow-up questions', { error });
   }
 }

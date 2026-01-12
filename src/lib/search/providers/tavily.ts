@@ -10,8 +10,10 @@ import {
   SearchProviderResponse,
   SearchProviderResult,
 } from '../types';
+import { logger } from '@/lib/logger';
 
 const TAVILY_API_URL = 'https://api.tavily.com/search';
+const log = logger.search.child({ provider: 'tavily' });
 
 interface TavilyResult {
   title: string;
@@ -48,41 +50,54 @@ export class TavilyProvider implements ISearchProvider {
     }
 
     const { query, maxResults = 5, searchType = 'web' } = params;
+    const startTime = Date.now();
 
-    const response = await fetch(TAVILY_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        api_key: this.apiKey,
-        query,
-        max_results: maxResults,
-        search_depth: 'basic',
-        include_answer: false,
-        include_raw_content: false,
-        topic: searchType === 'news' ? 'news' : 'general',
-      }),
-    });
+    log.info('Search started', { query, maxResults, searchType });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Tavily returned status ${response.status}: ${error}`);
+    try {
+      const response = await fetch(TAVILY_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          api_key: this.apiKey,
+          query,
+          max_results: maxResults,
+          search_depth: 'basic',
+          include_answer: false,
+          include_raw_content: false,
+          topic: searchType === 'news' ? 'news' : 'general',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        log.error('HTTP error', new Error(`Status ${response.status}`), { query, status: response.status, errorText });
+        throw new Error(`Tavily returned status ${response.status}: ${errorText}`);
+      }
+
+      const data: TavilyResponse = await response.json();
+      const duration = Date.now() - startTime;
+
+      const results: SearchProviderResult[] = data.results.map((result) => ({
+        title: result.title,
+        url: result.url,
+        content: result.content,
+        publishedDate: result.published_date,
+      }));
+
+      log.info('Search completed', { query, resultCount: results.length, duration, responseTime: data.response_time });
+
+      return {
+        results,
+        query: data.query,
+        provider: this.name,
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      log.error('Search failed', error, { query, duration });
+      throw error;
     }
-
-    const data: TavilyResponse = await response.json();
-
-    const results: SearchProviderResult[] = data.results.map((result) => ({
-      title: result.title,
-      url: result.url,
-      content: result.content,
-      publishedDate: result.published_date,
-    }));
-
-    return {
-      results,
-      query: data.query,
-      provider: this.name,
-    };
   }
 }

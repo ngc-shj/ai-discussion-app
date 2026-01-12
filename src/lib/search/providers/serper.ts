@@ -10,9 +10,11 @@ import {
   SearchProviderResponse,
   SearchProviderResult,
 } from '../types';
+import { logger } from '@/lib/logger';
 
 const SERPER_API_URL = 'https://google.serper.dev/search';
 const SERPER_NEWS_API_URL = 'https://google.serper.dev/news';
+const log = logger.search.child({ provider: 'serper' });
 
 interface SerperOrganicResult {
   title: string;
@@ -64,53 +66,66 @@ export class SerperProvider implements ISearchProvider {
     }
 
     const { query, maxResults = 5, language = 'ja', searchType = 'web' } = params;
-
+    const startTime = Date.now();
     const isNews = searchType === 'news';
+
+    log.info('Search started', { query, maxResults, language, searchType });
+
     const apiUrl = isNews ? SERPER_NEWS_API_URL : SERPER_API_URL;
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': this.apiKey,
-      },
-      body: JSON.stringify({
-        q: query,
-        num: maxResults,
-        hl: language,
-        gl: language === 'ja' ? 'jp' : language === 'en' ? 'us' : undefined,
-      }),
-    });
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': this.apiKey,
+        },
+        body: JSON.stringify({
+          q: query,
+          num: maxResults,
+          hl: language,
+          gl: language === 'ja' ? 'jp' : language === 'en' ? 'us' : undefined,
+        }),
+      });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Serper returned status ${response.status}: ${error}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        log.error('HTTP error', new Error(`Status ${response.status}`), { query, status: response.status, errorText });
+        throw new Error(`Serper returned status ${response.status}: ${errorText}`);
+      }
+
+      let results: SearchProviderResult[];
+
+      if (isNews) {
+        const data: SerperNewsResponse = await response.json();
+        results = (data.news || []).map((result) => ({
+          title: result.title,
+          url: result.link,
+          content: result.snippet,
+          publishedDate: result.date,
+        }));
+      } else {
+        const data: SerperWebResponse = await response.json();
+        results = (data.organic || []).map((result) => ({
+          title: result.title,
+          url: result.link,
+          content: result.snippet,
+          publishedDate: result.date,
+        }));
+      }
+
+      const duration = Date.now() - startTime;
+      log.info('Search completed', { query, resultCount: results.length, duration });
+
+      return {
+        results: results.slice(0, maxResults),
+        query,
+        provider: this.name,
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      log.error('Search failed', error, { query, duration });
+      throw error;
     }
-
-    let results: SearchProviderResult[];
-
-    if (isNews) {
-      const data: SerperNewsResponse = await response.json();
-      results = (data.news || []).map((result) => ({
-        title: result.title,
-        url: result.link,
-        content: result.snippet,
-        publishedDate: result.date,
-      }));
-    } else {
-      const data: SerperWebResponse = await response.json();
-      results = (data.organic || []).map((result) => ({
-        title: result.title,
-        url: result.link,
-        content: result.snippet,
-        publishedDate: result.date,
-      }));
-    }
-
-    return {
-      results: results.slice(0, maxResults),
-      query,
-      provider: this.name,
-    };
   }
 }

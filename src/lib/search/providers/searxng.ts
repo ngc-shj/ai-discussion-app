@@ -8,9 +8,11 @@ import {
   SearchProviderResponse,
   SearchProviderResult,
 } from '../types';
+import { logger } from '@/lib/logger';
 
 const SEARXNG_BASE_URL = process.env.SEARXNG_BASE_URL || 'http://localhost:8080';
 const DEFAULT_ENGINES = ['google'];
+const log = logger.search.child({ provider: 'searxng' });
 
 interface SearXNGResult {
   title: string;
@@ -43,6 +45,9 @@ export class SearXNGProvider implements ISearchProvider {
 
   async search(params: SearchProviderParams): Promise<SearchProviderResponse> {
     const { query, maxResults = 5, language = 'ja', searchType = 'web' } = params;
+    const startTime = Date.now();
+
+    log.info('Search started', { query, maxResults, language, searchType, engines: this.engines });
 
     const url = new URL('/search', SEARXNG_BASE_URL);
     url.searchParams.set('q', query);
@@ -59,31 +64,41 @@ export class SearXNGProvider implements ISearchProvider {
 
     url.searchParams.set('engines', this.engines.join(','));
 
-    const response = await fetch(url.toString(), {
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    try {
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error(`SearXNG returned status ${response.status}`);
+      if (!response.ok) {
+        log.error('HTTP error', new Error(`Status ${response.status}`), { query, status: response.status });
+        throw new Error(`SearXNG returned status ${response.status}`);
+      }
+
+      const data: SearXNGResponse = await response.json();
+      const duration = Date.now() - startTime;
+
+      const results: SearchProviderResult[] = data.results
+        .slice(0, maxResults)
+        .map((result) => ({
+          title: result.title,
+          url: result.url,
+          content: result.content || '',
+          publishedDate: result.publishedDate,
+        }));
+
+      log.info('Search completed', { query, resultCount: results.length, totalResults: data.number_of_results, duration });
+
+      return {
+        results,
+        query: data.query,
+        provider: this.name,
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      log.error('Search failed', error, { query, duration });
+      throw error;
     }
-
-    const data: SearXNGResponse = await response.json();
-
-    const results: SearchProviderResult[] = data.results
-      .slice(0, maxResults)
-      .map((result) => ({
-        title: result.title,
-        url: result.url,
-        content: result.content || '',
-        publishedDate: result.publishedDate,
-      }));
-
-    return {
-      results,
-      query: data.query,
-      provider: this.name,
-    };
   }
 }

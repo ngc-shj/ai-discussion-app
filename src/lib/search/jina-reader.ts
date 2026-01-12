@@ -3,6 +3,9 @@
  * https://r.jina.ai/{URL} でURLのコンテンツをMarkdownに変換して取得
  */
 
+import { logger } from '@/lib/logger';
+
+const log = logger.search.child({ component: 'jina-reader' });
 const JINA_READER_BASE_URL = 'https://r.jina.ai';
 
 export interface JinaReaderOptions {
@@ -25,6 +28,9 @@ export async function fetchPageContent(
   options: JinaReaderOptions = {}
 ): Promise<JinaReaderResult> {
   const { apiKey, timeout = 15000 } = options;
+  const startTime = Date.now();
+
+  log.debug('Fetching page content', { url, timeout });
 
   try {
     const jinaUrl = `${JINA_READER_BASE_URL}/${url}`;
@@ -49,6 +55,8 @@ export async function fetchPageContent(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      const duration = Date.now() - startTime;
+      log.warn('Fetch failed with HTTP error', { url, status: response.status, duration });
       return {
         url,
         content: '',
@@ -58,6 +66,9 @@ export async function fetchPageContent(
     }
 
     const content = await response.text();
+    const duration = Date.now() - startTime;
+
+    log.info('Fetch completed', { url, contentLength: content.length, duration });
 
     return {
       url,
@@ -65,12 +76,15 @@ export async function fetchPageContent(
       success: true,
     };
   } catch (error) {
+    const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isTimeout = errorMessage.includes('abort');
+    log.error('Fetch failed', error, { url, duration, isTimeout });
     return {
       url,
       content: '',
       success: false,
-      error: errorMessage.includes('abort') ? 'Request timeout' : errorMessage,
+      error: isTimeout ? 'Request timeout' : errorMessage,
     };
   }
 }
