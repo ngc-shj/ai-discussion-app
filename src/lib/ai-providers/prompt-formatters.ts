@@ -40,13 +40,21 @@ function truncateContent(content: string, maxLength: number): string {
 
 /**
  * 検索結果をフォーマット
+ * 注意: filtered: true の結果（関連性フィルタで除外されたもの）は含めない
  */
 export function formatSearchResults(searchResults: SearchResult[]): string {
   if (!searchResults || searchResults.length === 0) {
     return '';
   }
 
-  const formattedResults = searchResults
+  // filtered: true の結果を除外
+  const relevantResults = searchResults.filter((result) => !result.filtered);
+
+  if (relevantResults.length === 0) {
+    return '';
+  }
+
+  const formattedResults = relevantResults
     .map((result, i) => {
       let text = `${i + 1}. ${result.title}\n   URL: ${result.url}`;
       if (result.publishedDate) {

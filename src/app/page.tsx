@@ -51,6 +51,7 @@ export default function Home() {
     currentSearchKeywords,
     isLoading,
     isSearching,
+    searchProgress,
     isGeneratingFollowUps,
     isProcessing,
     summaryState,
@@ -699,6 +700,7 @@ export default function Home() {
           summaryState={summaryState}
           searchResults={currentSearchResults}
           searchKeywords={currentSearchKeywords}
+          searchProgress={searchProgress}
           onFollowUp={handleFollowUp}
           onDeepDive={handleDeepDive}
           onCounterargument={handleCounterargument}

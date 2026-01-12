@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       keywords,
       rawResponse: response.content,
+      prompt, // AIに渡されたプロンプト（確認用）
     });
   } catch (error) {
     const duration = Date.now() - startTime;

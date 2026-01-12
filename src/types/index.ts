@@ -29,6 +29,10 @@ export type { TurnBranch, DiscussionSession } from './session';
 export type {
   SearchResult,
   SearchKeywordInfo,
+  SearchPhase,
+  SearchProgress,
+  SearchWarningType,
+  SearchWarning,
   SearchProviderType,
   SearchConfig,
   SearchEnginePreset,
