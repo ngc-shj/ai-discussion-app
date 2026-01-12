@@ -13,6 +13,9 @@ import {
   BraveSearchProvider,
   SerperProvider,
 } from './providers';
+import { logger } from '@/lib/logger';
+
+const log = logger.search;
 
 // 型定義のエクスポート
 export * from './types';
@@ -178,7 +181,7 @@ export async function performSearch(
 
     return results;
   } catch (error) {
-    console.error('Search error:', error);
+    log.error('Search failed', error, { query, provider: config.provider });
     return [];
   }
 }
