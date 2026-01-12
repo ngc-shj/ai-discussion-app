@@ -5,7 +5,9 @@ import {
   ISearchProvider,
   SearchProviderInfo,
   SearchProviderParams,
+  SearchWarning,
 } from './types';
+import { createWarningFromError } from './warning-utils';
 import {
   SearXNGProvider,
   TavilyProvider,
@@ -124,6 +126,7 @@ export async function fetchSearchResults(params: SearchParams): Promise<{
   query: string;
   totalResults: number;
   provider: SearchProvider;
+  warnings?: SearchWarning[];
 }> {
   const provider = params.provider || getDefaultSearchProvider();
   const searchProvider = getSearchProvider(provider, params.engines);
@@ -149,6 +152,7 @@ export async function fetchSearchResults(params: SearchParams): Promise<{
     query: response.query,
     totalResults: results.length,
     provider: response.provider,
+    warnings: response.warnings,
   };
 }
 
@@ -158,9 +162,9 @@ export async function fetchSearchResults(params: SearchParams): Promise<{
 export async function performSearch(
   query: string,
   config: SearchConfig
-): Promise<SearchResult[]> {
+): Promise<{ results: SearchResult[]; warnings?: SearchWarning[] }> {
   try {
-    const { results } = await fetchSearchResults({
+    const { results, warnings } = await fetchSearchResults({
       query,
       searchType: config.searchType,
       maxResults: config.maxResults,
@@ -176,13 +180,14 @@ export async function performSearch(
         { apiKey: process.env.JINA_API_KEY },
         config.fullContentMaxResults || 3
       );
-      return enrichedResults;
+      return { results: enrichedResults, warnings };
     }
 
-    return results;
+    return { results, warnings };
   } catch (error) {
-    log.error('Search failed', error, { query, provider: config.provider });
-    return [];
+    const warning = (error as Error & { warning?: SearchWarning }).warning || createWarningFromError(error);
+    log.error('Search failed', error, { query, provider: config.provider, warning: warning.type });
+    return { results: [], warnings: [warning] };
   }
 }
 

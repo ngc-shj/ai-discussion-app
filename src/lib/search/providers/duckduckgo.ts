@@ -9,7 +9,13 @@ import {
   SearchProviderParams,
   SearchProviderResponse,
   SearchProviderResult,
+  SearchWarning,
 } from '../types';
+import {
+  createWarningFromHttpStatus,
+  createWarningFromError,
+  createNoResultsWarning,
+} from '../warning-utils';
 import { logger } from '@/lib/logger';
 
 const DDG_HTML_URL = 'https://html.duckduckgo.com/html/';
@@ -44,13 +50,23 @@ export class DuckDuckGoProvider implements ISearchProvider {
       });
 
       if (!response.ok) {
-        log.error('HTTP error', new Error(`Status ${response.status}`), { query, status: response.status });
-        throw new Error(`DuckDuckGo returned status ${response.status}`);
+        const warning = createWarningFromHttpStatus(response.status);
+        log.warn('HTTP error', { query, status: response.status, warning: warning.type });
+        const error = new Error(`DuckDuckGo returned status ${response.status}`);
+        (error as Error & { warning: SearchWarning }).warning = warning;
+        throw error;
       }
 
       const html = await response.text();
       const results = this.parseResults(html, maxResults);
       const duration = Date.now() - startTime;
+
+      const warnings: SearchWarning[] = [];
+      if (results.length === 0) {
+        const warning = createNoResultsWarning();
+        warnings.push(warning);
+        log.warn('No search results', { query, duration });
+      }
 
       log.info('Search completed', { query, resultCount: results.length, duration });
 
@@ -58,11 +74,15 @@ export class DuckDuckGoProvider implements ISearchProvider {
         results,
         query,
         provider: this.name,
+        warnings: warnings.length > 0 ? warnings : undefined,
       };
     } catch (error) {
       const duration = Date.now() - startTime;
-      log.error('Search failed', error, { query, duration });
-      throw error;
+      const warning = (error as Error & { warning?: SearchWarning }).warning || createWarningFromError(error);
+      log.error('Search failed', error, { query, duration, warning: warning.type });
+      const searchError = error instanceof Error ? error : new Error(String(error));
+      (searchError as Error & { warning: SearchWarning }).warning = warning;
+      throw searchError;
     }
   }
 

@@ -193,7 +193,7 @@ export async function* runDiscussion(
 
       // 各キーワードで検索
       for (const keyword of searchKeywords) {
-        const newResults = await performSearch(keyword, searchConfig);
+        const { results: newResults } = await performSearch(keyword, searchConfig);
         if (newResults.length > 0) {
           currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
         }
@@ -321,7 +321,7 @@ export async function* runDiscussion(
 
           // 各クエリで検索を実行
           for (const query of searchQueries) {
-            const newResults = await performSearch(query, searchConfig);
+            const { results: newResults } = await performSearch(query, searchConfig);
             if (newResults.length > 0) {
               currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
             }
