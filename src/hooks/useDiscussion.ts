@@ -102,7 +102,7 @@ export interface RestoreDiscussionStateParams {
 
 export interface DiscussionActions {
   setCurrentMessages: React.Dispatch<React.SetStateAction<DiscussionMessage[]>>;
-  setCurrentFinalAnswer: React.Dispatch<React.SetStateAction<string>>;
+  setCurrentFinalAnswer: (updater: string | ((prev: string) => string)) => void;
   setCurrentTopic: React.Dispatch<React.SetStateAction<string>>;
   setCurrentSearchResults: (updater: SearchResult[] | ((prev: SearchResult[]) => SearchResult[])) => void;
   setCurrentSearchKeywords: (updater: SearchKeywordInfo[] | ((prev: SearchKeywordInfo[]) => SearchKeywordInfo[])) => void;
@@ -218,6 +218,17 @@ export interface SearchData {
 const INITIAL_SEARCH_DATA: SearchData = {
   results: [],
   keywords: [],
+};
+
+// 統合回答データの統合型
+export interface SummaryData {
+  finalAnswer: string;
+  prompt: string;
+}
+
+const INITIAL_SUMMARY_DATA: SummaryData = {
+  finalAnswer: '',
+  prompt: '',
 };
 
 // ============================================
@@ -526,8 +537,8 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
 // ============================================
 export function useDiscussion(): DiscussionState & DiscussionActions {
   const [currentMessages, setCurrentMessages] = useState<DiscussionMessage[]>([]);
-  const [currentFinalAnswer, setCurrentFinalAnswer] = useState<string>('');
-  const [currentSummaryPrompt, setCurrentSummaryPrompt] = useState<string>('');
+  // 統合回答データ（回答とプロンプト）- 統合
+  const [summaryData, setSummaryData] = useState<SummaryData>(INITIAL_SUMMARY_DATA);
   const [currentTopic, setCurrentTopic] = useState<string>('');
   // 検索データ（結果とキーワード）- 統合
   const [searchData, setSearchData] = useState<SearchData>(INITIAL_SEARCH_DATA);
@@ -566,6 +577,25 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setSearchData(prev => ({
       ...prev,
       keywords: typeof updater === 'function' ? updater(prev.keywords) : updater,
+    }));
+  }, []);
+
+  // summaryDataから派生（後方互換）
+  const currentFinalAnswer = summaryData.finalAnswer;
+  const currentSummaryPrompt = summaryData.prompt;
+
+  // summaryData更新用ヘルパー
+  const setCurrentFinalAnswer = useCallback((updater: string | ((prev: string) => string)) => {
+    setSummaryData(prev => ({
+      ...prev,
+      finalAnswer: typeof updater === 'function' ? updater(prev.finalAnswer) : updater,
+    }));
+  }, []);
+
+  const setCurrentSummaryPrompt = useCallback((updater: string | ((prev: string) => string)) => {
+    setSummaryData(prev => ({
+      ...prev,
+      prompt: typeof updater === 'function' ? updater(prev.prompt) : updater,
     }));
   }, []);
 
