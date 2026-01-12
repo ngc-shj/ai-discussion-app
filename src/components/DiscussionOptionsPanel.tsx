@@ -433,6 +433,63 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
                 : 'スニペットのみ（高速）'}
             </p>
           </div>
+
+          {/* 関連性フィルタリング */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-400 shrink-0">関連性フィルタ</label>
+              <button
+                type="button"
+                onClick={() => onSearchConfigChange({
+                  ...searchConfig,
+                  relevanceFilter: {
+                    ...searchConfig.relevanceFilter,
+                    enabled: !searchConfig.relevanceFilter?.enabled
+                  }
+                })}
+                disabled={disabled}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
+                  searchConfig.relevanceFilter?.enabled ? 'bg-purple-600' : 'bg-gray-600'
+                } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                aria-label="関連性フィルタリングを切り替え"
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    searchConfig.relevanceFilter?.enabled ? 'translate-x-5' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              {searchConfig.relevanceFilter?.enabled && (
+                <>
+                  <span className="text-xs text-gray-400">閾値:</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="10"
+                    value={(searchConfig.relevanceFilter?.threshold ?? 0.5) * 100}
+                    onChange={(e) => onSearchConfigChange({
+                      ...searchConfig,
+                      relevanceFilter: {
+                        ...searchConfig.relevanceFilter,
+                        enabled: true,
+                        threshold: Number(e.target.value) / 100
+                      }
+                    })}
+                    disabled={disabled}
+                    title={`関連性スコア${(searchConfig.relevanceFilter?.threshold ?? 0.5) * 100}%以上のみ採用`}
+                    className={`flex-1 h-1.5 bg-gray-600 rounded-lg appearance-none accent-purple-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                  />
+                  <span className="text-xs text-purple-400 shrink-0">{Math.round((searchConfig.relevanceFilter?.threshold ?? 0.5) * 100)}%</span>
+                </>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">
+              {searchConfig.relevanceFilter?.enabled
+                ? `AIがトピックとの関連性を判定し、${Math.round((searchConfig.relevanceFilter?.threshold ?? 0.5) * 100)}%以下を除外`
+                : '全検索結果を使用'}
+            </p>
+          </div>
         </div>
       )}
       <p className="text-xs text-gray-500">
