@@ -26,7 +26,7 @@ export function FollowUpSuggestions({
     return (
       <div className="mt-3 flex items-center gap-2 text-gray-400">
         <div className="animate-spin w-4 h-4 border-2 border-gray-500 border-t-purple-400 rounded-full" />
-        <span className="text-sm">フォローアップ質問を生成中...</span>
+        <span className="text-xs md:text-sm">フォローアップ質問を生成中...</span>
       </div>
     );
   }

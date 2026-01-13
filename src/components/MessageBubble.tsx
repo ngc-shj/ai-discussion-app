@@ -84,7 +84,7 @@ export function MessageBubble({ message, participants, vote, onVote }: MessageBu
           {message.isLoading ? (
             <div className="flex items-center gap-2">
               <div className="animate-spin w-4 h-4 border-2 border-gray-500 border-t-white rounded-full" />
-              <span className="text-gray-400">考え中...</span>
+              <span className="text-gray-400 text-xs md:text-sm">考え中...</span>
             </div>
           ) : message.isStreaming ? (
             <div>
