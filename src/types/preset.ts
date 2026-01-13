@@ -5,7 +5,6 @@ import {
   DirectionGuide,
   TerminationConfig,
   SearchConfig,
-  UserProfile,
 } from './config';
 
 // プリセットID生成
@@ -19,14 +18,13 @@ export interface SettingsPreset {
   name: string;
   description?: string;
 
-  // 全設定を含む
+  // 議論設定を含む（ユーザープロファイルは個人設定のため除外）
   participants: DiscussionParticipant[];
   discussionMode: DiscussionMode;
   discussionDepth: DiscussionDepth;
   directionGuide: DirectionGuide;
   terminationConfig: TerminationConfig;
   searchConfig: SearchConfig;
-  userProfile: UserProfile;
 
   // メタデータ
   createdAt: Date;

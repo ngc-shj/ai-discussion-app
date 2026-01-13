@@ -12,63 +12,84 @@ interface SettingsContentProps {
   onApiKeyChange: (key: keyof ApiKeys, value: string) => void;
   onSaveApiKeys: () => void;
   hasUnsavedChanges: boolean;
+  isUrlValid?: (key: keyof ApiKeys) => boolean;
   userProfile: UserProfile;
   onProfileChange: (profile: UserProfile) => void;
   onBack: () => void;
   disabled?: boolean;
 }
 
-// APIキー入力フィールド
-function ApiKeyInput({
+// URL入力フィールド（編集可能）
+function UrlInput({
   label,
   value,
   onChange,
   placeholder,
-  isUrl = false,
   disabled,
+  isValid = true,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  isUrl?: boolean;
   disabled?: boolean;
+  isValid?: boolean;
 }) {
-  const [showValue, setShowValue] = useState(false);
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-sm font-medium text-gray-300">{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        className={`w-full px-3 py-2 bg-gray-800 border rounded-lg text-gray-200 text-sm focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
+          isValid
+            ? 'border-gray-600 focus:border-blue-500'
+            : 'border-red-500 focus:border-red-500'
+        }`}
+      />
+      {!isValid && (
+        <p className="text-xs text-red-400">有効なURL形式で入力してください（例: http://localhost:11434）</p>
+      )}
+    </div>
+  );
+}
 
+// APIキー表示フィールド（読み取り専用）
+function ApiKeyDisplay({
+  label,
+  placeholder,
+}: {
+  label: string;
+  placeholder?: string;
+}) {
   return (
     <div className="space-y-1.5">
       <label className="block text-sm font-medium text-gray-300">{label}</label>
       <div className="relative">
         <input
-          type={isUrl || showValue ? 'text' : 'password'}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          type="text"
+          value=""
           placeholder={placeholder}
-          disabled={disabled}
-          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-gray-200 text-sm focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed pr-10"
+          readOnly
+          className="w-full px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-500 text-sm cursor-not-allowed"
         />
-        {!isUrl && (
-          <button
-            type="button"
-            onClick={() => setShowValue(!showValue)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-            tabIndex={-1}
-          >
-            {showValue ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            )}
-          </button>
-        )}
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500">
+          .env.local で設定
+        </span>
       </div>
     </div>
+  );
+}
+
+// セクションヘッダー
+function SectionHeader({ title }: { title: string }) {
+  return (
+    <h3 className="text-sm font-medium text-gray-300 pb-2 border-b border-gray-700 mb-3">
+      {title}
+    </h3>
   );
 }
 
@@ -77,45 +98,54 @@ function AiProviderSettings({
   apiKeys,
   onApiKeyChange,
   disabled,
+  isUrlValid,
 }: {
   apiKeys: ApiKeys;
   onApiKeyChange: (key: keyof ApiKeys, value: string) => void;
   disabled?: boolean;
+  isUrlValid?: (key: keyof ApiKeys) => boolean;
 }) {
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-400">
-        AIプロバイダーのAPIキーを設定します。環境変数で設定されている場合は空欄でも動作します。
-      </p>
-      <ApiKeyInput
-        label="Claude (Anthropic)"
-        value={apiKeys.anthropic || ''}
-        onChange={(v) => onApiKeyChange('anthropic', v)}
-        placeholder="sk-ant-..."
-        disabled={disabled}
-      />
-      <ApiKeyInput
-        label="OpenAI"
-        value={apiKeys.openai || ''}
-        onChange={(v) => onApiKeyChange('openai', v)}
-        placeholder="sk-..."
-        disabled={disabled}
-      />
-      <ApiKeyInput
-        label="Gemini (Google AI)"
-        value={apiKeys.google || ''}
-        onChange={(v) => onApiKeyChange('google', v)}
-        placeholder="AIza..."
-        disabled={disabled}
-      />
-      <ApiKeyInput
-        label="Ollama Base URL"
-        value={apiKeys.ollamaBaseUrl || ''}
-        onChange={(v) => onApiKeyChange('ollamaBaseUrl', v)}
-        placeholder="http://localhost:11434"
-        isUrl
-        disabled={disabled}
-      />
+    <div className="space-y-6">
+      {/* APIキー セクション */}
+      <div>
+        <SectionHeader title="APIキー" />
+        <p className="text-xs text-gray-500 mb-3">
+          セキュリティ上の理由により、APIキーはブラウザから設定できません。環境変数（.env.local）で設定してください。
+        </p>
+        <div className="space-y-3">
+          <ApiKeyDisplay
+            label="Claude (Anthropic)"
+            placeholder="sk-ant-..."
+          />
+          <ApiKeyDisplay
+            label="OpenAI"
+            placeholder="sk-..."
+          />
+          <ApiKeyDisplay
+            label="Gemini (Google AI)"
+            placeholder="AIza..."
+          />
+        </div>
+      </div>
+
+      {/* ホスト名指定 セクション */}
+      <div>
+        <SectionHeader title="ホスト名指定" />
+        <p className="text-xs text-gray-500 mb-3">
+          セルフホスト型サービスのURLを設定できます
+        </p>
+        <div className="space-y-3">
+          <UrlInput
+            label="Ollama Base URL"
+            value={apiKeys.ollamaBaseUrl || ''}
+            onChange={(v) => onApiKeyChange('ollamaBaseUrl', v)}
+            placeholder="http://localhost:11434"
+            disabled={disabled}
+            isValid={isUrlValid?.('ollamaBaseUrl') ?? true}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -125,52 +155,58 @@ function SearchProviderSettings({
   apiKeys,
   onApiKeyChange,
   disabled,
+  isUrlValid,
 }: {
   apiKeys: ApiKeys;
   onApiKeyChange: (key: keyof ApiKeys, value: string) => void;
   disabled?: boolean;
+  isUrlValid?: (key: keyof ApiKeys) => boolean;
 }) {
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-400">
-        Web検索プロバイダーのAPIキーを設定します。複数設定した場合は優先順位に従って使用されます。
-      </p>
-      <ApiKeyInput
-        label="Tavily (推奨)"
-        value={apiKeys.tavily || ''}
-        onChange={(v) => onApiKeyChange('tavily', v)}
-        placeholder="tvly-..."
-        disabled={disabled}
-      />
-      <ApiKeyInput
-        label="Serper (Google検索)"
-        value={apiKeys.serper || ''}
-        onChange={(v) => onApiKeyChange('serper', v)}
-        placeholder="..."
-        disabled={disabled}
-      />
-      <ApiKeyInput
-        label="Brave Search"
-        value={apiKeys.brave || ''}
-        onChange={(v) => onApiKeyChange('brave', v)}
-        placeholder="BSA..."
-        disabled={disabled}
-      />
-      <ApiKeyInput
-        label="SearXNG Base URL"
-        value={apiKeys.searxngBaseUrl || ''}
-        onChange={(v) => onApiKeyChange('searxngBaseUrl', v)}
-        placeholder="http://localhost:8080"
-        isUrl
-        disabled={disabled}
-      />
-      <ApiKeyInput
-        label="Jina Reader (詳細取得用)"
-        value={apiKeys.jina || ''}
-        onChange={(v) => onApiKeyChange('jina', v)}
-        placeholder="jina_..."
-        disabled={disabled}
-      />
+    <div className="space-y-6">
+      {/* APIキー セクション */}
+      <div>
+        <SectionHeader title="APIキー" />
+        <p className="text-xs text-gray-500 mb-3">
+          セキュリティ上の理由により、APIキーはブラウザから設定できません。環境変数（.env.local）で設定してください。
+        </p>
+        <div className="space-y-3">
+          <ApiKeyDisplay
+            label="Tavily (推奨)"
+            placeholder="tvly-..."
+          />
+          <ApiKeyDisplay
+            label="Serper (Google検索)"
+            placeholder="..."
+          />
+          <ApiKeyDisplay
+            label="Brave Search"
+            placeholder="BSA..."
+          />
+          <ApiKeyDisplay
+            label="Jina Reader (詳細取得用)"
+            placeholder="jina_..."
+          />
+        </div>
+      </div>
+
+      {/* ホスト名指定 セクション */}
+      <div>
+        <SectionHeader title="ホスト名指定" />
+        <p className="text-xs text-gray-500 mb-3">
+          セルフホスト型サービスのURLを設定できます
+        </p>
+        <div className="space-y-3">
+          <UrlInput
+            label="SearXNG Base URL"
+            value={apiKeys.searxngBaseUrl || ''}
+            onChange={(v) => onApiKeyChange('searxngBaseUrl', v)}
+            placeholder="http://localhost:8080"
+            disabled={disabled}
+            isValid={isUrlValid?.('searxngBaseUrl') ?? true}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -180,32 +216,15 @@ export function SettingsContent({
   onApiKeyChange,
   onSaveApiKeys,
   hasUnsavedChanges,
+  isUrlValid,
   userProfile,
   onProfileChange,
   onBack,
   disabled,
 }: SettingsContentProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('ai');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
-    {
-      id: 'ai',
-      label: 'AIプロバイダー',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'search',
-      label: '検索プロバイダー',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      ),
-    },
     {
       id: 'profile',
       label: 'プロファイル',
@@ -215,42 +234,61 @@ export function SettingsContent({
         </svg>
       ),
     },
+    {
+      id: 'ai',
+      label: 'AI',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      ),
+    },
+    {
+      id: 'search',
+      label: '検索',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      ),
+    },
   ];
 
   return (
     <div className="flex flex-col h-full bg-gray-900">
       {/* ヘッダー */}
-      <div className="flex items-center gap-3 p-4 border-b border-gray-700 shrink-0">
-        <button
-          type="button"
-          onClick={onBack}
-          className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-          title="戻る"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <h2 className="text-lg font-semibold text-white">設定</h2>
-        {hasUnsavedChanges && (
-          <span className="px-2 py-0.5 text-xs bg-yellow-600/30 text-yellow-400 rounded">
-            未保存
-          </span>
-        )}
+      <div className="flex items-center justify-between p-4 border-b border-gray-700 shrink-0">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+            title="戻る"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2 className="text-lg font-semibold text-white">設定</h2>
+        </div>
+        {/* 全タブ自動保存 */}
+        <span className="text-sm text-gray-500">
+          自動保存
+        </span>
       </div>
 
-      {/* タブメニュー（サイドメニュー風） */}
+      {/* コンテンツエリア */}
       <div className="flex flex-1 min-h-0">
         {/* 左側タブ */}
-        <div className="w-48 border-r border-gray-700 p-2 shrink-0">
+        <div className="w-44 border-r border-gray-700 p-2 shrink-0">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 w-full px-3 py-2.5 text-sm rounded-lg transition-colors mb-1 ${
+              className={`flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors mb-1 ${
                 activeTab === tab.id
-                  ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30'
+                  ? 'bg-blue-600/20 text-blue-400'
                   : 'text-gray-400 hover:text-white hover:bg-gray-800'
               }`}
             >
@@ -261,13 +299,14 @@ export function SettingsContent({
         </div>
 
         {/* 右側コンテンツ */}
-        <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 flex justify-center">
+          <div className="max-w-lg w-full">
             {activeTab === 'ai' && (
               <AiProviderSettings
                 apiKeys={apiKeys}
                 onApiKeyChange={onApiKeyChange}
                 disabled={disabled}
+                isUrlValid={isUrlValid}
               />
             )}
             {activeTab === 'search' && (
@@ -275,6 +314,7 @@ export function SettingsContent({
                 apiKeys={apiKeys}
                 onApiKeyChange={onApiKeyChange}
                 disabled={disabled}
+                isUrlValid={isUrlValid}
               />
             )}
             {activeTab === 'profile' && (
@@ -290,20 +330,6 @@ export function SettingsContent({
               </div>
             )}
           </div>
-
-          {/* フッター（APIキー設定時のみ保存ボタン表示） */}
-          {(activeTab === 'ai' || activeTab === 'search') && (
-            <div className="p-4 border-t border-gray-700 shrink-0">
-              <button
-                type="button"
-                onClick={onSaveApiKeys}
-                disabled={!hasUnsavedChanges || disabled}
-                className="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                保存
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

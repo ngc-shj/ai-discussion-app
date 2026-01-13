@@ -1,32 +1,27 @@
 'use client';
 
-import { AIProviderType, ModelInfo, DiscussionParticipant, UserProfile } from '@/types';
+import { AIProviderType, ModelInfo, DiscussionParticipant } from '@/types';
 import { AISelector } from './AISelector';
-import { UserProfileSettings } from './UserProfileSettings';
 
-interface SettingsPanelProps {
+interface ParticipantsPanelProps {
   participants: DiscussionParticipant[];
   onParticipantsChange: (participants: DiscussionParticipant[]) => void;
   availableModels: Record<AIProviderType, ModelInfo[]>;
   availability: Record<AIProviderType, boolean>;
-  userProfile: UserProfile;
-  onUserProfileChange: (profile: UserProfile) => void;
   disabled?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-export function SettingsPanel({
+export function ParticipantsPanel({
   participants,
   onParticipantsChange,
   availableModels,
   availability,
-  userProfile,
-  onUserProfileChange,
   disabled,
   isOpen = true,
   onClose,
-}: SettingsPanelProps) {
+}: ParticipantsPanelProps) {
   // オーバーレイモードで閉じている場合は何も描画しない
   if (onClose && !isOpen) {
     return null;
@@ -50,13 +45,13 @@ export function SettingsPanel({
       >
         {/* ヘッダー */}
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">参加者</h2>
+          <h2 className="text-lg font-semibold text-white">参加AI</h2>
           {onClose && (
             <button
               type="button"
               onClick={onClose}
               className="md:hidden p-1 text-gray-400 hover:text-white rounded"
-              aria-label="参加者パネルを閉じる"
+              aria-label="参加AIパネルを閉じる"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -66,16 +61,7 @@ export function SettingsPanel({
         </div>
 
         <div className="flex-1 overflow-y-auto flex flex-col space-y-4">
-          {/* プロファイル設定 */}
-          <div className="bg-gray-700/50 rounded-lg p-3 border border-gray-600">
-            <UserProfileSettings
-              profile={userProfile}
-              onProfileChange={onUserProfileChange}
-              disabled={disabled}
-            />
-          </div>
-
-          {/* AI参加者 */}
+          {/* AI選択 */}
           <div className="bg-indigo-900/20 rounded-lg p-3 border border-indigo-800/30">
             <AISelector
               participants={participants}

@@ -10,7 +10,7 @@ import {
 } from '@/types';
 import {
   DiscussionPanel,
-  SettingsPanel,
+  ParticipantsPanel,
   SettingsContent,
   InputForm,
   ProgressIndicator,
@@ -112,6 +112,7 @@ export default function Home() {
     setApiKey,
     saveApiKeys,
     hasUnsavedChanges: hasUnsavedApiKeyChanges,
+    isUrlValid,
   } = useApiKeys();
 
   // サイドバー・設定パネルの開閉状態
@@ -413,7 +414,7 @@ export default function Home() {
     updateAndSaveSession,
   ]);
 
-  // 現在の設定をプリセットとして保存
+  // 現在の設定をプリセットとして保存（userProfileは個人設定のため除外）
   const handleSaveAsPreset = useCallback((name: string, description?: string) => {
     savePreset({
       name,
@@ -424,11 +425,10 @@ export default function Home() {
       directionGuide,
       terminationConfig,
       searchConfig,
-      userProfile,
     });
-  }, [savePreset, participants, discussionMode, discussionDepth, directionGuide, terminationConfig, searchConfig, userProfile]);
+  }, [savePreset, participants, discussionMode, discussionDepth, directionGuide, terminationConfig, searchConfig]);
 
-  // プリセットを読み込み
+  // プリセットを読み込み（userProfileは個人設定のため適用しない）
   const handleLoadPreset = useCallback((preset: SettingsPreset) => {
     // 利用可能なモデルのみをフィルタリング
     const validation = validatePreset(preset, availableModels);
@@ -440,15 +440,14 @@ export default function Home() {
       });
     }
 
-    // 全設定を適用
+    // 議論設定を適用
     setParticipants(validParticipants);
     setDiscussionMode(preset.discussionMode);
     setDiscussionDepth(preset.discussionDepth);
     setDirectionGuide(preset.directionGuide);
     setTerminationConfig(preset.terminationConfig);
     setSearchConfig(preset.searchConfig);
-    setUserProfile(preset.userProfile);
-  }, [validatePreset, availableModels, setParticipants, setDiscussionMode, setDiscussionDepth, setDirectionGuide, setTerminationConfig, setSearchConfig, setUserProfile]);
+  }, [validatePreset, availableModels, setParticipants, setDiscussionMode, setDiscussionDepth, setDirectionGuide, setTerminationConfig, setSearchConfig]);
 
   // プリセットを検証
   const handleValidatePreset = useCallback((preset: SettingsPreset) => {
@@ -559,6 +558,8 @@ export default function Home() {
               disabled={isSessionSelectionDisabled}
               onCollapse={() => setIsSidebarCollapsed(true)}
               onOpenSettings={() => setIsSettingsMode(true)}
+              onOpenPresets={() => setIsPresetModalOpen(true)}
+              presetCount={presets.length}
             />
           </div>
         )}
@@ -588,6 +589,11 @@ export default function Home() {
               setIsSidebarOpen(false);
               setIsSettingsMode(true);
             }}
+            onOpenPresets={() => {
+              setIsSidebarOpen(false);
+              setIsPresetModalOpen(true);
+            }}
+            presetCount={presets.length}
           />
         </div>
 
@@ -598,12 +604,26 @@ export default function Home() {
             onApiKeyChange={setApiKey}
             onSaveApiKeys={saveApiKeys}
             hasUnsavedChanges={hasUnsavedApiKeyChanges}
+            isUrlValid={isUrlValid}
             userProfile={userProfile}
             onProfileChange={setUserProfile}
             onBack={() => setIsSettingsMode(false)}
             disabled={isSettingsDisabled}
           />
         </div>
+
+        {/* プリセット管理モーダル（設定モード時用） */}
+        <PresetManagerModal
+          isOpen={isPresetModalOpen}
+          onClose={() => setIsPresetModalOpen(false)}
+          presets={presets}
+          onLoadPreset={handleLoadPreset}
+          onSaveCurrentAsPreset={handleSaveAsPreset}
+          onRenamePreset={(id, name) => updatePreset(id, { name })}
+          onDeletePreset={deletePreset}
+          onDuplicatePreset={duplicatePreset}
+          validatePreset={handleValidatePreset}
+        />
       </div>
     );
   }
@@ -624,6 +644,8 @@ export default function Home() {
             disabled={isSessionSelectionDisabled}
             onCollapse={() => setIsSidebarCollapsed(true)}
             onOpenSettings={() => setIsSettingsMode(true)}
+            onOpenPresets={() => setIsPresetModalOpen(true)}
+            presetCount={presets.length}
           />
         </div>
       )}
@@ -651,11 +673,16 @@ export default function Home() {
             setIsSidebarOpen(false);
             setIsSettingsMode(true);
           }}
+          onOpenPresets={() => {
+            setIsSidebarOpen(false);
+            setIsPresetModalOpen(true);
+          }}
+          presetCount={presets.length}
         />
       </div>
 
       {/* メインコンテンツ */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* モバイル用ヘッダー */}
         <MobileHeader
           title="AI Discussion Arena"
@@ -663,8 +690,6 @@ export default function Home() {
           onMenuClick={() => setIsSidebarOpen(true)}
           onNewSession={handleNewSession}
           onSettingsClick={() => setIsSettingsOpen(true)}
-          onPresetClick={() => setIsPresetModalOpen(true)}
-          presetCount={presets.length}
           disabled={isSettingsDisabled}
         />
 
@@ -692,27 +717,12 @@ export default function Home() {
             )}
           </div>
           <div className="flex items-center gap-1">
-            {/* プリセット管理ボタン */}
-            <button
-              type="button"
-              onClick={() => setIsPresetModalOpen(true)}
-              disabled={isSettingsDisabled}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-              title="全設定プリセット（参加者・議論オプションを保存/読込）"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              {presets.length > 0 && (
-                <span className="text-xs text-indigo-400">{presets.length}</span>
-              )}
-            </button>
-            {/* 参加者パネル折りたたみボタン */}
+            {/* 参加AIパネル折りたたみボタン */}
             <button
               type="button"
               onClick={() => setIsSettingsCollapsed(!isSettingsCollapsed)}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-              title={isSettingsCollapsed ? '参加者パネルを開く' : '参加者パネルを閉じる'}
+              title={isSettingsCollapsed ? '参加AIパネルを開く' : '参加AIパネルを閉じる'}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -848,30 +858,26 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 参加者パネル - デスクトップ */}
+      {/* 参加AIパネル - デスクトップ */}
       {!isSettingsCollapsed && (
         <div className="hidden md:block">
-          <SettingsPanel
+          <ParticipantsPanel
             participants={participants}
             onParticipantsChange={setParticipants}
             availableModels={availableModels}
             availability={availability}
-            userProfile={userProfile}
-            onUserProfileChange={setUserProfile}
             disabled={isSettingsDisabled}
           />
         </div>
       )}
 
-      {/* モバイル用参加者パネル（オーバーレイ）- md以下でのみ表示 */}
+      {/* モバイル用参加AIパネル（オーバーレイ）- md以下でのみ表示 */}
       <div className="md:hidden">
-        <SettingsPanel
+        <ParticipantsPanel
           participants={participants}
           onParticipantsChange={setParticipants}
           availableModels={availableModels}
           availability={availability}
-          userProfile={userProfile}
-          onUserProfileChange={setUserProfile}
           disabled={isSettingsDisabled}
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}

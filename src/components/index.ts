@@ -5,7 +5,7 @@ export { CurrentTurnDisplay } from './CurrentTurnDisplay';
 export { SearchResultsDisplay } from './SearchResultsDisplay';
 export { SearchKeywordsDisplay } from './SearchKeywordsDisplay';
 export { AISelector } from './AISelector';
-export { SettingsPanel } from './SettingsPanel';
+export { ParticipantsPanel } from './ParticipantsPanel';
 export { InputForm } from './InputForm';
 export { DiscussionOptionsPanel } from './DiscussionOptionsPanel';
 export { FinalAnswer } from './FinalAnswer';

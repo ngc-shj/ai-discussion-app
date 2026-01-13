@@ -128,6 +128,7 @@ export function InputForm({
 
         {/* 展開時の設定パネル */}
         {isModeExpanded && (
+          <div className="max-h-[50vh] overflow-y-auto">
           <DiscussionOptionsPanel
             disabled={disabled}
             searchConfig={searchConfig}
@@ -150,6 +151,7 @@ export function InputForm({
             onRemoveTermKeyword={handleRemoveTermKeyword}
             onTermKeywordKeyDown={handleTermKeywordKeyDown}
           />
+          </div>
         )}
       </div>
 
