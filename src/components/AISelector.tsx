@@ -73,19 +73,16 @@ export function AISelector({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-gray-300">参加AI</label>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowRoleEditor(true)}
-            className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
-            title="カスタムロールを管理"
-          >
-            ロール管理
-          </button>
-          <span className="text-xs text-gray-500">{participants.length}人参加</span>
-        </div>
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => setShowRoleEditor(true)}
+          className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+          title="カスタムロールを管理"
+        >
+          ロール管理
+        </button>
+        <span className="text-xs text-gray-500">{participants.length}人参加</span>
       </div>
 
       {/* 選択された参加者一覧 */}

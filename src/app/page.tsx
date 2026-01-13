@@ -10,14 +10,15 @@ import {
 } from '@/types';
 import {
   DiscussionPanel,
-  SettingsPanel,
+  ParticipantsPanel,
+  SettingsContent,
   InputForm,
   ProgressIndicator,
   SessionSidebar,
   MobileHeader,
   PresetManagerModal,
 } from '@/components';
-import { useDiscussionSettings, useSessionManager, useDiscussion, usePresetManager } from '@/hooks';
+import { useDiscussionSettings, useSessionManager, useDiscussion, usePresetManager, useApiKeys } from '@/hooks';
 
 export default function Home() {
   // 設定関連（カスタムフックを使用）
@@ -105,12 +106,23 @@ export default function Home() {
     validatePreset,
   } = usePresetManager();
 
+  // APIキー管理
+  const {
+    apiKeys,
+    setApiKey,
+    saveApiKeys,
+    hasUnsavedChanges: hasUnsavedApiKeyChanges,
+    isUrlValid,
+  } = useApiKeys();
+
   // サイドバー・設定パネルの開閉状態
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   // PC用サイドバー折りたたみ状態
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsCollapsed, setIsSettingsCollapsed] = useState(false);
+  // 設定モード（右パネルの表示切り替え）
+  const [isSettingsMode, setIsSettingsMode] = useState(false);
   // フォローアップ用のプリセットトピック
   const [presetTopic, setPresetTopic] = useState<string>('');
   // プリセットモーダルの開閉状態
@@ -402,7 +414,7 @@ export default function Home() {
     updateAndSaveSession,
   ]);
 
-  // 現在の設定をプリセットとして保存
+  // 現在の設定をプリセットとして保存（userProfileは個人設定のため除外）
   const handleSaveAsPreset = useCallback((name: string, description?: string) => {
     savePreset({
       name,
@@ -413,11 +425,10 @@ export default function Home() {
       directionGuide,
       terminationConfig,
       searchConfig,
-      userProfile,
     });
-  }, [savePreset, participants, discussionMode, discussionDepth, directionGuide, terminationConfig, searchConfig, userProfile]);
+  }, [savePreset, participants, discussionMode, discussionDepth, directionGuide, terminationConfig, searchConfig]);
 
-  // プリセットを読み込み
+  // プリセットを読み込み（userProfileは個人設定のため適用しない）
   const handleLoadPreset = useCallback((preset: SettingsPreset) => {
     // 利用可能なモデルのみをフィルタリング
     const validation = validatePreset(preset, availableModels);
@@ -429,15 +440,14 @@ export default function Home() {
       });
     }
 
-    // 全設定を適用
+    // 議論設定を適用
     setParticipants(validParticipants);
     setDiscussionMode(preset.discussionMode);
     setDiscussionDepth(preset.discussionDepth);
     setDirectionGuide(preset.directionGuide);
     setTerminationConfig(preset.terminationConfig);
     setSearchConfig(preset.searchConfig);
-    setUserProfile(preset.userProfile);
-  }, [validatePreset, availableModels, setParticipants, setDiscussionMode, setDiscussionDepth, setDirectionGuide, setTerminationConfig, setSearchConfig, setUserProfile]);
+  }, [validatePreset, availableModels, setParticipants, setDiscussionMode, setDiscussionDepth, setDirectionGuide, setTerminationConfig, setSearchConfig]);
 
   // プリセットを検証
   const handleValidatePreset = useCallback((preset: SettingsPreset) => {
@@ -524,6 +534,100 @@ export default function Home() {
   const isSettingsDisabled = isProcessing;
   const isSessionSelectionDisabled = isProcessing;
 
+  // 設定モード時は全画面設定画面を表示
+  if (isSettingsMode) {
+    return (
+      <div className="flex h-screen bg-gray-900 text-white">
+        {/* 左サイドバー - 設定モード時も表示 */}
+        {!isSidebarCollapsed && (
+          <div className="hidden md:block">
+            <SessionSidebar
+              sessions={sessions}
+              currentSessionId={currentSession?.id || null}
+              onSelectSession={(session) => {
+                handleSelectSession(session);
+                setIsSettingsMode(false);
+              }}
+              onNewSession={() => {
+                handleNewSession();
+                setIsSettingsMode(false);
+              }}
+              onDeleteSession={handleDeleteSession}
+              onBulkDeleteSessions={handleBulkDeleteSessions}
+              onRenameSession={handleRenameSession}
+              disabled={isSessionSelectionDisabled}
+              onCollapse={() => setIsSidebarCollapsed(true)}
+              onOpenSettings={() => setIsSettingsMode(true)}
+              onOpenPresets={() => setIsPresetModalOpen(true)}
+              presetCount={presets.length}
+            />
+          </div>
+        )}
+
+        {/* モバイル用サイドバー */}
+        <div className="md:hidden">
+          <SessionSidebar
+            sessions={sessions}
+            currentSessionId={currentSession?.id || null}
+            onSelectSession={(session) => {
+              handleSelectSession(session);
+              setIsSidebarOpen(false);
+              setIsSettingsMode(false);
+            }}
+            onNewSession={() => {
+              handleNewSession();
+              setIsSidebarOpen(false);
+              setIsSettingsMode(false);
+            }}
+            onDeleteSession={handleDeleteSession}
+            onBulkDeleteSessions={handleBulkDeleteSessions}
+            onRenameSession={handleRenameSession}
+            disabled={isSessionSelectionDisabled}
+            isOpen={isSidebarOpen}
+            onClose={() => setIsSidebarOpen(false)}
+            onOpenSettings={() => {
+              setIsSidebarOpen(false);
+              setIsSettingsMode(true);
+            }}
+            onOpenPresets={() => {
+              setIsSidebarOpen(false);
+              setIsPresetModalOpen(true);
+            }}
+            presetCount={presets.length}
+          />
+        </div>
+
+        {/* 設定画面（全画面） */}
+        <div className="flex-1 h-full">
+          <SettingsContent
+            apiKeys={apiKeys}
+            onApiKeyChange={setApiKey}
+            onSaveApiKeys={saveApiKeys}
+            hasUnsavedChanges={hasUnsavedApiKeyChanges}
+            isUrlValid={isUrlValid}
+            userProfile={userProfile}
+            onProfileChange={setUserProfile}
+            onBack={() => setIsSettingsMode(false)}
+            disabled={isSettingsDisabled}
+          />
+        </div>
+
+        {/* プリセット管理モーダル（設定モード時用） */}
+        <PresetManagerModal
+          isOpen={isPresetModalOpen}
+          onClose={() => setIsPresetModalOpen(false)}
+          presets={presets}
+          onLoadPreset={handleLoadPreset}
+          onSaveCurrentAsPreset={handleSaveAsPreset}
+          onRenamePreset={(id, name) => updatePreset(id, { name })}
+          onDeletePreset={deletePreset}
+          onDuplicatePreset={duplicatePreset}
+          validatePreset={handleValidatePreset}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-gray-900 text-white">
       {/* 左サイドバー: セッション一覧 - デスクトップ */}
@@ -539,6 +643,9 @@ export default function Home() {
             onRenameSession={handleRenameSession}
             disabled={isSessionSelectionDisabled}
             onCollapse={() => setIsSidebarCollapsed(true)}
+            onOpenSettings={() => setIsSettingsMode(true)}
+            onOpenPresets={() => setIsPresetModalOpen(true)}
+            presetCount={presets.length}
           />
         </div>
       )}
@@ -562,11 +669,20 @@ export default function Home() {
           disabled={isSessionSelectionDisabled}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
+          onOpenSettings={() => {
+            setIsSidebarOpen(false);
+            setIsSettingsMode(true);
+          }}
+          onOpenPresets={() => {
+            setIsSidebarOpen(false);
+            setIsPresetModalOpen(true);
+          }}
+          presetCount={presets.length}
         />
       </div>
 
       {/* メインコンテンツ */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* モバイル用ヘッダー */}
         <MobileHeader
           title="AI Discussion Arena"
@@ -574,13 +690,11 @@ export default function Home() {
           onMenuClick={() => setIsSidebarOpen(true)}
           onNewSession={handleNewSession}
           onSettingsClick={() => setIsSettingsOpen(true)}
-          onPresetClick={() => setIsPresetModalOpen(true)}
-          presetCount={presets.length}
           disabled={isSettingsDisabled}
         />
 
         {/* デスクトップ用ヘッダー */}
-        <header className="hidden md:flex items-center justify-between p-3 border-b border-gray-700 shrink-0">
+        <header className="hidden md:flex items-center justify-between p-3 border-b border-gray-700 shrink-0 min-h-[52px]">
           <div className="flex items-center gap-3">
             {/* サイドバーが閉じている時は開くボタンのみ表示 */}
             {isSidebarCollapsed && (
@@ -601,34 +715,6 @@ export default function Home() {
                 {currentSession.title}
               </p>
             )}
-          </div>
-          <div className="flex items-center gap-1">
-            {/* プリセット管理ボタン */}
-            <button
-              type="button"
-              onClick={() => setIsPresetModalOpen(true)}
-              disabled={isSettingsDisabled}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-              title="全設定プリセット（参加者・議論オプションを保存/読込）"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              {presets.length > 0 && (
-                <span className="text-xs text-indigo-400">{presets.length}</span>
-              )}
-            </button>
-            {/* 参加者パネル折りたたみボタン */}
-            <button
-              type="button"
-              onClick={() => setIsSettingsCollapsed(!isSettingsCollapsed)}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-              title={isSettingsCollapsed ? '参加者パネルを開く' : '参加者パネルを閉じる'}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </button>
           </div>
         </header>
 
@@ -759,30 +845,43 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 参加者パネル - デスクトップ */}
-      {!isSettingsCollapsed && (
+      {/* 参加AIパネル - デスクトップ */}
+      {!isSettingsCollapsed ? (
         <div className="hidden md:block">
-          <SettingsPanel
+          <ParticipantsPanel
             participants={participants}
             onParticipantsChange={setParticipants}
             availableModels={availableModels}
             availability={availability}
-            userProfile={userProfile}
-            onUserProfileChange={setUserProfile}
             disabled={isSettingsDisabled}
+            onCollapse={() => setIsSettingsCollapsed(true)}
           />
         </div>
+      ) : (
+        /* 折りたたみ時のバー - 参加者数を表示 */
+        <button
+          type="button"
+          onClick={() => setIsSettingsCollapsed(false)}
+          className="hidden md:flex flex-col items-center justify-center w-10 bg-gray-800 border-l border-gray-700 hover:bg-gray-700 transition-colors cursor-pointer"
+          title="参加AIパネルを開く"
+        >
+          <svg className="w-5 h-5 text-indigo-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+          <span className="text-xs text-gray-400 font-medium">{participants.length}</span>
+          <svg className="w-4 h-4 text-gray-500 mt-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
       )}
 
-      {/* モバイル用参加者パネル（オーバーレイ）- md以下でのみ表示 */}
+      {/* モバイル用参加AIパネル（オーバーレイ）- md以下でのみ表示 */}
       <div className="md:hidden">
-        <SettingsPanel
+        <ParticipantsPanel
           participants={participants}
           onParticipantsChange={setParticipants}
           availableModels={availableModels}
           availability={availability}
-          userProfile={userProfile}
-          onUserProfileChange={setUserProfile}
           disabled={isSettingsDisabled}
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}

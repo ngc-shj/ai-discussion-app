@@ -12,3 +12,5 @@ export { usePresetManager } from './usePresetManager';
 export type { UsePresetManagerReturn } from './usePresetManager';
 export { useElapsedTime } from './useElapsedTime';
 export type { UseElapsedTimeState } from './useElapsedTime';
+export { useApiKeys } from './useApiKeys';
+export type { ApiKeys, UseApiKeysReturn } from './useApiKeys';

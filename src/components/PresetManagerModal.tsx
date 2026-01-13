@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { SettingsPreset, PresetValidationResult } from '@/types';
+import { SettingsPreset, PresetValidationResult, DISCUSSION_MODE_PRESETS, DISCUSSION_DEPTH_PRESETS } from '@/types';
 
 interface PresetManagerModalProps {
   isOpen: boolean;
@@ -81,17 +81,20 @@ export function PresetManagerModal({
       <div className="bg-gray-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-hidden border border-gray-700 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700 shrink-0">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-            <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-              />
-            </svg>
-            設定プリセット
-          </h2>
+          <div>
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
+              </svg>
+              議論テンプレート
+            </h2>
+            <p className="text-xs text-gray-400 mt-1 ml-7">よく使う議論設定を保存・再利用できます</p>
+          </div>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white transition-colors"
@@ -130,10 +133,13 @@ export function PresetManagerModal({
         <div className="flex-1 overflow-y-auto p-4 min-h-[300px]">
           {activeTab === 'load' ? (
             /* Load Tab */
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <div className="text-xs text-gray-500 pb-2 border-b border-gray-700">
+                テンプレートを選択すると詳細を確認できます
+              </div>
               {presets.length === 0 ? (
                 <div className="text-center text-gray-500 py-8">
-                  保存されたプリセットがありません
+                  保存されたテンプレートがありません
                 </div>
               ) : (
                 presets.map((preset) => (
@@ -158,12 +164,12 @@ export function PresetManagerModal({
             /* Save Tab */
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">プリセット名</label>
+                <label className="text-sm font-medium text-gray-300">テンプレート名</label>
                 <input
                   type="text"
                   value={newPresetName}
                   onChange={(e) => setNewPresetName(e.target.value)}
-                  placeholder="例: ブレスト用設定"
+                  placeholder="例: ブレインストーミング用"
                   className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
@@ -172,13 +178,13 @@ export function PresetManagerModal({
                 <textarea
                   value={newPresetDescription}
                   onChange={(e) => setNewPresetDescription(e.target.value)}
-                  placeholder="このプリセットの説明..."
+                  placeholder="このテンプレートの説明..."
                   className="w-full bg-gray-900 border border-gray-700 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                   rows={2}
                 />
               </div>
               <div className="text-xs text-gray-500">
-                現在の設定がすべて保存されます：参加者、議論モード、深さ、終了条件、検索設定、プロファイル
+                現在の議論設定が保存されます：AI参加者、議論モード、深さ、終了条件、検索設定
               </div>
             </div>
           )}
@@ -300,6 +306,31 @@ function PresetListItem({
                 <span>|</span>
                 <span>{new Date(preset.updatedAt).toLocaleDateString('ja-JP')}</span>
               </div>
+
+              {/* 選択時に詳細表示 */}
+              {isSelected && (
+                <div className="mt-2 pt-2 border-t border-indigo-500/30 space-y-1 text-xs text-gray-400">
+                  <div className="flex flex-wrap gap-1.5">
+                    {preset.participants.map((p, i) => (
+                      <span key={i} className="px-1.5 py-0.5 bg-gray-700/50 rounded text-gray-300">
+                        {p.model || '不明'}
+                        {p.displayRoleName && <span className="text-indigo-400 ml-1">({p.displayRoleName})</span>}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <span>
+                      {DISCUSSION_MODE_PRESETS.find(m => m.id === preset.discussionMode)?.name || preset.discussionMode}
+                    </span>
+                    <span>|</span>
+                    <span>
+                      深さ: {DISCUSSION_DEPTH_PRESETS.find(d => d.level === preset.discussionDepth)?.name || preset.discussionDepth}
+                    </span>
+                    <span>|</span>
+                    <span>{preset.searchConfig?.enabled ? '検索ON' : '検索OFF'}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Menu Button */}
