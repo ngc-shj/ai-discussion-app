@@ -739,6 +739,7 @@ export function useDiscussion(): UseDiscussionReturn {
               messages: messagesForKeywords,
               timing: 'summary',
               participant: participants[0],
+              maxKeywords: searchConfig.maxKeywords || 3,
             }),
             signal: abortControllerRef.current.signal,
           });
@@ -1096,6 +1097,7 @@ export function useDiscussion(): UseDiscussionReturn {
               topic,
               timing: 'start',
               participant: participants[0], // 最初の参加者のプロバイダーを使用
+              maxKeywords: searchConfig.maxKeywords || 3,
             }),
             signal: abortControllerRef.current.signal,
           });
@@ -1587,6 +1589,7 @@ export function useDiscussion(): UseDiscussionReturn {
                 topic: interruptedState.topic,
                 timing: 'start',
                 participant: interruptedState.participants[0],
+                maxKeywords: searchConfig.maxKeywords || 3,
               }),
               signal: abortControllerRef.current.signal,
             });
