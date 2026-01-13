@@ -40,7 +40,7 @@ function truncateContent(content: string, maxLength: number): string {
 }
 
 /**
- * 検索結果をフォーマット
+ * 検索結果をXML形式でフォーマット
  * 注意: filtered: true の結果（関連性フィルタで除外されたもの）は含めない
  */
 export function formatSearchResults(searchResults: SearchResult[]): string {
@@ -55,24 +55,28 @@ export function formatSearchResults(searchResults: SearchResult[]): string {
     return '';
   }
 
-  const formattedResults = relevantResults
+  const resultsXml = relevantResults
     .map((result, i) => {
-      let text = `${i + 1}. ${result.title}\n   URL: ${result.url}`;
-      if (result.publishedDate) {
-        text += `\n   日付: ${result.publishedDate}`;
-      }
+      const dateAttr = result.publishedDate ? ` date="${escapeXmlAttr(result.publishedDate)}"` : '';
       // fullContentがあればそれを使用、なければcontentを使用
-      if (result.fullContent) {
-        const truncated = truncateContent(result.fullContent, MAX_FULL_CONTENT_LENGTH);
-        text += `\n   詳細:\n${truncated}`;
-      } else if (result.content) {
-        text += `\n   内容: ${result.content}`;
-      }
-      return text;
-    })
-    .join('\n\n');
+      const contentText = result.fullContent
+        ? truncateContent(result.fullContent, MAX_FULL_CONTENT_LENGTH)
+        : (result.content || '');
 
-  return `\n【最新の検索結果】\n以下は関連する最新の情報です。これらの情報を参考にして議論してください。\n\n${formattedResults}\n`;
+      return `  <result index="${i + 1}" url="${escapeXmlAttr(result.url)}"${dateAttr}>
+    <title>${escapeXmlContent(result.title)}</title>
+    <content>${escapeXmlContent(contentText)}</content>
+  </result>`;
+    })
+    .join('\n');
+
+  return `
+【最新の検索結果（XML形式）】
+以下の検索結果はXML形式で構造化されています。各<result>要素にはURL、日付などの属性が含まれています。
+<search-results count="${relevantResults.length}">
+${resultsXml}
+</search-results>
+`;
 }
 
 /**
