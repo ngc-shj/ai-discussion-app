@@ -11,6 +11,7 @@ interface GenerateKeywordsRequest {
   messages?: Array<{ provider: string; content: string }>;
   timing: SearchKeywordTiming;
   participant?: DiscussionParticipant;
+  maxKeywords?: number; // キーワードの最大数（デフォルト3）
 }
 
 /**
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: GenerateKeywordsRequest = await request.json();
-    const { topic, messages, timing, participant } = body;
+    const { topic, messages, timing, participant, maxKeywords = 3 } = body;
 
     if (!topic) {
       log.warn('Missing topic parameter');
@@ -95,7 +96,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const keywords = parseKeywordsResponse(response.content);
+    // AIが指定より多くのキーワードを返すことがあるため、明示的に制限
+    const keywords = parseKeywordsResponse(response.content).slice(0, maxKeywords);
     const duration = Date.now() - startTime;
 
     log.info('Keywords generated', { topic, keywordCount: keywords.length, duration });
