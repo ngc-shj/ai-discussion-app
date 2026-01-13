@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   DiscussionSession,
   DiscussionParticipant,
-  InterruptedDiscussionState,
+  InterruptedDiscussionSnapshot,
 } from '@/types';
 import {
   getAllSessions,
@@ -17,19 +17,19 @@ import {
   saveInterruptedState,
 } from '@/lib/session-storage';
 
-export interface SessionManagerState {
+export interface UseSessionManagerState {
   sessions: DiscussionSession[];
   currentSession: DiscussionSession | null;
-  interruptedState: InterruptedDiscussionState | null;
+  interruptedState: InterruptedDiscussionSnapshot | null;
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   isInitialLoadComplete: boolean;
 }
 
-export interface SessionManagerActions {
+export interface UseSessionManagerActions {
   // Low-level setters (for direct state manipulation in handlers)
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
   setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
-  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  setInterruptedState: (state: InterruptedDiscussionSnapshot | null) => void;
   // High-level actions
   loadSessions: () => Promise<DiscussionSession[]>;
   selectSession: (session: DiscussionSession) => void;
@@ -43,10 +43,10 @@ export interface SessionManagerActions {
   discardInterrupted: () => void;
 }
 
-export function useSessionManager(): SessionManagerState & SessionManagerActions {
+export function useSessionManager(): UseSessionManagerState & UseSessionManagerActions {
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
   const [currentSession, setCurrentSession] = useState<DiscussionSession | null>(null);
-  const [interruptedState, setInterruptedStateInternal] = useState<InterruptedDiscussionState | null>(null);
+  const [interruptedState, setInterruptedStateInternal] = useState<InterruptedDiscussionSnapshot | null>(null);
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
 
   // 最新のセッションを参照するためのref
@@ -104,9 +104,9 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
       if (sessionWithInterrupted) {
         setCurrentSession(sessionWithInterrupted);
         const turn = sessionWithInterrupted.interruptedTurn!;
-        // 注意: InterruptedTurnState/InterruptedDiscussionState にフィールドを追加した場合、
+        // 注意: InterruptedTurnState/InterruptedDiscussionSnapshot にフィールドを追加した場合、
         // ここと selectSession の両方で対応するフィールドを追加すること
-        const interrupted: InterruptedDiscussionState = {
+        const interrupted: InterruptedDiscussionSnapshot = {
           sessionId: sessionWithInterrupted.id,
           topic: turn.topic,
           participants: turn.participants || sessionWithInterrupted.participants,
@@ -124,7 +124,7 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
           directionGuide: turn.directionGuide,
           terminationConfig: turn.terminationConfig,
           interruptedAt: turn.interruptedAt,
-          summaryState: turn.summaryState,
+          summaryPhase: turn.summaryPhase,
           startMarker: turn.startMarker,
           extensionMarkers: turn.extensionMarkers,
         };
@@ -147,9 +147,9 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
     // セッションに中断状態がある場合
     if (session.interruptedTurn) {
       const turn = session.interruptedTurn;
-      // 注意: InterruptedTurnState/InterruptedDiscussionState にフィールドを追加した場合、
+      // 注意: InterruptedTurnState/InterruptedDiscussionSnapshot にフィールドを追加した場合、
       // ここと初期ロード処理の両方で対応するフィールドを追加すること
-      const interrupted: InterruptedDiscussionState = {
+      const interrupted: InterruptedDiscussionSnapshot = {
         sessionId: session.id,
         topic: turn.topic,
         participants: turn.participants || session.participants,
@@ -167,7 +167,7 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
         directionGuide: turn.directionGuide,
         terminationConfig: turn.terminationConfig,
         interruptedAt: turn.interruptedAt,
-        summaryState: turn.summaryState,
+        summaryPhase: turn.summaryPhase,
         startMarker: turn.startMarker,
         extensionMarkers: turn.extensionMarkers,
       };
@@ -243,7 +243,7 @@ export function useSessionManager(): SessionManagerState & SessionManagerActions
   }, []);
 
   // 中断状態を設定
-  const setInterruptedState = useCallback((state: InterruptedDiscussionState | null) => {
+  const setInterruptedState = useCallback((state: InterruptedDiscussionSnapshot | null) => {
     setInterruptedStateInternal(state);
     if (state) {
       saveInterruptedState(state);

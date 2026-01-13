@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export interface ElapsedTimeState {
+export interface UseElapsedTimeState {
   elapsedSeconds: number;
   isRunning: boolean;
   formattedTime: string;
@@ -13,7 +13,7 @@ export interface ElapsedTimeState {
  * @param isActive - タイマーがアクティブかどうか
  * @param resetKey - この値が変わるとタイマーがリセットされる（参加者切り替え時など）
  */
-export function useElapsedTime(isActive: boolean, resetKey?: string): ElapsedTimeState {
+export function useElapsedTime(isActive: boolean, resetKey?: string): UseElapsedTimeState {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const startTimeRef = useRef<number | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);

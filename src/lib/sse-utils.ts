@@ -5,7 +5,7 @@ import {
   DiscussionParticipant,
   DiscussionSession,
   FollowUpQuestion,
-  InterruptedDiscussionState,
+  InterruptedDiscussionSnapshot,
   PreviousTurnSummary,
   SearchResult,
   SearchKeywordInfo,
@@ -256,7 +256,7 @@ export async function processSSEStream(
 // ============================================
 
 /**
- * InterruptedDiscussionState を作成するためのパラメータ
+ * InterruptedDiscussionSnapshot を作成するためのパラメータ
  */
 export interface CreateInterruptedStateParams {
   sessionId: string;
@@ -281,12 +281,12 @@ export interface CreateInterruptedStateParams {
 }
 
 /**
- * InterruptedDiscussionState オブジェクトを作成
+ * InterruptedDiscussionSnapshot オブジェクトを作成
  * 中断時の状態保存で使用する共通ヘルパー
  */
 export function createInterruptedState(
   params: CreateInterruptedStateParams
-): InterruptedDiscussionState {
+): InterruptedDiscussionSnapshot {
   return {
     sessionId: params.sessionId,
     topic: params.topic,

@@ -15,9 +15,9 @@ import {
 } from '@/types';
 
 /**
- * 議論の進捗情報
+ * 議論のSSEイベント（サーバーからクライアントへのリアルタイム通知）
  */
-export interface DiscussionProgress {
+export interface DiscussionSSEEvent {
   type: 'message' | 'message_chunk' | 'summary' | 'error' | 'complete' | 'progress' | 'searching' | 'search_results' | 'search_keywords' | 'search_progress' | 'terminated' | 'followups' | 'ready_for_summary';
   message?: DiscussionMessage;
   messageId?: string;
@@ -49,7 +49,7 @@ export interface DiscussionProgress {
 /**
  * 再開用のパラメータ
  */
-export interface ResumeFromState {
+export interface ResumeFromParams {
   messages: DiscussionMessage[];
   currentRound: number;
   currentParticipantIndex: number;
@@ -70,7 +70,7 @@ export interface DiscussionRequest {
   discussionDepth?: DiscussionDepth;
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
-  resumeFrom?: ResumeFromState; // 中断からの再開用
+  resumeFrom?: ResumeFromParams; // 中断からの再開用
   messageVotes?: MessageVote[]; // ユーザーの投票（統合回答に反映）
   skipSummary?: boolean; // 統合回答生成をスキップ（ユーザーが投票後に手動で生成）
   onMessageChunk?: OnMessageChunkCallback; // ストリーミングチャンクのコールバック

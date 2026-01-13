@@ -1,5 +1,5 @@
 import { DiscussionParticipant } from './participant';
-import { DiscussionTurn, InterruptedTurnState } from './message';
+import { DiscussionTurn, InterruptedTurnSnapshot } from './message';
 
 // 分岐情報
 export interface TurnBranch {
@@ -17,6 +17,6 @@ export interface DiscussionSession {
   rounds: number;
   createdAt: Date;
   updatedAt: Date;
-  interruptedTurn?: InterruptedTurnState; // 中断された議論がある場合
+  interruptedTurn?: InterruptedTurnSnapshot; // 中断された議論がある場合
   branches?: TurnBranch[]; // 分岐一覧
 }

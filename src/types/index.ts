@@ -8,16 +8,16 @@ export { ROLE_PRESETS, generateParticipantId, generateCustomRoleId, isCustomRole
 
 // Message types
 export type {
-  SummaryState,
+  SummaryPhase,
   DiscussionMessage,
   PreviousTurnSummary,
   DiscussionRequest,
   SearchBasedDiscussionRequest,
   DiscussionTurn,
-  InterruptedTurnState,
+  InterruptedTurnSnapshot,
   MessageVote,
   MessageRating,
-  InterruptedDiscussionState,
+  InterruptedDiscussionSnapshot,
   StartMarker,
   ExtensionMarker,
 } from './message';
@@ -30,7 +30,7 @@ export type {
   SearchResult,
   SearchKeywordInfo,
   SearchPhase,
-  SearchProgress,
+  SearchUiProgress,
   SearchWarningType,
   SearchWarning,
   SearchProviderType,

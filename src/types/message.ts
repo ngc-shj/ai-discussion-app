@@ -3,8 +3,8 @@ import { DiscussionParticipant } from './participant';
 import { SearchResult, SearchKeywordInfo, SearchConfig, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig } from './config';
 import { FollowUpQuestion } from './followup';
 
-// 統合回答の状態
-export type SummaryState =
+// 統合回答のフェーズ
+export type SummaryPhase =
   | 'idle'           // 通常状態（議論中または議論前）
   | 'awaiting'       // 統合回答ボタン表示中（ユーザーのクリック待ち）
   | 'generating';    // 統合回答生成中
@@ -69,10 +69,10 @@ export interface DiscussionTurn {
 
 // 中断された議論の進行状態（セッション内保存用）
 // 注意: フィールドを追加・変更した場合、以下も合わせて更新すること:
-//   - InterruptedDiscussionState（同ファイル内）
+//   - InterruptedDiscussionSnapshot（同ファイル内）
 //   - useSessionManager.ts の selectSession と初期ロード処理
 //   - session-storage.ts の serializeSession / deserializeSession
-export interface InterruptedTurnState {
+export interface InterruptedTurnSnapshot {
   topic: string;
   participants: DiscussionParticipant[]; // 中断時の参加者（セッションの参加者と同期するために保存）
   messages: DiscussionMessage[];
@@ -89,7 +89,7 @@ export interface InterruptedTurnState {
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
   interruptedAt: Date;
-  summaryState?: SummaryState; // 統合回答の状態
+  summaryPhase?: SummaryPhase; // 統合回答のフェーズ
   // 議論マーカー
   startMarker?: StartMarker;
   extensionMarkers?: ExtensionMarker[];
@@ -112,10 +112,10 @@ export interface MessageRating {
 
 // 中断された議論の状態
 // 注意: フィールドを追加・変更した場合、以下も合わせて更新すること:
-//   - InterruptedTurnState（同ファイル内）
+//   - InterruptedTurnSnapshot（同ファイル内）
 //   - useSessionManager.ts の selectSession と初期ロード処理
 //   - session-storage.ts の serializeInterruptedState / deserializeInterruptedState
-export interface InterruptedDiscussionState {
+export interface InterruptedDiscussionSnapshot {
   sessionId: string;
   topic: string;
   participants: DiscussionParticipant[];
@@ -133,7 +133,7 @@ export interface InterruptedDiscussionState {
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
   interruptedAt: Date;
-  summaryState?: SummaryState; // 統合回答の状態
+  summaryPhase?: SummaryPhase; // 統合回答のフェーズ
   // 議論マーカー
   startMarker?: StartMarker;
   extensionMarkers?: ExtensionMarker[];

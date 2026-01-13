@@ -1,7 +1,7 @@
 import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile, SearchResult, SearchConfig, formatParticipantDisplayName } from '@/types';
 import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from '../ai-providers';
 import { createSearchKeywordPrompt, SearchKeywordTiming } from '../ai-providers/prompt-formatters';
-import { DiscussionProgress, DiscussionRequest, getProviderDisplayName } from './types';
+import { DiscussionSSEEvent, DiscussionRequest, getProviderDisplayName } from './types';
 import { checkConsensus, checkTerminationKeywords } from './termination';
 import { performSearch, mergeSearchResults, DefaultAIConfig } from '../search';
 import { logger } from '@/lib/logger';
@@ -9,7 +9,7 @@ import { logger } from '@/lib/logger';
 const log = logger.discussion;
 
 // Re-export types
-export type { DiscussionProgress, ResumeFromState, DiscussionRequest } from './types';
+export type { DiscussionSSEEvent, ResumeFromParams, DiscussionRequest } from './types';
 export { getProviderDisplayName } from './types';
 export { checkConsensus, checkTerminationKeywords } from './termination';
 
@@ -106,7 +106,7 @@ async function generateSearchKeywords(
  */
 export async function* runDiscussion(
   request: DiscussionRequest
-): AsyncGenerator<DiscussionProgress> {
+): AsyncGenerator<DiscussionSSEEvent> {
   const {
     topic,
     participants,
@@ -507,7 +507,7 @@ async function* generateSummary(
   discussionDepth: import('@/types').DiscussionDepth | undefined,
   directionGuide: import('@/types').DirectionGuide | undefined,
   messageVotes: import('@/types').MessageVote[] | undefined
-): AsyncGenerator<DiscussionProgress> {
+): AsyncGenerator<DiscussionSSEEvent> {
   // 統合中の進捗を送信
   yield {
     type: 'progress',
@@ -606,7 +606,7 @@ async function* generateFollowUps(
   topic: string,
   summaryContent: string,
   userProfile: UserProfile | undefined
-): AsyncGenerator<DiscussionProgress> {
+): AsyncGenerator<DiscussionSSEEvent> {
   try {
     const followUpProvider = successfulParticipants[0];
     if (followUpProvider) {

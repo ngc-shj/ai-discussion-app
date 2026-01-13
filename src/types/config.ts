@@ -42,7 +42,7 @@ export interface SearchWarning {
   message?: string;                        // 詳細メッセージ
 }
 
-export interface SearchProgress {
+export interface SearchUiProgress {
   phase: SearchPhase;                      // 現在のフェーズ
   currentKeywordIndex: number;             // 現在処理中のキーワードインデックス
   totalKeywords: number;                   // 総キーワード数

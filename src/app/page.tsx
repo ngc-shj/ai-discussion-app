@@ -49,13 +49,13 @@ export default function Home() {
     currentTopic,
     currentSearchResults,
     currentSearchKeywords,
-    isLoading,
+    isDiscussing,
     isSearching,
     searchProgress,
     isGeneratingFollowUps,
     isProcessing,
-    summaryState,
-    progress,
+    summaryPhase,
+    discussionProgress,
     completedParticipants,
     suggestedFollowUps,
     error,
@@ -145,7 +145,7 @@ export default function Home() {
       searchResults: interruptedState.searchResults,
       searchKeywords: interruptedState.searchKeywords,
       // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
-      summaryState: interruptedState.summaryState === 'generating' ? 'awaiting' : interruptedState.summaryState,
+      summaryPhase: interruptedState.summaryPhase === 'generating' ? 'awaiting' : interruptedState.summaryPhase,
       startMarker: interruptedState.startMarker,
       extensionMarkers: interruptedState.extensionMarkers,
       discussionMode: interruptedState.discussionMode,
@@ -159,10 +159,10 @@ export default function Home() {
   // 新しいセッションを開始
   const handleNewSession = useCallback(() => {
     // 議論中の場合は中断状態を保存してからクリア
-    // 注: isSearching は isLoading のサブステート（検索中は必ず isLoading も true）
+    // 注: isSearching は isDiscussing のサブステート（検索中は必ず isDiscussing も true）
     // currentSessionRefを使用（Reactの状態更新が非同期のため、currentSessionがまだnullの場合がある）
     const sessionToSave = currentSessionRef.current;
-    if (isLoading && sessionToSave && currentTopic) {
+    if (isDiscussing && sessionToSave && currentTopic) {
       // 中断フラグを立てる（SSEストリーム処理用）
       handleInterrupt();
       // 中断状態をセッションに即座に保存
@@ -171,9 +171,9 @@ export default function Home() {
         topic: currentTopic,
         participants: discussionParticipants.length > 0 ? discussionParticipants : participants,
         messages: currentMessages,
-        currentRound: progress.currentRound,
-        currentParticipantIndex: progress.currentParticipantIndex,
-        totalRounds: progress.totalRounds,
+        currentRound: discussionProgress.currentRound,
+        currentParticipantIndex: discussionProgress.currentParticipantIndex,
+        totalRounds: discussionProgress.totalRounds,
         searchResults: currentSearchResults.length > 0 ? currentSearchResults : undefined,
         searchKeywords: currentSearchKeywords.length > 0 ? currentSearchKeywords : undefined,
         searchConfig,
@@ -183,7 +183,7 @@ export default function Home() {
         directionGuide,
         terminationConfig,
         interruptedAt: new Date(),
-        summaryState: 'idle' as const,
+        summaryPhase: 'idle' as const,
         startMarker: startMarker || undefined,
         extensionMarkers: extensionMarkers.length > 0 ? extensionMarkers : undefined,
       };
@@ -192,7 +192,7 @@ export default function Home() {
     setCurrentSession(null);
     clearCurrentTurnState();
   }, [
-    isLoading,
+    isDiscussing,
     currentSessionRef,
     currentTopic,
     currentMessages,
@@ -201,7 +201,7 @@ export default function Home() {
     searchConfig,
     discussionParticipants,
     participants,
-    progress,
+    discussionProgress,
     userProfile,
     discussionMode,
     discussionDepth,
@@ -233,14 +233,14 @@ export default function Home() {
         userProfile: turn.userProfile,
       });
 
-      // 議論の表示状態を復元（メッセージ、トピック、summaryState等）
+      // 議論の表示状態を復元（メッセージ、トピック、summaryPhase等）
       restoreDiscussionState({
         topic: turn.topic,
         messages: turn.messages,
         searchResults: turn.searchResults,
         searchKeywords: turn.searchKeywords,
         // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
-        summaryState: turn.summaryState === 'generating' ? 'awaiting' : turn.summaryState,
+        summaryPhase: turn.summaryPhase === 'generating' ? 'awaiting' : turn.summaryPhase,
         startMarker: turn.startMarker,
         extensionMarkers: turn.extensionMarkers,
         discussionMode: turn.discussionMode,
@@ -267,7 +267,7 @@ export default function Home() {
         terminationConfig: turn.terminationConfig,
         interruptedAt: turn.interruptedAt,
         // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
-        summaryState: turn.summaryState === 'generating' ? 'awaiting' : turn.summaryState,
+        summaryPhase: turn.summaryPhase === 'generating' ? 'awaiting' : turn.summaryPhase,
         // マーカーを復元
         startMarker: turn.startMarker,
         extensionMarkers: turn.extensionMarkers,
@@ -363,9 +363,9 @@ export default function Home() {
         topic: currentTopic,
         participants: discussionParticipants.length > 0 ? discussionParticipants : participants,
         messages: currentMessages,
-        currentRound: progress.currentRound,
-        currentParticipantIndex: progress.currentParticipantIndex,
-        totalRounds: progress.totalRounds,
+        currentRound: discussionProgress.currentRound,
+        currentParticipantIndex: discussionProgress.currentParticipantIndex,
+        totalRounds: discussionProgress.totalRounds,
         searchResults: currentSearchResults.length > 0 ? currentSearchResults : undefined,
         searchKeywords: currentSearchKeywords.length > 0 ? currentSearchKeywords : undefined,
         searchConfig,
@@ -375,7 +375,7 @@ export default function Home() {
         directionGuide,
         terminationConfig,
         interruptedAt: new Date(),
-        summaryState: 'idle' as const,
+        summaryPhase: 'idle' as const,
         startMarker: startMarker || undefined,
         extensionMarkers: extensionMarkers.length > 0 ? extensionMarkers : undefined,
       };
@@ -391,7 +391,7 @@ export default function Home() {
     searchConfig,
     discussionParticipants,
     participants,
-    progress,
+    discussionProgress,
     userProfile,
     discussionMode,
     discussionDepth,
@@ -640,7 +640,7 @@ export default function Home() {
         )}
 
         {/* 中断された議論の復元バナー */}
-        {interruptedState && !isLoading && interruptedState.summaryState !== 'awaiting' && interruptedState.summaryState !== 'generating' && (
+        {interruptedState && !isDiscussing && interruptedState.summaryPhase !== 'awaiting' && interruptedState.summaryPhase !== 'generating' && (
           <div className="mx-3 md:mx-4 mt-3 md:mt-4 p-3 bg-yellow-900/50 border border-yellow-700 rounded-lg shrink-0">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -691,12 +691,12 @@ export default function Home() {
         <DiscussionPanel
           turns={currentSession?.turns || []}
           currentMessages={currentMessages}
-          participants={isLoading ? discussionParticipants : participants}
+          participants={isDiscussing ? discussionParticipants : participants}
           currentTopic={currentTopic}
           currentFinalAnswer={currentFinalAnswer}
           currentSummaryPrompt={currentSummaryPrompt}
-          isLoading={isLoading}
-          summaryState={summaryState}
+          isDiscussing={isDiscussing}
+          summaryPhase={summaryPhase}
           searchResults={currentSearchResults}
           searchKeywords={currentSearchKeywords}
           searchProgress={searchProgress}
@@ -711,7 +711,7 @@ export default function Home() {
           isGeneratingFollowUps={isGeneratingFollowUps}
           onGenerateSummary={handleGenerateSummary}
           onExtendDiscussion={handleExtendDiscussion}
-          currentRounds={progress.currentRound}
+          currentRounds={discussionProgress.currentRound}
           currentMode={currentDiscussionMode || discussionMode}
           currentDepth={currentDiscussionDepth || discussionDepth}
           currentKeywords={currentDirectionGuide?.keywords || directionGuide.keywords}
@@ -722,20 +722,18 @@ export default function Home() {
 
         {/* 進捗インジケーター */}
         <ProgressIndicator
-          isActive={isLoading}
-          currentRound={progress.currentRound}
-          totalRounds={progress.totalRounds}
-          currentProvider={progress.currentParticipant?.provider || null}
-          currentParticipant={progress.currentParticipant}
-          totalProviders={progress.totalParticipants}
-          currentProviderIndex={progress.currentParticipantIndex}
-          isSummarizing={summaryState === 'generating' && !streamingMessage}
-          isSummaryStreaming={summaryState === 'generating' && !!streamingMessage}
+          isActive={isDiscussing}
+          currentRound={discussionProgress.currentRound}
+          totalRounds={discussionProgress.totalRounds}
+          currentProvider={discussionProgress.currentParticipant?.provider || null}
+          currentParticipant={discussionProgress.currentParticipant}
+          totalProviders={discussionProgress.totalParticipants}
+          currentProviderIndex={discussionProgress.currentParticipantIndex}
           isSearching={isSearching}
           isStreaming={!!streamingMessage}
           isGeneratingFollowUps={isGeneratingFollowUps}
-          summaryState={summaryState}
-          participants={isLoading || summaryState !== 'idle' ? discussionParticipants : participants}
+          summaryPhase={summaryPhase}
+          participants={isDiscussing || summaryPhase !== 'idle' ? discussionParticipants : participants}
           completedParticipants={completedParticipants}
           onInterrupt={handleInterruptWithSave}
         />

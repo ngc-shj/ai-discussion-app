@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // 統合中の進捗を送信（summaryStateで管理されるためprogressは空）
+          // 統合中の進捗を送信（summaryPhaseで管理されるためprogressは空）
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             type: 'progress',
             progress: {},

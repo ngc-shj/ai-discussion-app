@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { DiscussionTurn, DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, SearchProgress, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
+import { DiscussionTurn, DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, SearchUiProgress, MessageVote, FollowUpQuestion, DeepDiveType, SummaryPhase, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { TurnDisplay } from './TurnDisplay';
 import { CurrentTurnDisplay } from './CurrentTurnDisplay';
@@ -13,10 +13,10 @@ interface DiscussionPanelProps {
   currentTopic?: string;
   currentFinalAnswer?: string;
   currentSummaryPrompt?: string;
-  isLoading: boolean;
+  isDiscussing: boolean;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
-  searchProgress?: SearchProgress | null; // 検索進捗状態
+  searchProgress?: SearchUiProgress | null; // 検索進捗状態
   onFollowUp?: (topic: string, previousAnswer: string) => void;
   onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
   onCounterargument?: (topic: string, previousAnswer: string) => void;
@@ -26,7 +26,7 @@ interface DiscussionPanelProps {
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   suggestedFollowUps?: FollowUpQuestion[];
   isGeneratingFollowUps?: boolean;
-  summaryState?: SummaryState;
+  summaryPhase?: SummaryPhase;
   onGenerateSummary?: () => void;
   onExtendDiscussion?: (config: ExtendDiscussionConfig) => void;
   currentRounds?: number;
@@ -45,7 +45,7 @@ export function DiscussionPanel({
   currentTopic,
   currentFinalAnswer,
   currentSummaryPrompt,
-  isLoading,
+  isDiscussing,
   searchResults,
   searchKeywords,
   searchProgress,
@@ -58,7 +58,7 @@ export function DiscussionPanel({
   onVote,
   suggestedFollowUps,
   isGeneratingFollowUps,
-  summaryState,
+  summaryPhase,
   onGenerateSummary,
   onExtendDiscussion,
   currentRounds,
@@ -102,7 +102,7 @@ export function DiscussionPanel({
           onCounterargument={onCounterargument}
           onFork={onFork}
           onGenerateFollowUps={onGenerateFollowUps}
-          disabled={isLoading}
+          disabled={isDiscussing}
           isGeneratingFollowUps={isGeneratingFollowUps}
           messageVotes={messageVotes}
           onVote={onVote}
@@ -117,8 +117,8 @@ export function DiscussionPanel({
           participants={participants}
           finalAnswer={currentFinalAnswer}
           summaryPrompt={currentSummaryPrompt}
-          isLoading={isLoading}
-          summaryState={summaryState}
+          isDiscussing={isDiscussing}
+          summaryPhase={summaryPhase}
           searchResults={searchResults}
           searchKeywords={searchKeywords}
           searchProgress={searchProgress}

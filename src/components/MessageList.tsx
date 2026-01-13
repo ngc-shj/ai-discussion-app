@@ -1,14 +1,14 @@
 'use client';
 
 import { RefObject } from 'react';
-import { DiscussionMessage, DiscussionParticipant, MessageVote, StartMarker, ExtensionMarker, SearchKeywordInfo, SearchProgress } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, MessageVote, StartMarker, ExtensionMarker, SearchKeywordInfo, SearchUiProgress } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { MessageBubble } from './MessageBubble';
 import { StartSeparatorInline, ExtensionSeparatorInline } from './ExtensionSeparator';
 import { SearchKeywordItem } from './SearchKeywordItem';
 
 // 検索進捗インジケーターコンポーネント
-function SearchProgressIndicator({ searchProgress }: { searchProgress: SearchProgress }) {
+function SearchUiProgressIndicator({ searchProgress }: { searchProgress: SearchUiProgress }) {
   return (
     <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-3 my-2">
       <div className="flex items-center gap-2 mb-2">
@@ -81,10 +81,10 @@ interface MessageListProps {
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   // リアルタイム表示用（CurrentTurnDisplay で使用）
   streamingMessage?: StreamingMessage | null;
-  isLoading?: boolean;
+  isDiscussing?: boolean;
   bottomRef?: RefObject<HTMLDivElement | null>;
   // 検索中状態の表示用
-  searchProgress?: SearchProgress | null;
+  searchProgress?: SearchUiProgress | null;
 }
 
 export function MessageList({
@@ -96,7 +96,7 @@ export function MessageList({
   messageVotes,
   onVote,
   streamingMessage,
-  isLoading,
+  isDiscussing,
   bottomRef,
   searchProgress,
 }: MessageListProps) {
@@ -138,7 +138,7 @@ export function MessageList({
   return (
     <>
       {/* 議論開始セパレーター */}
-      {startMarker && (isLoading || messages.length > 0 || streamingMessage) && (
+      {startMarker && (isDiscussing || messages.length > 0 || streamingMessage) && (
         <StartSeparatorInline marker={startMarker} />
       )}
 
@@ -180,7 +180,7 @@ export function MessageList({
         const pendingExtensionMarker = lastMessage
           ? extensionMarkers.find(m => m.afterRound === lastMessage.round)
           : null;
-        if (pendingExtensionMarker && (isLoading || streamingMessage || searchProgress)) {
+        if (pendingExtensionMarker && (isDiscussing || streamingMessage || searchProgress)) {
           const hasMessageAfterExtension = messages.some(msg => msg.round > pendingExtensionMarker.afterRound);
           if (!hasMessageAfterExtension) {
             return <ExtensionSeparatorInline marker={pendingExtensionMarker} />;
@@ -201,7 +201,7 @@ export function MessageList({
 
       {/* 検索進捗インジケーター */}
       {searchProgress?.phase === 'searching' && (
-        <SearchProgressIndicator searchProgress={searchProgress} />
+        <SearchUiProgressIndicator searchProgress={searchProgress} />
       )}
 
       {/* ストリーミング中のメッセージ */}
@@ -223,7 +223,7 @@ export function MessageList({
       )}
 
       {/* 議論開始中のローディング */}
-      {isLoading && messages.length === 0 && !streamingMessage && !searchProgress && (
+      {isDiscussing && messages.length === 0 && !streamingMessage && !searchProgress && (
         <div className="flex items-center gap-2 py-3 md:py-4">
           <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-blue-400 rounded-full" />
           <span className="text-gray-400 text-sm md:text-base">議論を開始中...</span>

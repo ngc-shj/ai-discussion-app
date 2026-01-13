@@ -102,9 +102,9 @@ export function SessionItem({
               {/* 状態マーク */}
               {/* アクティブなセッションで処理中（disabled） */}
               {isSelected && disabled && (() => {
-                // session.interruptedTurnのsummaryStateで状態を判断
-                const summaryState = session.interruptedTurn?.summaryState;
-                const isGeneratingSummary = summaryState === 'generating';
+                // session.interruptedTurnのsummaryPhaseで状態を判断
+                const summaryPhase = session.interruptedTurn?.summaryPhase;
+                const isGeneratingSummary = summaryPhase === 'generating';
 
                 return (
                   <span
@@ -127,23 +127,23 @@ export function SessionItem({
               {session.interruptedTurn && !(isSelected && disabled) && (
                 <span
                   className={`shrink-0 px-1.5 py-0.5 text-[10px] rounded font-medium ${
-                    session.interruptedTurn.summaryState === 'generating'
+                    session.interruptedTurn.summaryPhase === 'generating'
                       ? 'bg-purple-600/80 text-purple-100'
-                      : session.interruptedTurn.summaryState === 'awaiting'
+                      : session.interruptedTurn.summaryPhase === 'awaiting'
                         ? 'bg-blue-600/80 text-blue-100'
                         : 'bg-orange-600/80 text-orange-100'
                   }`}
                   title={
-                    session.interruptedTurn.summaryState === 'generating'
+                    session.interruptedTurn.summaryPhase === 'generating'
                       ? `統合中: ${session.interruptedTurn.topic}`
-                      : session.interruptedTurn.summaryState === 'awaiting'
+                      : session.interruptedTurn.summaryPhase === 'awaiting'
                         ? `投票待ち: ${session.interruptedTurn.topic}`
                         : `中断中: ${session.interruptedTurn.topic}`
                   }
                 >
-                  {session.interruptedTurn.summaryState === 'generating'
+                  {session.interruptedTurn.summaryPhase === 'generating'
                     ? '統合中'
-                    : session.interruptedTurn.summaryState === 'awaiting'
+                    : session.interruptedTurn.summaryPhase === 'awaiting'
                       ? '投票待ち'
                       : '中断中'}
                 </span>

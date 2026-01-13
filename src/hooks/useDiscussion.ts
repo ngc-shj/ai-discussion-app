@@ -7,19 +7,19 @@ import {
   DiscussionSession,
   SearchResult,
   SearchKeywordInfo,
-  SearchProgress,
+  SearchUiProgress,
   SearchWarning,
   MessageVote,
   FollowUpQuestion,
-  InterruptedDiscussionState,
-  InterruptedTurnState,
+  InterruptedDiscussionSnapshot,
+  InterruptedTurnSnapshot,
   UserProfile,
   DiscussionMode,
   DiscussionDepth,
   DirectionGuide,
   TerminationConfig,
   SearchConfig,
-  SummaryState,
+  SummaryPhase,
   ExtendDiscussionConfig,
   StartMarker,
   ExtensionMarker,
@@ -39,7 +39,7 @@ import {
   getPreviousTurns,
 } from '@/lib/sse-utils';
 
-export interface ProgressState {
+export interface DiscussionUiProgress {
   currentRound: number;
   totalRounds: number;
   currentParticipantIndex: number;
@@ -56,20 +56,22 @@ export interface StreamingMessage {
   round: number;
 }
 
-export interface DiscussionState {
+/** useDiscussion フックが提供する状態 */
+export interface UseDiscussionState {
   currentMessages: DiscussionMessage[];
   currentFinalAnswer: string;
   currentSummaryPrompt: string;
   currentTopic: string;
   currentSearchResults: SearchResult[];
   currentSearchKeywords: SearchKeywordInfo[];
-  isLoading: boolean;
+  isDiscussing: boolean;
+  /** 検索中かどうか（searchProgress !== null から派生） */
   isSearching: boolean;
   isGeneratingFollowUps: boolean;
   isProcessing: boolean;
-  summaryState: SummaryState;
-  progress: ProgressState;
-  searchProgress: SearchProgress | null;
+  summaryPhase: SummaryPhase;
+  discussionProgress: DiscussionUiProgress;
+  searchProgress: SearchUiProgress | null;
   completedParticipants: Set<string>;
   suggestedFollowUps: FollowUpQuestion[];
   error: string | null;
@@ -90,7 +92,7 @@ export interface RestoreDiscussionStateParams {
   messages: DiscussionMessage[];
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
-  summaryState?: SummaryState;
+  summaryPhase?: SummaryPhase;
   startMarker?: StartMarker;
   extensionMarkers?: ExtensionMarker[];
   discussionMode?: DiscussionMode;
@@ -99,14 +101,15 @@ export interface RestoreDiscussionStateParams {
   terminationConfig?: TerminationConfig;
 }
 
-export interface DiscussionActions {
-  setCurrentMessages: React.Dispatch<React.SetStateAction<DiscussionMessage[]>>;
-  setCurrentFinalAnswer: React.Dispatch<React.SetStateAction<string>>;
-  setCurrentTopic: React.Dispatch<React.SetStateAction<string>>;
-  setCurrentSearchResults: React.Dispatch<React.SetStateAction<SearchResult[]>>;
-  setCurrentSearchKeywords: React.Dispatch<React.SetStateAction<SearchKeywordInfo[]>>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
-  setMessageVotes: React.Dispatch<React.SetStateAction<MessageVote[]>>;
+/** useDiscussion フックが提供するアクション */
+export interface UseDiscussionActions {
+  setCurrentMessages: (updater: DiscussionMessage[] | ((prev: DiscussionMessage[]) => DiscussionMessage[])) => void;
+  setCurrentFinalAnswer: (updater: string | ((prev: string) => string)) => void;
+  setCurrentTopic: (updater: string | ((prev: string) => string)) => void;
+  setCurrentSearchResults: (updater: SearchResult[] | ((prev: SearchResult[]) => SearchResult[])) => void;
+  setCurrentSearchKeywords: (updater: SearchKeywordInfo[] | ((prev: SearchKeywordInfo[]) => SearchKeywordInfo[])) => void;
+  setError: (updater: string | null | ((prev: string | null) => string | null)) => void;
+  setMessageVotes: (updater: MessageVote[] | ((prev: MessageVote[]) => MessageVote[])) => void;
   handleVote: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   clearCurrentTurnState: () => void;
   restoreDiscussionState: (params: RestoreDiscussionStateParams) => void;
@@ -117,6 +120,9 @@ export interface DiscussionActions {
   generateSummary: (params: GenerateSummaryParams) => Promise<void>;
   generateFollowUps: (params: GenerateFollowUpsParams) => Promise<void>;
 }
+
+/** useDiscussion フックの戻り値 */
+export type UseDiscussionReturn = UseDiscussionState & UseDiscussionActions;
 
 export interface StartDiscussionParams {
   topic: string;
@@ -130,12 +136,12 @@ export interface StartDiscussionParams {
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
-  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  setInterruptedState: (state: InterruptedDiscussionSnapshot | null) => void;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
 }
 
 export interface ResumeDiscussionParams {
-  interruptedState: InterruptedDiscussionState;
+  interruptedState: InterruptedDiscussionSnapshot;
   restoreFromSession: (session: {
     participants: DiscussionParticipant[];
     discussionMode?: DiscussionMode;
@@ -147,7 +153,7 @@ export interface ResumeDiscussionParams {
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
-  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  setInterruptedState: (state: InterruptedDiscussionSnapshot | null) => void;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
 }
 
@@ -159,7 +165,7 @@ export interface GenerateSummaryParams {
   directionGuide: DirectionGuide;
   searchConfig: SearchConfig;
   currentSessionRef: React.RefObject<DiscussionSession | null>;
-  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  setInterruptedState: (state: InterruptedDiscussionSnapshot | null) => void;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
 }
 
@@ -181,16 +187,53 @@ export interface ExtendDiscussionParams {
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
-  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  setInterruptedState: (state: InterruptedDiscussionSnapshot | null) => void;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
 }
 
-const INITIAL_PROGRESS: ProgressState = {
+const INITIAL_PROGRESS: DiscussionUiProgress = {
   currentRound: 0,
   totalRounds: 0,
   currentParticipantIndex: 0,
   totalParticipants: 0,
   currentParticipant: null,
+};
+
+// 議論設定の統合型
+export interface CurrentSettings {
+  discussionMode: DiscussionMode | null;
+  discussionDepth: DiscussionDepth | null;
+  directionGuide: DirectionGuide | null;
+  terminationConfig: TerminationConfig | null;
+}
+
+const INITIAL_SETTINGS: CurrentSettings = {
+  discussionMode: null,
+  discussionDepth: null,
+  directionGuide: null,
+  terminationConfig: null,
+};
+
+// 検索データの統合型
+export interface SearchData {
+  results: SearchResult[];
+  keywords: SearchKeywordInfo[];
+}
+
+const INITIAL_SEARCH_DATA: SearchData = {
+  results: [],
+  keywords: [],
+};
+
+// 統合回答データの統合型
+export interface SummaryData {
+  finalAnswer: string;
+  prompt: string;
+}
+
+const INITIAL_SUMMARY_DATA: SummaryData = {
+  finalAnswer: '',
+  prompt: '',
 };
 
 // ============================================
@@ -219,26 +262,26 @@ interface CreateSSEHandlersParams {
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
   setCurrentSession?: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
-  setProgress: React.Dispatch<React.SetStateAction<ProgressState>>;
+  setDiscussionUiProgress: React.Dispatch<React.SetStateAction<DiscussionUiProgress>>;
   setCurrentMessages: React.Dispatch<React.SetStateAction<DiscussionMessage[]>>;
   setCompletedParticipants: React.Dispatch<React.SetStateAction<Set<string>>>;
   setCurrentFinalAnswer: React.Dispatch<React.SetStateAction<string>>;
   setCurrentSummaryPrompt: React.Dispatch<React.SetStateAction<string>>;
   setSuggestedFollowUps: React.Dispatch<React.SetStateAction<FollowUpQuestion[]>>;
   setIsGeneratingFollowUps: React.Dispatch<React.SetStateAction<boolean>>;
-  setSummaryState?: React.Dispatch<React.SetStateAction<SummaryState>>;
-  setIsLoading?: React.Dispatch<React.SetStateAction<boolean>>;
-  setIsSearching?: React.Dispatch<React.SetStateAction<boolean>>;
-  setSearchProgress?: React.Dispatch<React.SetStateAction<SearchProgress | null>>;
-  setCurrentSearchResults?: React.Dispatch<React.SetStateAction<SearchResult[]>>;
-  setCurrentSearchKeywords?: React.Dispatch<React.SetStateAction<SearchKeywordInfo[]>>;
+  setSummaryPhase?: React.Dispatch<React.SetStateAction<SummaryPhase>>;
+  setIsDiscussing?: React.Dispatch<React.SetStateAction<boolean>>;
+  // isSearchingは不要（searchProgressから派生）
+  setSearchUiProgress?: React.Dispatch<React.SetStateAction<SearchUiProgress | null>>;
+  setCurrentSearchResults?: (updater: SearchResult[] | ((prev: SearchResult[]) => SearchResult[])) => void;
+  setCurrentSearchKeywords?: (updater: SearchKeywordInfo[] | ((prev: SearchKeywordInfo[]) => SearchKeywordInfo[])) => void;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setStreamingMessage?: React.Dispatch<React.SetStateAction<StreamingMessage | null>>;
   collectedMessagesRef: { current: DiscussionMessage[] };
   collectedFinalAnswerRef: { current: string };
   collectedSummaryPromptRef: { current: string };
   collectedSearchKeywordsRef?: { current: SearchKeywordInfo[] };
-  currentProgressStateRef: { current: { currentRound: number; currentParticipantIndex: number } };
+  currentDiscussionUiProgressRef: { current: { currentRound: number; currentParticipantIndex: number } };
   includeReadyForSummary?: boolean;
 }
 
@@ -248,17 +291,16 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     currentSessionRef,
     setSessions,
     setCurrentSession,
-    setProgress,
+    setDiscussionUiProgress,
     setCurrentMessages,
     setCompletedParticipants,
     setCurrentFinalAnswer,
     setCurrentSummaryPrompt,
     setSuggestedFollowUps,
     setIsGeneratingFollowUps,
-    setSummaryState,
-    setIsLoading,
-    setIsSearching,
-    setSearchProgress,
+    setSummaryPhase,
+    setIsDiscussing,
+    setSearchUiProgress,
     setCurrentSearchResults,
     setCurrentSearchKeywords,
     setError,
@@ -267,17 +309,17 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     collectedFinalAnswerRef,
     collectedSummaryPromptRef,
     collectedSearchKeywordsRef,
-    currentProgressStateRef,
+    currentDiscussionUiProgressRef,
     includeReadyForSummary = false,
   } = params;
 
   return {
     onProgress: (progressData) => {
-      currentProgressStateRef.current = {
+      currentDiscussionUiProgressRef.current = {
         currentRound: progressData.currentRound,
         currentParticipantIndex: progressData.currentParticipantIndex,
       };
-      setProgress({
+      setDiscussionUiProgress({
         currentRound: progressData.currentRound,
         totalRounds: progressData.totalRounds,
         currentParticipantIndex: progressData.currentParticipantIndex,
@@ -296,8 +338,8 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       });
       // 自動保存
       // 次に発言すべきAIの位置を計算
-      const currentRound = currentProgressStateRef.current.currentRound;
-      const currentPIndex = currentProgressStateRef.current.currentParticipantIndex;
+      const currentRound = currentDiscussionUiProgressRef.current.currentRound;
+      const currentPIndex = currentDiscussionUiProgressRef.current.currentParticipantIndex;
       const totalParticipants = context.participants.length;
 
       // 次の位置を計算（ラウンド内で最後の参加者なら次のラウンドへ）
@@ -324,7 +366,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
           ? searchKeywordsForSave[0].keywords.length - 1  // 議論中なので検索は完了している
           : undefined;
 
-        const interruptedTurn: InterruptedTurnState = {
+        const interruptedTurn: InterruptedTurnSnapshot = {
           topic: context.topic,
           participants: context.participants,
           messages: collectedMessagesRef.current,
@@ -340,7 +382,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
           directionGuide: context.directionGuide,
           terminationConfig: context.terminationConfig,
           interruptedAt: new Date(),
-          summaryState: isAllComplete ? 'awaiting' : 'idle',
+          summaryPhase: isAllComplete ? 'awaiting' : 'idle',
           startMarker: context.startMarker,
           extensionMarkers: context.extensionMarkers,
         };
@@ -359,7 +401,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     },
     onMessageChunk: (messageId, _chunk, accumulatedContent, provider, model, round) => {
       // 現在の参加者IDを取得
-      const currentParticipantIndex = currentProgressStateRef.current.currentParticipantIndex;
+      const currentParticipantIndex = currentDiscussionUiProgressRef.current.currentParticipantIndex;
       const currentParticipant = context.participants[currentParticipantIndex];
       const participantId = currentParticipant?.id || '';
 
@@ -387,22 +429,22 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     },
     onReadyForSummary: includeReadyForSummary
       ? () => {
-          setSummaryState?.('awaiting');
-          setIsLoading?.(false);
+          setSummaryPhase?.('awaiting');
+          setIsDiscussing?.(false);
           const latestSession = currentSessionRef.current;
           if (latestSession) {
-            // summaryState: 'awaiting'状態を保持した中断状態を保存
+            // summaryPhase: 'awaiting'状態を保持した中断状態を保存
             const searchKeywordsForAwait = collectedSearchKeywordsRef?.current?.length ? collectedSearchKeywordsRef.current : context.searchKeywords;
             const completedKeywordIndexForAwait = searchKeywordsForAwait && searchKeywordsForAwait.length > 0 && searchKeywordsForAwait[0].keywords.length > 0
               ? searchKeywordsForAwait[0].keywords.length - 1
               : undefined;
 
-            const interruptedTurn: InterruptedTurnState = {
+            const interruptedTurn: InterruptedTurnSnapshot = {
               topic: context.topic,
               participants: context.participants,
               messages: collectedMessagesRef.current,
-              currentRound: currentProgressStateRef.current.currentRound,
-              currentParticipantIndex: currentProgressStateRef.current.currentParticipantIndex,
+              currentRound: currentDiscussionUiProgressRef.current.currentRound,
+              currentParticipantIndex: currentDiscussionUiProgressRef.current.currentParticipantIndex,
               totalRounds: context.totalRounds,
               searchResults: context.searchResults,
               searchKeywords: searchKeywordsForAwait,
@@ -413,7 +455,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
               directionGuide: context.directionGuide,
               terminationConfig: context.terminationConfig,
               interruptedAt: new Date(),
-              summaryState: 'awaiting',
+              summaryPhase: 'awaiting',
               startMarker: context.startMarker,
               extensionMarkers: context.extensionMarkers,
             };
@@ -433,16 +475,15 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
         }
       : undefined,
     onComplete: () => {
-      setIsLoading?.(false);
+      setIsDiscussing?.(false);
       setIsGeneratingFollowUps(false);
-      // 注意: ここでsummaryStateを'idle'にしない
+      // 注意: ここでsummaryPhaseを'idle'にしない
       // startDiscussionの場合: onReadyForSummaryで'awaiting'に設定されるので、それを維持する
       // generateSummaryの場合: onSummaryで'idle'に設定されるので、ここでは不要
     },
     onSearching: () => {
-      setIsSearching?.(true);
       // 検索開始時はキーワード生成中フェーズとして表示
-      setSearchProgress?.({
+      setSearchUiProgress?.({
         phase: 'keywords',
         currentKeywordIndex: 0,
         totalKeywords: 0,
@@ -450,8 +491,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       });
     },
     onSearchResults: (searchResults) => {
-      setIsSearching?.(false);
-      setSearchProgress?.(null);
+      setSearchUiProgress?.(null);
       setCurrentSearchResults?.(searchResults);
       // 最後に追加されたSearchKeywordInfoに結果を紐付け
       if (collectedSearchKeywordsRef && collectedSearchKeywordsRef.current.length > 0) {
@@ -470,7 +510,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
         collectedSearchKeywordsRef.current = [...collectedSearchKeywordsRef.current, searchKeywords];
       }
       // 検索進捗を更新（キーワードが確定したので検索フェーズへ）
-      setSearchProgress?.({
+      setSearchUiProgress?.({
         phase: 'searching',
         currentKeywordIndex: 0,
         totalKeywords: searchKeywords.keywords.length,
@@ -480,7 +520,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     },
     onSearchProgress: (progress) => {
       // 検索進捗を更新
-      setSearchProgress?.((prev) => {
+      setSearchUiProgress?.((prev) => {
         if (!prev) return prev;
         const newState = {
           ...prev,
@@ -500,18 +540,18 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
 // ============================================
 // useDiscussion フック
 // ============================================
-export function useDiscussion(): DiscussionState & DiscussionActions {
+export function useDiscussion(): UseDiscussionReturn {
   const [currentMessages, setCurrentMessages] = useState<DiscussionMessage[]>([]);
-  const [currentFinalAnswer, setCurrentFinalAnswer] = useState<string>('');
-  const [currentSummaryPrompt, setCurrentSummaryPrompt] = useState<string>('');
+  // 統合回答データ（回答とプロンプト）- 統合
+  const [summaryData, setSummaryData] = useState<SummaryData>(INITIAL_SUMMARY_DATA);
   const [currentTopic, setCurrentTopic] = useState<string>('');
-  const [currentSearchResults, setCurrentSearchResults] = useState<SearchResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchProgress, setSearchProgress] = useState<SearchProgress | null>(null);
+  // 検索データ（結果とキーワード）- 統合
+  const [searchData, setSearchData] = useState<SearchData>(INITIAL_SEARCH_DATA);
+  const [isDiscussing, setIsDiscussing] = useState(false);
+  const [searchProgress, setSearchUiProgress] = useState<SearchUiProgress | null>(null);
   const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
-  const [summaryState, setSummaryState] = useState<SummaryState>('idle');
-  const [progress, setProgress] = useState<ProgressState>(INITIAL_PROGRESS);
+  const [summaryPhase, setSummaryPhase] = useState<SummaryPhase>('idle');
+  const [discussionProgress, setDiscussionUiProgress] = useState<DiscussionUiProgress>(INITIAL_PROGRESS);
   const [completedParticipants, setCompletedParticipants] = useState<Set<string>>(new Set());
   const [suggestedFollowUps, setSuggestedFollowUps] = useState<FollowUpQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -520,15 +560,49 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [streamingMessage, setStreamingMessage] = useState<StreamingMessage | null>(null);
   const [startMarker, setStartMarker] = useState<StartMarker | null>(null);
   const [extensionMarkers, setExtensionMarkers] = useState<ExtensionMarker[]>([]);
-  const [currentSearchKeywords, setCurrentSearchKeywords] = useState<SearchKeywordInfo[]>([]);
-  // 現在の議論で使用中の設定（延長時に参照するため）
-  const [currentDiscussionMode, setCurrentDiscussionMode] = useState<DiscussionMode | null>(null);
-  const [currentDiscussionDepth, setCurrentDiscussionDepth] = useState<DiscussionDepth | null>(null);
-  const [currentDirectionGuide, setCurrentDirectionGuide] = useState<DirectionGuide | null>(null);
-  const [currentTerminationConfig, setCurrentTerminationConfig] = useState<TerminationConfig | null>(null);
+  // 現在の議論で使用中の設定（延長時に参照するため）- 統合
+  const [currentSettings, setCurrentSettings] = useState<CurrentSettings>(INITIAL_SETTINGS);
 
   const interruptRequestedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // searchDataから派生（後方互換）
+  const currentSearchResults = searchData.results;
+  const currentSearchKeywords = searchData.keywords;
+
+  // searchData更新用ヘルパー
+  const setCurrentSearchResults = useCallback((updater: SearchResult[] | ((prev: SearchResult[]) => SearchResult[])) => {
+    setSearchData(prev => ({
+      ...prev,
+      results: typeof updater === 'function' ? updater(prev.results) : updater,
+    }));
+  }, []);
+
+  const setCurrentSearchKeywords = useCallback((updater: SearchKeywordInfo[] | ((prev: SearchKeywordInfo[]) => SearchKeywordInfo[])) => {
+    setSearchData(prev => ({
+      ...prev,
+      keywords: typeof updater === 'function' ? updater(prev.keywords) : updater,
+    }));
+  }, []);
+
+  // summaryDataから派生（後方互換）
+  const currentFinalAnswer = summaryData.finalAnswer;
+  const currentSummaryPrompt = summaryData.prompt;
+
+  // summaryData更新用ヘルパー
+  const setCurrentFinalAnswer = useCallback((updater: string | ((prev: string) => string)) => {
+    setSummaryData(prev => ({
+      ...prev,
+      finalAnswer: typeof updater === 'function' ? updater(prev.finalAnswer) : updater,
+    }));
+  }, []);
+
+  const setCurrentSummaryPrompt = useCallback((updater: string | ((prev: string) => string)) => {
+    setSummaryData(prev => ({
+      ...prev,
+      prompt: typeof updater === 'function' ? updater(prev.prompt) : updater,
+    }));
+  }, []);
 
   const handleVote = useCallback((messageId: string, vote: 'agree' | 'disagree' | 'neutral') => {
     setMessageVotes((prev: MessageVote[]) => {
@@ -550,16 +624,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setCurrentSummaryPrompt('');
     setCurrentTopic('');
     // 検索関連
-    setCurrentSearchResults([]);
-    setCurrentSearchKeywords([]);
+    setSearchData(INITIAL_SEARCH_DATA);
     // ローディング・進行状況
-    setIsLoading(false);
-    setIsSearching(false);
+    setIsDiscussing(false);
     setIsGeneratingFollowUps(false);
-    setSummaryState('idle');
-    setProgress(INITIAL_PROGRESS);
+    setSummaryPhase('idle');
+    setDiscussionUiProgress(INITIAL_PROGRESS);
     setCompletedParticipants(new Set());
-    setSearchProgress(null);
+    setSearchUiProgress(null);
     // フォローアップ・投票
     setSuggestedFollowUps([]);
     setMessageVotes([]);
@@ -572,10 +644,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     setStartMarker(null);
     setExtensionMarkers([]);
     // 議論設定
-    setCurrentDiscussionMode(null);
-    setCurrentDiscussionDepth(null);
-    setCurrentDirectionGuide(null);
-    setCurrentTerminationConfig(null);
+    setCurrentSettings(INITIAL_SETTINGS);
   }, []);
 
   const clearCurrentTurnState = useCallback(() => {
@@ -592,16 +661,20 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     // 固有の設定を上書き
     setCurrentTopic(params.topic);
     setCurrentMessages(params.messages);
-    setCurrentSearchResults(params.searchResults || []);
-    setCurrentSearchKeywords(params.searchKeywords || []);
-    setSummaryState(params.summaryState || 'idle');
+    setSearchData({
+      results: params.searchResults || [],
+      keywords: params.searchKeywords || [],
+    });
+    setSummaryPhase(params.summaryPhase || 'idle');
     // マーカーと議論設定を復元
     setStartMarker(params.startMarker || null);
     setExtensionMarkers(params.extensionMarkers || []);
-    setCurrentDiscussionMode(params.discussionMode || null);
-    setCurrentDiscussionDepth(params.discussionDepth || null);
-    setCurrentDirectionGuide(params.directionGuide || null);
-    setCurrentTerminationConfig(params.terminationConfig || null);
+    setCurrentSettings({
+      discussionMode: params.discussionMode || null,
+      discussionDepth: params.discussionDepth || null,
+      directionGuide: params.directionGuide || null,
+      terminationConfig: params.terminationConfig || null,
+    });
   }, [resetAllState]);
 
   const handleInterrupt = useCallback(() => {
@@ -631,7 +704,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         updateAndSaveSession,
       } = params;
 
-      setSummaryState('generating');
+      setSummaryPhase('generating');
       setError(null);
       // 復元・破棄ボタンをすぐに非表示にする
       setInterruptedState(null);
@@ -644,7 +717,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       let summarySearchResults = currentSearchResults;
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
       if (searchConfig.enabled && timing.beforeSummary) {
-        setIsSearching(true);
+        setSearchUiProgress({
+          phase: 'searching',
+          currentKeywordIndex: 0,
+          totalKeywords: 1,
+          completedKeywords: [],
+        });
         try {
           // 議論内容をAIに渡してキーワードを生成
           const messagesForKeywords = currentMessages.map(m => ({
@@ -712,23 +790,22 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
             // 中断された場合は正常終了
-            setIsSearching(false);
-            setSummaryState('idle');
+            setSummaryPhase('idle');
             return;
           }
           console.error('beforeSummary search failed:', err);
         } finally {
-          setIsSearching(false);
+          setSearchUiProgress(null);
         }
       }
 
       // セッションのinterruptedTurnを統合回答生成中状態に更新
-      // クリアするのではなく、summaryState: 'generating'で更新することでリロード時に復元可能にする
+      // クリアするのではなく、summaryPhase: 'generating'で更新することでリロード時に復元可能にする
       if (currentSessionRef.current?.interruptedTurn) {
         await updateAndSaveSession({
           interruptedTurn: {
             ...currentSessionRef.current.interruptedTurn,
-            summaryState: 'generating',
+            summaryPhase: 'generating',
             interruptedAt: new Date(),
           },
         });
@@ -764,7 +841,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
 
         const handlers: SSEEventHandlers = {
           onProgress: () => {
-            // Progress is tracked via summaryState
+            // Progress is tracked via summaryPhase
           },
           onSummaryChunk: (_chunk, accumulatedContent) => {
             // ストリーミング中のテキストをリアルタイム表示
@@ -777,14 +854,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             setCurrentSummaryPrompt(summaryPrompt || '');
             // 状態遷移: 'generating' → 'idle'
             // 統合回答の生成が完了したので、アクションボタンを表示可能にする
-            setSummaryState('idle');
+            setSummaryPhase('idle');
           },
           onError: (errorMsg) => {
             console.error('Summary error:', errorMsg);
             setError(errorMsg);
           },
           onComplete: () => {
-            setSummaryState('idle');
+            setSummaryPhase('idle');
           },
         };
 
@@ -796,7 +873,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
 
         if (wasInterrupted) {
           // 中断された場合は状態をリセットして終了
-          setSummaryState('idle');
+          setSummaryPhase('idle');
           return;
         }
 
@@ -903,9 +980,9 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       } finally {
         // AbortControllerをクリア
         abortControllerRef.current = null;
-        // エラー時のフォールバック: summaryStateを確実にidleに戻す
+        // エラー時のフォールバック: summaryPhaseを確実にidleに戻す
         // 成功時はonSummaryで既にidleに設定されているので二重設定になるが問題ない
-        setSummaryState('idle');
+        setSummaryPhase('idle');
       }
     },
     [currentMessages, currentTopic, currentSearchResults, currentSearchKeywords, messageVotes, clearCurrentTurnState, startMarker, extensionMarkers]
@@ -949,17 +1026,19 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         timestamp: new Date(),
       });
       // 現在の議論設定を保存（延長時に参照するため）
-      setCurrentDiscussionMode(discussionMode);
-      setCurrentDiscussionDepth(discussionDepth);
-      setCurrentDirectionGuide(directionGuide);
-      setCurrentTerminationConfig(terminationConfig);
-      setIsLoading(true);
+      setCurrentSettings({
+        discussionMode,
+        discussionDepth,
+        directionGuide,
+        terminationConfig,
+      });
+      setIsDiscussing(true);
       setCurrentTopic(topic);
       setDiscussionParticipants(participants);
       interruptRequestedRef.current = false;
       // AbortControllerを初期化
       abortControllerRef.current = new AbortController();
-      setProgress({
+      setDiscussionUiProgress({
         currentRound: 1,
         totalRounds: terminationConfig.maxRounds,
         currentParticipantIndex: 0,
@@ -994,8 +1073,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       let lastCompletedKeywordIndex = -1; // 完了した検索キーワードのインデックス（中断時の再開用）
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
       if (searchConfig.enabled && timing.onStart) {
-        setIsSearching(true);
-        setSearchProgress({
+        setSearchUiProgress({
           phase: 'keywords',
           currentKeywordIndex: 0,
           totalKeywords: 0,
@@ -1035,7 +1113,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setCurrentSearchKeywords([keywordInfo]);
 
           // 進捗を更新（検索フェーズへ）
-          setSearchProgress({
+          setSearchUiProgress({
             phase: 'searching',
             currentKeywordIndex: 0,
             totalKeywords: searchKeywords.length,
@@ -1052,7 +1130,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             const keyword = searchKeywords[i];
 
             // 進捗を更新
-            setSearchProgress((prev) => prev ? {
+            setSearchUiProgress((prev) => prev ? {
               ...prev,
               currentKeywordIndex: i,
               currentKeyword: keyword,
@@ -1103,7 +1181,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
 
             // 進捗を更新（完了したキーワードを追加、警告も含む）
             lastCompletedKeywordIndex = i;
-            setSearchProgress((prev) => prev ? {
+            setSearchUiProgress((prev) => prev ? {
               ...prev,
               completedKeywords: [...prev.completedKeywords, keyword],
               warnings: [...collectedWarnings],
@@ -1111,7 +1189,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           }
 
           // 検索完了
-          setSearchProgress({
+          setSearchUiProgress({
             phase: 'done',
             currentKeywordIndex: searchKeywords.length,
             totalKeywords: searchKeywords.length,
@@ -1133,7 +1211,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             // 中断された場合：検索進捗を保存してセッションに記録
             const latestSession = currentSessionRef.current || sessionAtStart;
             if (latestSession && collectedSearchKeywords.length > 0) {
-              const interruptedTurn: InterruptedTurnState = {
+              const interruptedTurn: InterruptedTurnSnapshot = {
                 topic,
                 participants,
                 messages: [],
@@ -1150,7 +1228,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 directionGuide,
                 terminationConfig,
                 interruptedAt: new Date(),
-                summaryState: 'idle',
+                summaryPhase: 'idle',
                 // 検索中断時はまだ議論が開始されていないので、マーカーは未定義
                 startMarker: undefined,
                 extensionMarkers: undefined,
@@ -1168,15 +1246,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
               );
             }
-            setIsSearching(false);
-            setSearchProgress(null);
-            setIsLoading(false);
+            setIsDiscussing(false);
             return;
           }
           console.error('Search failed:', err);
         } finally {
-          setIsSearching(false);
-          setSearchProgress(null);
+          setSearchUiProgress(null);
         }
       }
 
@@ -1185,7 +1260,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       const collectedFinalAnswerRef = { current: '' };
       const collectedSummaryPromptRef = { current: '' };
       const collectedSearchKeywordsRef = { current: collectedSearchKeywords };
-      const currentProgressStateRef = { current: { currentRound: 1, currentParticipantIndex: 0 } };
+      const currentDiscussionUiProgressRef = { current: { currentRound: 1, currentParticipantIndex: 0 } };
 
       // 開始マーカーを作成（context用）
       const turnStartMarker: StartMarker = {
@@ -1242,17 +1317,16 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           currentSessionRef,
           setSessions,
           setCurrentSession,
-          setProgress,
+          setDiscussionUiProgress,
           setCurrentMessages,
           setCompletedParticipants,
           setCurrentFinalAnswer,
           setCurrentSummaryPrompt,
           setSuggestedFollowUps,
           setIsGeneratingFollowUps,
-          setSummaryState,
-          setIsLoading,
-          setIsSearching,
-          setSearchProgress,
+          setSummaryPhase,
+          setIsDiscussing,
+          setSearchUiProgress,
           setCurrentSearchResults,
           setCurrentSearchKeywords,
           setError,
@@ -1261,7 +1335,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           collectedFinalAnswerRef,
           collectedSummaryPromptRef,
           collectedSearchKeywordsRef,
-          currentProgressStateRef,
+          currentDiscussionUiProgressRef,
           includeReadyForSummary: true,
         });
 
@@ -1291,8 +1365,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             topic,
             participants,
             messages: collectedMessagesRef.current,
-            currentRound: currentProgressStateRef.current.currentRound,
-            currentParticipantIndex: currentProgressStateRef.current.currentParticipantIndex,
+            currentRound: currentDiscussionUiProgressRef.current.currentRound,
+            currentParticipantIndex: currentDiscussionUiProgressRef.current.currentParticipantIndex,
             totalRounds: terminationConfig.maxRounds,
             searchResults: searchResults.length > 0 ? searchResults : undefined,
             searchKeywords: searchKeywordsForInterrupted.length > 0 ? searchKeywordsForInterrupted : undefined,
@@ -1308,7 +1382,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           });
           saveInterruptedState(interrupted);
           setInterruptedState(interrupted);
-          setIsLoading(false);
+          setIsDiscussing(false);
           return;
         }
 
@@ -1348,17 +1422,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
           // 中断された場合は正常終了
-          setIsSearching(false);
-          setSearchProgress(null);
           return;
         }
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         // AbortControllerをクリア
         abortControllerRef.current = null;
-        setIsLoading(false);
-        setIsSearching(false);
-        setSearchProgress(null);
+        setIsDiscussing(false);
+        setSearchUiProgress(null);
       }
     },
     [currentTopic, currentFinalAnswer, messageVotes, clearCurrentTurnState, resetAllState]
@@ -1423,13 +1494,13 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       setCurrentMessages(interruptedState.messages);
       setCurrentSearchResults(interruptedState.searchResults || []);
       setDiscussionParticipants(interruptedState.participants);
-      setIsLoading(true);
+      setIsDiscussing(true);
       setError(null);
       interruptRequestedRef.current = false;
       // AbortControllerを初期化
       abortControllerRef.current = new AbortController();
       setCompletedParticipants(new Set());
-      setProgress({
+      setDiscussionUiProgress({
         currentRound: interruptedState.currentRound,
         totalRounds: interruptedState.totalRounds,
         currentParticipantIndex: interruptedState.currentParticipantIndex,
@@ -1444,18 +1515,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         setExtensionMarkers(interruptedState.extensionMarkers);
       }
       // 中断状態から議論設定を復元（延長時に参照するため）
-      if (interruptedState.discussionMode) {
-        setCurrentDiscussionMode(interruptedState.discussionMode);
-      }
-      if (interruptedState.discussionDepth) {
-        setCurrentDiscussionDepth(interruptedState.discussionDepth);
-      }
-      if (interruptedState.directionGuide) {
-        setCurrentDirectionGuide(interruptedState.directionGuide);
-      }
-      if (interruptedState.terminationConfig) {
-        setCurrentTerminationConfig(interruptedState.terminationConfig);
-      }
+      setCurrentSettings({
+        discussionMode: interruptedState.discussionMode || null,
+        discussionDepth: interruptedState.discussionDepth || null,
+        directionGuide: interruptedState.directionGuide || null,
+        terminationConfig: interruptedState.terminationConfig || null,
+      });
 
       // 検索が有効で、まだ検索が完了していない場合は検索を実行
       // （検索中に中断された場合の対応）
@@ -1490,8 +1555,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           existingSearchResults: searchResults.length,
         });
 
-        setIsSearching(true);
-        setSearchProgress({
+        setSearchUiProgress({
           phase: 'keywords',
           currentKeywordIndex: 0,
           totalKeywords: 0,
@@ -1545,7 +1609,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           const completedKeywordsList = searchKeywordsList.slice(0, startIndex);
 
           // 進捗を更新（検索フェーズへ）
-          setSearchProgress({
+          setSearchUiProgress({
             phase: 'searching',
             currentKeywordIndex: startIndex,
             totalKeywords: searchKeywordsList.length,
@@ -1563,7 +1627,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
               const keyword = searchKeywordsList[i];
 
               // 進捗を更新
-              setSearchProgress((prev) => prev ? {
+              setSearchUiProgress((prev) => prev ? {
                 ...prev,
                 currentKeywordIndex: i,
                 currentKeyword: keyword,
@@ -1589,8 +1653,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 signal: abortControllerRef.current.signal,
               });
               if (searchResponse.ok) {
-                const searchData = await searchResponse.json();
-                const newResults = searchData.results || [];
+                const searchDataJson = await searchResponse.json();
+                const newResults = searchDataJson.results || [];
                 const existingUrls = new Set(searchResults.map(r => r.url));
                 const uniqueResults = newResults.filter((r: SearchResult) => !existingUrls.has(r.url));
                 searchResults = [...searchResults, ...uniqueResults];
@@ -1600,8 +1664,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 setCurrentSearchResults(limitedResults);
 
                 // 警告を収集
-                if (searchData.warnings && searchData.warnings.length > 0) {
-                  for (const warnType of searchData.warnings) {
+                if (searchDataJson.warnings && searchDataJson.warnings.length > 0) {
+                  for (const warnType of searchDataJson.warnings) {
                     collectedWarnings.push({
                       type: warnType,
                       keyword,
@@ -1612,7 +1676,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
 
               // 進捗を更新（完了したキーワードを追加、警告も含む）
               lastCompletedKeywordIndex = i;
-              setSearchProgress((prev) => prev ? {
+              setSearchUiProgress((prev) => prev ? {
                 ...prev,
                 completedKeywords: [...prev.completedKeywords, keyword],
                 warnings: [...collectedWarnings],
@@ -1621,7 +1685,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           }
 
           // 検索完了
-          setSearchProgress({
+          setSearchUiProgress({
             phase: 'done',
             currentKeywordIndex: searchKeywordsList.length,
             totalKeywords: searchKeywordsList.length,
@@ -1643,7 +1707,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             // 中断された場合：検索進捗を保存してセッションに記録
             const latestSession = currentSessionRef.current;
             if (latestSession && collectedSearchKeywords.length > 0) {
-              const interruptedTurn: InterruptedTurnState = {
+              const interruptedTurn: InterruptedTurnSnapshot = {
                 topic: interruptedState.topic,
                 participants: interruptedState.participants,
                 messages: interruptedState.messages,
@@ -1660,7 +1724,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 directionGuide: interruptedState.directionGuide,
                 terminationConfig: interruptedState.terminationConfig,
                 interruptedAt: new Date(),
-                summaryState: 'idle',
+                summaryPhase: 'idle',
                 startMarker: interruptedState.startMarker,
                 extensionMarkers: interruptedState.extensionMarkers,
               };
@@ -1677,15 +1741,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
               );
             }
-            setIsSearching(false);
-            setSearchProgress(null);
-            setIsLoading(false);
+            setIsDiscussing(false);
             return;
           }
           console.error('Search failed:', err);
         } finally {
-          setIsSearching(false);
-          setSearchProgress(null);
+          setSearchUiProgress(null);
         }
       }
 
@@ -1697,7 +1758,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       const collectedFinalAnswerRef = { current: '' };
       const collectedSummaryPromptRef = { current: '' };
       const collectedSearchKeywordsRef = { current: collectedSearchKeywords };
-      const currentProgressStateRef = {
+      const currentDiscussionUiProgressRef = {
         current: {
           currentRound: interruptedState.currentRound,
           currentParticipantIndex: interruptedState.currentParticipantIndex,
@@ -1755,17 +1816,16 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           currentSessionRef,
           setSessions,
           setCurrentSession,
-          setProgress,
+          setDiscussionUiProgress,
           setCurrentMessages,
           setCompletedParticipants,
           setCurrentFinalAnswer,
           setCurrentSummaryPrompt,
           setSuggestedFollowUps,
           setIsGeneratingFollowUps,
-          setSummaryState,
-          setIsLoading,
-          setIsSearching,
-          setSearchProgress,
+          setSummaryPhase,
+          setIsDiscussing,
+          setSearchUiProgress,
           setCurrentSearchResults,
           setCurrentSearchKeywords,
           setError,
@@ -1774,7 +1834,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           collectedFinalAnswerRef,
           collectedSummaryPromptRef,
           collectedSearchKeywordsRef,
-          currentProgressStateRef,
+          currentDiscussionUiProgressRef,
           includeReadyForSummary: true,
         });
 
@@ -1790,8 +1850,8 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
             topic: interruptedState.topic,
             participants: interruptedState.participants,
             messages: collectedMessagesRef.current,
-            currentRound: currentProgressStateRef.current.currentRound,
-            currentParticipantIndex: currentProgressStateRef.current.currentParticipantIndex,
+            currentRound: currentDiscussionUiProgressRef.current.currentRound,
+            currentParticipantIndex: currentDiscussionUiProgressRef.current.currentParticipantIndex,
             totalRounds: interruptedState.totalRounds,
             searchResults: interruptedState.searchResults,
             searchKeywords: collectedSearchKeywordsRef.current.length > 0 ? collectedSearchKeywordsRef.current : undefined,
@@ -1807,7 +1867,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           });
           saveInterruptedState(newInterruptedState);
           setInterruptedState(newInterruptedState);
-          setIsLoading(false);
+          setIsDiscussing(false);
           return;
         }
 
@@ -1852,17 +1912,14 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
           // 中断された場合は正常終了
-          setIsSearching(false);
-          setSearchProgress(null);
           return;
         }
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         // AbortControllerをクリア
         abortControllerRef.current = null;
-        setIsLoading(false);
-        setIsSearching(false);
-        setSearchProgress(null);
+        setIsDiscussing(false);
+        setSearchUiProgress(null);
       }
     },
     [messageVotes, clearCurrentTurnState, extensionMarkers]
@@ -1962,7 +2019,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         updateAndSaveSession,
       } = params;
 
-      // 現在の状態から延長用のInterruptedTurnStateを構築
+      // 現在の状態から延長用のInterruptedTurnSnapshotを構築
       const currentSession = currentSessionRef.current;
       if (!currentSession) {
         setError('セッションが見つかりません');
@@ -1971,10 +2028,10 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
 
       // 現在の議論設定を使用（フック内の状態から取得）
       // 1回目の延長で変更された設定が正しく引き継がれる
-      const discussionMode: DiscussionMode = currentDiscussionMode || 'free';
-      const discussionDepth: DiscussionDepth = currentDiscussionDepth || 2;
-      const directionGuide: DirectionGuide = currentDirectionGuide || { keywords: [] };
-      const terminationConfig: TerminationConfig = currentTerminationConfig || { condition: 'rounds', maxRounds: 2 };
+      const discussionMode: DiscussionMode = currentSettings.discussionMode || 'free';
+      const discussionDepth: DiscussionDepth = currentSettings.discussionDepth || 2;
+      const directionGuide: DirectionGuide = currentSettings.directionGuide || { keywords: [] };
+      const terminationConfig: TerminationConfig = currentSettings.terminationConfig || { condition: 'rounds', maxRounds: 2 };
 
       // メッセージから完了済みラウンド数を計算（最も信頼性が高い）
       const completedRounds = currentMessages.length > 0
@@ -2024,12 +2081,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       // 延長マーカーリストを更新
       const updatedExtensionMarkers = [...extensionMarkers, newMarker];
 
-      // InterruptedDiscussionStateを作成（マーカーを含める）
+      // InterruptedDiscussionSnapshotを作成（マーカーを含める）
       // 検索キーワードがある場合、全て完了しているとみなす（延長時点では検索済み）
       const completedKeywordIndexForExtend = currentSearchKeywords.length > 0 && currentSearchKeywords[0].keywords.length > 0
         ? currentSearchKeywords[0].keywords.length - 1
         : undefined;
-      const interruptedState: InterruptedDiscussionState = {
+      const interruptedState: InterruptedDiscussionSnapshot = {
         sessionId: currentSession.id,
         topic: currentTopic,
         participants,
@@ -2050,7 +2107,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           maxRounds: newTotalRounds,
         },
         interruptedAt: new Date(),
-        summaryState: 'idle',
+        summaryPhase: 'idle',
         startMarker: startMarker || undefined,
         extensionMarkers: updatedExtensionMarkers,
       };
@@ -2059,7 +2116,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       setExtensionMarkers(updatedExtensionMarkers);
 
       // 統合回答待ち状態をリセット
-      setSummaryState('idle');
+      setSummaryPhase('idle');
       setCurrentFinalAnswer('');
       setSuggestedFollowUps([]);
 
@@ -2083,15 +2140,17 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       resumeDiscussion,
       startMarker,
       extensionMarkers,
-      currentDiscussionMode,
-      currentDiscussionDepth,
-      currentDirectionGuide,
-      currentTerminationConfig,
+      currentSettings,
     ]
   );
 
-  // 処理中フラグ（議論実行中、検索中、統合回答生成中、フォローアップ生成中）
-  const isProcessing = isLoading || isSearching || summaryState === 'generating' || isGeneratingFollowUps;
+  // isSearchingはsearchProgressから派生
+  // 注: 検索中は必ずisDiscussingもtrueなので、isProcessingには不要
+  const isSearching = searchProgress !== null;
+
+  // 処理中フラグ（議論実行中、統合回答生成中、フォローアップ生成中）
+  // 検索中はisDiscussingがtrueなのでisSearchingは不要
+  const isProcessing = isDiscussing || summaryPhase === 'generating' || isGeneratingFollowUps;
 
   return {
     currentMessages,
@@ -2100,12 +2159,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     currentTopic,
     currentSearchResults,
     currentSearchKeywords,
-    isLoading,
+    isDiscussing,
     isSearching,
     isGeneratingFollowUps,
     isProcessing,
-    summaryState,
-    progress,
+    summaryPhase,
+    discussionProgress,
     searchProgress,
     completedParticipants,
     suggestedFollowUps,
@@ -2115,10 +2174,10 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     streamingMessage,
     startMarker,
     extensionMarkers,
-    currentDiscussionMode,
-    currentDiscussionDepth,
-    currentDirectionGuide,
-    currentTerminationConfig,
+    currentDiscussionMode: currentSettings.discussionMode,
+    currentDiscussionDepth: currentSettings.discussionDepth,
+    currentDirectionGuide: currentSettings.directionGuide,
+    currentTerminationConfig: currentSettings.terminationConfig,
     setCurrentMessages,
     setCurrentFinalAnswer,
     setCurrentTopic,
