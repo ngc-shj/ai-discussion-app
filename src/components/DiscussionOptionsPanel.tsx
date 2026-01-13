@@ -14,6 +14,9 @@ import {
   SearchProviderType,
 } from '@/types';
 
+// タブの種類
+type OptionsTab = 'search' | 'discussion';
+
 // 検索プロバイダー情報
 interface SearchProviderInfo {
   id: SearchProviderType;
@@ -73,75 +76,109 @@ export function DiscussionOptionsPanel({
   onRemoveTermKeyword,
   onTermKeywordKeyDown,
 }: DiscussionOptionsPanelProps) {
+  const [activeTab, setActiveTab] = useState<OptionsTab>('search');
+
   const currentModePreset = DISCUSSION_MODE_PRESETS.find((m) => m.id === discussionMode);
   const currentDepthPreset = DISCUSSION_DEPTH_PRESETS.find((d) => d.level === discussionDepth);
   const currentTermPreset = TERMINATION_PRESETS.find((t) => t.id === terminationConfig.condition);
 
+  // 各タブにカスタム設定があるかどうか
+  const hasSearchCustom = searchConfig.enabled;
+  const hasDiscussionCustom =
+    discussionMode !== 'free' ||
+    discussionDepth !== 3 ||
+    directionGuide.keywords.length > 0 ||
+    terminationConfig.condition !== 'rounds';
+
   return (
-    <div className="mt-2 space-y-3">
-      {/* 情報取得セクション */}
-      <div className="p-3 bg-green-900/20 border border-green-800/30 rounded-lg">
-        <div className="flex items-center gap-2 mb-3">
-          <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="mt-2">
+      {/* タブヘッダー */}
+      <div className="flex border-b border-gray-700 mb-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab('search')}
+          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === 'search'
+              ? 'border-green-500 text-green-400'
+              : 'border-transparent text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          <span className="text-xs font-medium text-green-400">情報取得</span>
-        </div>
-        <SearchConfigSection
-          disabled={disabled}
-          searchConfig={searchConfig}
-          onSearchConfigChange={onSearchConfigChange}
-        />
-      </div>
-
-      {/* 議論設定セクション */}
-      <div className="p-3 bg-blue-900/20 border border-blue-800/30 rounded-lg space-y-4">
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          情報取得
+          {hasSearchCustom && <span className="w-1.5 h-1.5 rounded-full bg-green-400" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('discussion')}
+          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
+            activeTab === 'discussion'
+              ? 'border-blue-500 text-blue-400'
+              : 'border-transparent text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
-          <span className="text-xs font-medium text-blue-400">議論設定</span>
+          議論設定
+          {hasDiscussionCustom && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
+        </button>
+      </div>
+
+      {/* タブコンテンツ - 高さ固定でスクロール、両方レンダリングしてhiddenで切り替え（カクカク防止） */}
+      <div className={`h-[340px] overflow-y-auto ${activeTab === 'search' ? '' : 'hidden'}`}>
+        <div className="p-3 bg-green-900/20 border border-green-800/30 rounded-lg">
+          <SearchConfigSection
+            disabled={disabled}
+            searchConfig={searchConfig}
+            onSearchConfigChange={onSearchConfigChange}
+          />
         </div>
+      </div>
 
-        {/* 議論モード選択 */}
-        <ModeSection
-          disabled={disabled}
-          discussionMode={discussionMode}
-          onDiscussionModeChange={onDiscussionModeChange}
-          currentModePreset={currentModePreset}
-        />
+      <div className={`h-[340px] overflow-y-auto ${activeTab === 'discussion' ? '' : 'hidden'}`}>
+        <div className="p-3 bg-blue-900/20 border border-blue-800/30 rounded-lg space-y-4">
+          {/* 議論モード選択 */}
+          <ModeSection
+            disabled={disabled}
+            discussionMode={discussionMode}
+            onDiscussionModeChange={onDiscussionModeChange}
+            currentModePreset={currentModePreset}
+          />
 
-        {/* 議論の深さ */}
-        <DepthSection
-          disabled={disabled}
-          discussionDepth={discussionDepth}
-          onDiscussionDepthChange={onDiscussionDepthChange}
-          currentDepthPreset={currentDepthPreset}
-        />
+          {/* 議論の深さ */}
+          <DepthSection
+            disabled={disabled}
+            discussionDepth={discussionDepth}
+            onDiscussionDepthChange={onDiscussionDepthChange}
+            currentDepthPreset={currentDepthPreset}
+          />
 
-        {/* 注目キーワード */}
-        <KeywordSection
-          disabled={disabled}
-          directionGuide={directionGuide}
-          keywordInput={keywordInput}
-          onKeywordInputChange={onKeywordInputChange}
-          onAddKeyword={onAddKeyword}
-          onRemoveKeyword={onRemoveKeyword}
-          onKeywordKeyDown={onKeywordKeyDown}
-        />
+          {/* 注目キーワード */}
+          <KeywordSection
+            disabled={disabled}
+            directionGuide={directionGuide}
+            keywordInput={keywordInput}
+            onKeywordInputChange={onKeywordInputChange}
+            onAddKeyword={onAddKeyword}
+            onRemoveKeyword={onRemoveKeyword}
+            onKeywordKeyDown={onKeywordKeyDown}
+          />
 
-        {/* 終了条件 */}
-        <TerminationSection
-          disabled={disabled}
-          terminationConfig={terminationConfig}
-          onTerminationConfigChange={onTerminationConfigChange}
-          currentTermPreset={currentTermPreset}
-          termKeywordInput={termKeywordInput}
-          onTermKeywordInputChange={onTermKeywordInputChange}
-          onAddTermKeyword={onAddTermKeyword}
-          onRemoveTermKeyword={onRemoveTermKeyword}
-          onTermKeywordKeyDown={onTermKeywordKeyDown}
-        />
+          {/* 終了条件 */}
+          <TerminationSection
+            disabled={disabled}
+            terminationConfig={terminationConfig}
+            onTerminationConfigChange={onTerminationConfigChange}
+            currentTermPreset={currentTermPreset}
+            termKeywordInput={termKeywordInput}
+            onTermKeywordInputChange={onTermKeywordInputChange}
+            onAddTermKeyword={onAddTermKeyword}
+            onRemoveTermKeyword={onRemoveTermKeyword}
+            onTermKeywordKeyDown={onTermKeywordKeyDown}
+          />
+        </div>
       </div>
     </div>
   );

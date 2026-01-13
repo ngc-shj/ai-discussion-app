@@ -128,7 +128,7 @@ export function InputForm({
 
         {/* 展開時の設定パネル */}
         {isModeExpanded && (
-          <div className="max-h-[50vh] overflow-y-auto">
+          <div>
           <DiscussionOptionsPanel
             disabled={disabled}
             searchConfig={searchConfig}
