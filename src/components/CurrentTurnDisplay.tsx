@@ -17,7 +17,7 @@ interface CurrentTurnDisplayProps {
   participants?: DiscussionParticipant[]; // 実行中の参加者リスト
   finalAnswer?: string;
   summaryPrompt?: string;
-  isLoading: boolean;
+  isDiscussing: boolean;
   summaryState?: SummaryState;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
@@ -46,7 +46,7 @@ export function CurrentTurnDisplay({
   participants,
   finalAnswer,
   summaryPrompt,
-  isLoading,
+  isDiscussing,
   summaryState,
   searchResults: _searchResults, // 後方互換のため保持、searchKeywordsに統合済み
   searchKeywords,
@@ -134,7 +134,7 @@ export function CurrentTurnDisplay({
       </div>
 
       {/* AIの議論（折りたたみ） */}
-      {(messages.length > 0 || isLoading) && (
+      {(messages.length > 0 || isDiscussing) && (
         <div className="ml-10 md:ml-13 mb-2 md:mb-3">
           <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
             <button
@@ -157,7 +157,7 @@ export function CurrentTurnDisplay({
                   ({participantCount}<span className="hidden sm:inline">モデル</span> × {maxRound}<span className="hidden sm:inline">ラウンド</span>)
                 </span>
               )}
-              {isLoading && summaryState !== 'generating' && (
+              {isDiscussing && summaryState !== 'generating' && (
                 <div className="animate-spin w-3 h-3 border-2 border-gray-500 border-t-blue-400 rounded-full" />
               )}
             </button>
@@ -202,7 +202,7 @@ export function CurrentTurnDisplay({
                 messageVotes={messageVotes}
                 onVote={onVote}
                 streamingMessage={streamingMessage}
-                isLoading={isLoading}
+                isDiscussing={isDiscussing}
                 bottomRef={bottomRef}
                 searchProgress={searchProgress}
               />
@@ -356,7 +356,7 @@ export function CurrentTurnDisplay({
               </div>
             )}
             {/* アクションボタン（統合完了後のみ表示） */}
-            {finalAnswer && summaryState !== 'generating' && !isLoading && (onDeepDive || onCounterargument) && (
+            {finalAnswer && summaryState !== 'generating' && !isDiscussing && (onDeepDive || onCounterargument) && (
               <div className="mt-2 flex justify-end gap-2 flex-wrap">
                 {onDeepDive && (
                   <button
@@ -392,8 +392,8 @@ export function CurrentTurnDisplay({
               <FollowUpSuggestions
                 questions={suggestedFollowUps || []}
                 onSelect={(question) => onFollowUp(question, finalAnswer)}
-                disabled={isLoading}
-                isLoading={isGeneratingFollowUps}
+                disabled={isDiscussing}
+                isDiscussing={isGeneratingFollowUps}
               />
             )}
           </div>

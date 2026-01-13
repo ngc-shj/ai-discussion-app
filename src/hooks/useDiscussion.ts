@@ -63,13 +63,13 @@ export interface DiscussionState {
   currentTopic: string;
   currentSearchResults: SearchResult[];
   currentSearchKeywords: SearchKeywordInfo[];
-  isLoading: boolean;
+  isDiscussing: boolean;
   /** 検索中かどうか（searchProgress !== null から派生） */
   isSearching: boolean;
   isGeneratingFollowUps: boolean;
   isProcessing: boolean;
   summaryState: SummaryState;
-  progress: ProgressState;
+  discussionProgress: ProgressState;
   searchProgress: SearchProgress | null;
   completedParticipants: Set<string>;
   suggestedFollowUps: FollowUpQuestion[];
@@ -257,7 +257,7 @@ interface CreateSSEHandlersParams {
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
   setCurrentSession?: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
-  setProgress: React.Dispatch<React.SetStateAction<ProgressState>>;
+  setDiscussionProgress: React.Dispatch<React.SetStateAction<ProgressState>>;
   setCurrentMessages: React.Dispatch<React.SetStateAction<DiscussionMessage[]>>;
   setCompletedParticipants: React.Dispatch<React.SetStateAction<Set<string>>>;
   setCurrentFinalAnswer: React.Dispatch<React.SetStateAction<string>>;
@@ -265,7 +265,7 @@ interface CreateSSEHandlersParams {
   setSuggestedFollowUps: React.Dispatch<React.SetStateAction<FollowUpQuestion[]>>;
   setIsGeneratingFollowUps: React.Dispatch<React.SetStateAction<boolean>>;
   setSummaryState?: React.Dispatch<React.SetStateAction<SummaryState>>;
-  setIsLoading?: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsDiscussing?: React.Dispatch<React.SetStateAction<boolean>>;
   // isSearchingは不要（searchProgressから派生）
   setSearchProgress?: React.Dispatch<React.SetStateAction<SearchProgress | null>>;
   setCurrentSearchResults?: (updater: SearchResult[] | ((prev: SearchResult[]) => SearchResult[])) => void;
@@ -286,7 +286,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     currentSessionRef,
     setSessions,
     setCurrentSession,
-    setProgress,
+    setDiscussionProgress,
     setCurrentMessages,
     setCompletedParticipants,
     setCurrentFinalAnswer,
@@ -294,7 +294,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     setSuggestedFollowUps,
     setIsGeneratingFollowUps,
     setSummaryState,
-    setIsLoading,
+    setIsDiscussing,
     setSearchProgress,
     setCurrentSearchResults,
     setCurrentSearchKeywords,
@@ -314,7 +314,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
         currentRound: progressData.currentRound,
         currentParticipantIndex: progressData.currentParticipantIndex,
       };
-      setProgress({
+      setDiscussionProgress({
         currentRound: progressData.currentRound,
         totalRounds: progressData.totalRounds,
         currentParticipantIndex: progressData.currentParticipantIndex,
@@ -425,7 +425,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     onReadyForSummary: includeReadyForSummary
       ? () => {
           setSummaryState?.('awaiting');
-          setIsLoading?.(false);
+          setIsDiscussing?.(false);
           const latestSession = currentSessionRef.current;
           if (latestSession) {
             // summaryState: 'awaiting'状態を保持した中断状態を保存
@@ -470,7 +470,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
         }
       : undefined,
     onComplete: () => {
-      setIsLoading?.(false);
+      setIsDiscussing?.(false);
       setIsGeneratingFollowUps(false);
       // 注意: ここでsummaryStateを'idle'にしない
       // startDiscussionの場合: onReadyForSummaryで'awaiting'に設定されるので、それを維持する
@@ -542,11 +542,11 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   const [currentTopic, setCurrentTopic] = useState<string>('');
   // 検索データ（結果とキーワード）- 統合
   const [searchData, setSearchData] = useState<SearchData>(INITIAL_SEARCH_DATA);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isDiscussing, setIsDiscussing] = useState(false);
   const [searchProgress, setSearchProgress] = useState<SearchProgress | null>(null);
   const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
   const [summaryState, setSummaryState] = useState<SummaryState>('idle');
-  const [progress, setProgress] = useState<ProgressState>(INITIAL_PROGRESS);
+  const [discussionProgress, setDiscussionProgress] = useState<ProgressState>(INITIAL_PROGRESS);
   const [completedParticipants, setCompletedParticipants] = useState<Set<string>>(new Set());
   const [suggestedFollowUps, setSuggestedFollowUps] = useState<FollowUpQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -621,10 +621,10 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     // 検索関連
     setSearchData(INITIAL_SEARCH_DATA);
     // ローディング・進行状況
-    setIsLoading(false);
+    setIsDiscussing(false);
     setIsGeneratingFollowUps(false);
     setSummaryState('idle');
-    setProgress(INITIAL_PROGRESS);
+    setDiscussionProgress(INITIAL_PROGRESS);
     setCompletedParticipants(new Set());
     setSearchProgress(null);
     // フォローアップ・投票
@@ -1027,13 +1027,13 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
         directionGuide,
         terminationConfig,
       });
-      setIsLoading(true);
+      setIsDiscussing(true);
       setCurrentTopic(topic);
       setDiscussionParticipants(participants);
       interruptRequestedRef.current = false;
       // AbortControllerを初期化
       abortControllerRef.current = new AbortController();
-      setProgress({
+      setDiscussionProgress({
         currentRound: 1,
         totalRounds: terminationConfig.maxRounds,
         currentParticipantIndex: 0,
@@ -1241,7 +1241,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
               );
             }
-            setIsLoading(false);
+            setIsDiscussing(false);
             return;
           }
           console.error('Search failed:', err);
@@ -1312,7 +1312,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           currentSessionRef,
           setSessions,
           setCurrentSession,
-          setProgress,
+          setDiscussionProgress,
           setCurrentMessages,
           setCompletedParticipants,
           setCurrentFinalAnswer,
@@ -1320,7 +1320,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setSuggestedFollowUps,
           setIsGeneratingFollowUps,
           setSummaryState,
-          setIsLoading,
+          setIsDiscussing,
           setSearchProgress,
           setCurrentSearchResults,
           setCurrentSearchKeywords,
@@ -1377,7 +1377,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           });
           saveInterruptedState(interrupted);
           setInterruptedState(interrupted);
-          setIsLoading(false);
+          setIsDiscussing(false);
           return;
         }
 
@@ -1423,7 +1423,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       } finally {
         // AbortControllerをクリア
         abortControllerRef.current = null;
-        setIsLoading(false);
+        setIsDiscussing(false);
         setSearchProgress(null);
       }
     },
@@ -1489,13 +1489,13 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       setCurrentMessages(interruptedState.messages);
       setCurrentSearchResults(interruptedState.searchResults || []);
       setDiscussionParticipants(interruptedState.participants);
-      setIsLoading(true);
+      setIsDiscussing(true);
       setError(null);
       interruptRequestedRef.current = false;
       // AbortControllerを初期化
       abortControllerRef.current = new AbortController();
       setCompletedParticipants(new Set());
-      setProgress({
+      setDiscussionProgress({
         currentRound: interruptedState.currentRound,
         totalRounds: interruptedState.totalRounds,
         currentParticipantIndex: interruptedState.currentParticipantIndex,
@@ -1736,7 +1736,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
                 prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
               );
             }
-            setIsLoading(false);
+            setIsDiscussing(false);
             return;
           }
           console.error('Search failed:', err);
@@ -1811,7 +1811,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           currentSessionRef,
           setSessions,
           setCurrentSession,
-          setProgress,
+          setDiscussionProgress,
           setCurrentMessages,
           setCompletedParticipants,
           setCurrentFinalAnswer,
@@ -1819,7 +1819,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           setSuggestedFollowUps,
           setIsGeneratingFollowUps,
           setSummaryState,
-          setIsLoading,
+          setIsDiscussing,
           setSearchProgress,
           setCurrentSearchResults,
           setCurrentSearchKeywords,
@@ -1862,7 +1862,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
           });
           saveInterruptedState(newInterruptedState);
           setInterruptedState(newInterruptedState);
-          setIsLoading(false);
+          setIsDiscussing(false);
           return;
         }
 
@@ -1913,7 +1913,7 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
       } finally {
         // AbortControllerをクリア
         abortControllerRef.current = null;
-        setIsLoading(false);
+        setIsDiscussing(false);
         setSearchProgress(null);
       }
     },
@@ -2140,12 +2140,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
   );
 
   // isSearchingはsearchProgressから派生
-  // 注: 検索中は必ずisLoadingもtrueなので、isProcessingには不要
+  // 注: 検索中は必ずisDiscussingもtrueなので、isProcessingには不要
   const isSearching = searchProgress !== null;
 
   // 処理中フラグ（議論実行中、統合回答生成中、フォローアップ生成中）
-  // 検索中はisLoadingがtrueなのでisSearchingは不要
-  const isProcessing = isLoading || summaryState === 'generating' || isGeneratingFollowUps;
+  // 検索中はisDiscussingがtrueなのでisSearchingは不要
+  const isProcessing = isDiscussing || summaryState === 'generating' || isGeneratingFollowUps;
 
   return {
     currentMessages,
@@ -2154,12 +2154,12 @@ export function useDiscussion(): DiscussionState & DiscussionActions {
     currentTopic,
     currentSearchResults,
     currentSearchKeywords,
-    isLoading,
+    isDiscussing,
     isSearching,
     isGeneratingFollowUps,
     isProcessing,
     summaryState,
-    progress,
+    discussionProgress,
     searchProgress,
     completedParticipants,
     suggestedFollowUps,

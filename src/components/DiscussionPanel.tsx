@@ -13,7 +13,7 @@ interface DiscussionPanelProps {
   currentTopic?: string;
   currentFinalAnswer?: string;
   currentSummaryPrompt?: string;
-  isLoading: boolean;
+  isDiscussing: boolean;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
   searchProgress?: SearchProgress | null; // 検索進捗状態
@@ -45,7 +45,7 @@ export function DiscussionPanel({
   currentTopic,
   currentFinalAnswer,
   currentSummaryPrompt,
-  isLoading,
+  isDiscussing,
   searchResults,
   searchKeywords,
   searchProgress,
@@ -102,7 +102,7 @@ export function DiscussionPanel({
           onCounterargument={onCounterargument}
           onFork={onFork}
           onGenerateFollowUps={onGenerateFollowUps}
-          disabled={isLoading}
+          disabled={isDiscussing}
           isGeneratingFollowUps={isGeneratingFollowUps}
           messageVotes={messageVotes}
           onVote={onVote}
@@ -117,7 +117,7 @@ export function DiscussionPanel({
           participants={participants}
           finalAnswer={currentFinalAnswer}
           summaryPrompt={currentSummaryPrompt}
-          isLoading={isLoading}
+          isDiscussing={isDiscussing}
           summaryState={summaryState}
           searchResults={searchResults}
           searchKeywords={searchKeywords}
