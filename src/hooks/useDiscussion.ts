@@ -7,7 +7,7 @@ import {
   DiscussionSession,
   SearchResult,
   SearchKeywordInfo,
-  SearchProgress,
+  SearchUiProgress,
   SearchWarning,
   MessageVote,
   FollowUpQuestion,
@@ -71,7 +71,7 @@ export interface UseDiscussionState {
   isProcessing: boolean;
   summaryState: SummaryState;
   discussionProgress: DiscussionUiProgress;
-  searchProgress: SearchProgress | null;
+  searchProgress: SearchUiProgress | null;
   completedParticipants: Set<string>;
   suggestedFollowUps: FollowUpQuestion[];
   error: string | null;
@@ -272,7 +272,7 @@ interface CreateSSEHandlersParams {
   setSummaryState?: React.Dispatch<React.SetStateAction<SummaryState>>;
   setIsDiscussing?: React.Dispatch<React.SetStateAction<boolean>>;
   // isSearchingは不要（searchProgressから派生）
-  setSearchProgress?: React.Dispatch<React.SetStateAction<SearchProgress | null>>;
+  setSearchUiProgress?: React.Dispatch<React.SetStateAction<SearchUiProgress | null>>;
   setCurrentSearchResults?: (updater: SearchResult[] | ((prev: SearchResult[]) => SearchResult[])) => void;
   setCurrentSearchKeywords?: (updater: SearchKeywordInfo[] | ((prev: SearchKeywordInfo[]) => SearchKeywordInfo[])) => void;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
@@ -300,7 +300,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     setIsGeneratingFollowUps,
     setSummaryState,
     setIsDiscussing,
-    setSearchProgress,
+    setSearchUiProgress,
     setCurrentSearchResults,
     setCurrentSearchKeywords,
     setError,
@@ -483,7 +483,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     },
     onSearching: () => {
       // 検索開始時はキーワード生成中フェーズとして表示
-      setSearchProgress?.({
+      setSearchUiProgress?.({
         phase: 'keywords',
         currentKeywordIndex: 0,
         totalKeywords: 0,
@@ -491,7 +491,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       });
     },
     onSearchResults: (searchResults) => {
-      setSearchProgress?.(null);
+      setSearchUiProgress?.(null);
       setCurrentSearchResults?.(searchResults);
       // 最後に追加されたSearchKeywordInfoに結果を紐付け
       if (collectedSearchKeywordsRef && collectedSearchKeywordsRef.current.length > 0) {
@@ -510,7 +510,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
         collectedSearchKeywordsRef.current = [...collectedSearchKeywordsRef.current, searchKeywords];
       }
       // 検索進捗を更新（キーワードが確定したので検索フェーズへ）
-      setSearchProgress?.({
+      setSearchUiProgress?.({
         phase: 'searching',
         currentKeywordIndex: 0,
         totalKeywords: searchKeywords.keywords.length,
@@ -520,7 +520,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     },
     onSearchProgress: (progress) => {
       // 検索進捗を更新
-      setSearchProgress?.((prev) => {
+      setSearchUiProgress?.((prev) => {
         if (!prev) return prev;
         const newState = {
           ...prev,
@@ -548,7 +548,7 @@ export function useDiscussion(): UseDiscussionReturn {
   // 検索データ（結果とキーワード）- 統合
   const [searchData, setSearchData] = useState<SearchData>(INITIAL_SEARCH_DATA);
   const [isDiscussing, setIsDiscussing] = useState(false);
-  const [searchProgress, setSearchProgress] = useState<SearchProgress | null>(null);
+  const [searchProgress, setSearchUiProgress] = useState<SearchUiProgress | null>(null);
   const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
   const [summaryState, setSummaryState] = useState<SummaryState>('idle');
   const [discussionProgress, setDiscussionUiProgress] = useState<DiscussionUiProgress>(INITIAL_PROGRESS);
@@ -631,7 +631,7 @@ export function useDiscussion(): UseDiscussionReturn {
     setSummaryState('idle');
     setDiscussionUiProgress(INITIAL_PROGRESS);
     setCompletedParticipants(new Set());
-    setSearchProgress(null);
+    setSearchUiProgress(null);
     // フォローアップ・投票
     setSuggestedFollowUps([]);
     setMessageVotes([]);
@@ -717,7 +717,7 @@ export function useDiscussion(): UseDiscussionReturn {
       let summarySearchResults = currentSearchResults;
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
       if (searchConfig.enabled && timing.beforeSummary) {
-        setSearchProgress({
+        setSearchUiProgress({
           phase: 'searching',
           currentKeywordIndex: 0,
           totalKeywords: 1,
@@ -795,7 +795,7 @@ export function useDiscussion(): UseDiscussionReturn {
           }
           console.error('beforeSummary search failed:', err);
         } finally {
-          setSearchProgress(null);
+          setSearchUiProgress(null);
         }
       }
 
@@ -1073,7 +1073,7 @@ export function useDiscussion(): UseDiscussionReturn {
       let lastCompletedKeywordIndex = -1; // 完了した検索キーワードのインデックス（中断時の再開用）
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
       if (searchConfig.enabled && timing.onStart) {
-        setSearchProgress({
+        setSearchUiProgress({
           phase: 'keywords',
           currentKeywordIndex: 0,
           totalKeywords: 0,
@@ -1113,7 +1113,7 @@ export function useDiscussion(): UseDiscussionReturn {
           setCurrentSearchKeywords([keywordInfo]);
 
           // 進捗を更新（検索フェーズへ）
-          setSearchProgress({
+          setSearchUiProgress({
             phase: 'searching',
             currentKeywordIndex: 0,
             totalKeywords: searchKeywords.length,
@@ -1130,7 +1130,7 @@ export function useDiscussion(): UseDiscussionReturn {
             const keyword = searchKeywords[i];
 
             // 進捗を更新
-            setSearchProgress((prev) => prev ? {
+            setSearchUiProgress((prev) => prev ? {
               ...prev,
               currentKeywordIndex: i,
               currentKeyword: keyword,
@@ -1181,7 +1181,7 @@ export function useDiscussion(): UseDiscussionReturn {
 
             // 進捗を更新（完了したキーワードを追加、警告も含む）
             lastCompletedKeywordIndex = i;
-            setSearchProgress((prev) => prev ? {
+            setSearchUiProgress((prev) => prev ? {
               ...prev,
               completedKeywords: [...prev.completedKeywords, keyword],
               warnings: [...collectedWarnings],
@@ -1189,7 +1189,7 @@ export function useDiscussion(): UseDiscussionReturn {
           }
 
           // 検索完了
-          setSearchProgress({
+          setSearchUiProgress({
             phase: 'done',
             currentKeywordIndex: searchKeywords.length,
             totalKeywords: searchKeywords.length,
@@ -1251,7 +1251,7 @@ export function useDiscussion(): UseDiscussionReturn {
           }
           console.error('Search failed:', err);
         } finally {
-          setSearchProgress(null);
+          setSearchUiProgress(null);
         }
       }
 
@@ -1326,7 +1326,7 @@ export function useDiscussion(): UseDiscussionReturn {
           setIsGeneratingFollowUps,
           setSummaryState,
           setIsDiscussing,
-          setSearchProgress,
+          setSearchUiProgress,
           setCurrentSearchResults,
           setCurrentSearchKeywords,
           setError,
@@ -1429,7 +1429,7 @@ export function useDiscussion(): UseDiscussionReturn {
         // AbortControllerをクリア
         abortControllerRef.current = null;
         setIsDiscussing(false);
-        setSearchProgress(null);
+        setSearchUiProgress(null);
       }
     },
     [currentTopic, currentFinalAnswer, messageVotes, clearCurrentTurnState, resetAllState]
@@ -1555,7 +1555,7 @@ export function useDiscussion(): UseDiscussionReturn {
           existingSearchResults: searchResults.length,
         });
 
-        setSearchProgress({
+        setSearchUiProgress({
           phase: 'keywords',
           currentKeywordIndex: 0,
           totalKeywords: 0,
@@ -1609,7 +1609,7 @@ export function useDiscussion(): UseDiscussionReturn {
           const completedKeywordsList = searchKeywordsList.slice(0, startIndex);
 
           // 進捗を更新（検索フェーズへ）
-          setSearchProgress({
+          setSearchUiProgress({
             phase: 'searching',
             currentKeywordIndex: startIndex,
             totalKeywords: searchKeywordsList.length,
@@ -1627,7 +1627,7 @@ export function useDiscussion(): UseDiscussionReturn {
               const keyword = searchKeywordsList[i];
 
               // 進捗を更新
-              setSearchProgress((prev) => prev ? {
+              setSearchUiProgress((prev) => prev ? {
                 ...prev,
                 currentKeywordIndex: i,
                 currentKeyword: keyword,
@@ -1676,7 +1676,7 @@ export function useDiscussion(): UseDiscussionReturn {
 
               // 進捗を更新（完了したキーワードを追加、警告も含む）
               lastCompletedKeywordIndex = i;
-              setSearchProgress((prev) => prev ? {
+              setSearchUiProgress((prev) => prev ? {
                 ...prev,
                 completedKeywords: [...prev.completedKeywords, keyword],
                 warnings: [...collectedWarnings],
@@ -1685,7 +1685,7 @@ export function useDiscussion(): UseDiscussionReturn {
           }
 
           // 検索完了
-          setSearchProgress({
+          setSearchUiProgress({
             phase: 'done',
             currentKeywordIndex: searchKeywordsList.length,
             totalKeywords: searchKeywordsList.length,
@@ -1746,7 +1746,7 @@ export function useDiscussion(): UseDiscussionReturn {
           }
           console.error('Search failed:', err);
         } finally {
-          setSearchProgress(null);
+          setSearchUiProgress(null);
         }
       }
 
@@ -1825,7 +1825,7 @@ export function useDiscussion(): UseDiscussionReturn {
           setIsGeneratingFollowUps,
           setSummaryState,
           setIsDiscussing,
-          setSearchProgress,
+          setSearchUiProgress,
           setCurrentSearchResults,
           setCurrentSearchKeywords,
           setError,
@@ -1919,7 +1919,7 @@ export function useDiscussion(): UseDiscussionReturn {
         // AbortControllerをクリア
         abortControllerRef.current = null;
         setIsDiscussing(false);
-        setSearchProgress(null);
+        setSearchUiProgress(null);
       }
     },
     [messageVotes, clearCurrentTurnState, extensionMarkers]

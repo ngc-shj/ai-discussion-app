@@ -1,14 +1,14 @@
 'use client';
 
 import { RefObject } from 'react';
-import { DiscussionMessage, DiscussionParticipant, MessageVote, StartMarker, ExtensionMarker, SearchKeywordInfo, SearchProgress } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, MessageVote, StartMarker, ExtensionMarker, SearchKeywordInfo, SearchUiProgress } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { MessageBubble } from './MessageBubble';
 import { StartSeparatorInline, ExtensionSeparatorInline } from './ExtensionSeparator';
 import { SearchKeywordItem } from './SearchKeywordItem';
 
 // 検索進捗インジケーターコンポーネント
-function SearchProgressIndicator({ searchProgress }: { searchProgress: SearchProgress }) {
+function SearchUiProgressIndicator({ searchProgress }: { searchProgress: SearchUiProgress }) {
   return (
     <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-3 my-2">
       <div className="flex items-center gap-2 mb-2">
@@ -84,7 +84,7 @@ interface MessageListProps {
   isDiscussing?: boolean;
   bottomRef?: RefObject<HTMLDivElement | null>;
   // 検索中状態の表示用
-  searchProgress?: SearchProgress | null;
+  searchProgress?: SearchUiProgress | null;
 }
 
 export function MessageList({
@@ -201,7 +201,7 @@ export function MessageList({
 
       {/* 検索進捗インジケーター */}
       {searchProgress?.phase === 'searching' && (
-        <SearchProgressIndicator searchProgress={searchProgress} />
+        <SearchUiProgressIndicator searchProgress={searchProgress} />
       )}
 
       {/* ストリーミング中のメッセージ */}

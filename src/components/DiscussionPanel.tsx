@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { DiscussionTurn, DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, SearchProgress, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
+import { DiscussionTurn, DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, SearchUiProgress, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { TurnDisplay } from './TurnDisplay';
 import { CurrentTurnDisplay } from './CurrentTurnDisplay';
@@ -16,7 +16,7 @@ interface DiscussionPanelProps {
   isDiscussing: boolean;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
-  searchProgress?: SearchProgress | null; // 検索進捗状態
+  searchProgress?: SearchUiProgress | null; // 検索進捗状態
   onFollowUp?: (topic: string, previousAnswer: string) => void;
   onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
   onCounterargument?: (topic: string, previousAnswer: string) => void;

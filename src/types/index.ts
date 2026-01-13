@@ -30,7 +30,7 @@ export type {
   SearchResult,
   SearchKeywordInfo,
   SearchPhase,
-  SearchProgress,
+  SearchUiProgress,
   SearchWarningType,
   SearchWarning,
   SearchProviderType,
