@@ -342,8 +342,8 @@ export function CurrentTurnDisplay({
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-purple-400 rounded-full" />
-                    <span className="text-gray-400 text-sm md:text-base">議論を統合中...</span>
+                    <div className="animate-spin w-4 h-4 border-2 border-gray-500 border-t-blue-400 rounded-full" />
+                    <span className="text-xs md:text-sm text-gray-300">議論を統合中...</span>
                   </div>
                 )
               ) : (
