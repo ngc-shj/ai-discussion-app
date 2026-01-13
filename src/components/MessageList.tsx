@@ -226,7 +226,7 @@ export function MessageList({
       {isDiscussing && messages.length === 0 && !streamingMessage && !searchProgress && (
         <div className="flex items-center gap-2 py-3 md:py-4">
           <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-blue-400 rounded-full" />
-          <span className="text-gray-400 text-sm md:text-base">議論を開始中...</span>
+          <span className="text-gray-400 text-xs md:text-sm">議論を開始中...</span>
         </div>
       )}
 

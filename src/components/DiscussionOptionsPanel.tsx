@@ -45,6 +45,18 @@ interface DiscussionOptionsPanelProps {
   onAddKeyword: () => void;
   onRemoveKeyword: (keyword: string) => void;
   onKeywordKeyDown: (e: React.KeyboardEvent) => void;
+  // Focus Areas
+  focusAreaInput: string;
+  onFocusAreaInputChange: (input: string) => void;
+  onAddFocusArea: () => void;
+  onRemoveFocusArea: (area: string) => void;
+  onFocusAreaKeyDown: (e: React.KeyboardEvent) => void;
+  // Avoid Topics
+  avoidTopicInput: string;
+  onAvoidTopicInputChange: (input: string) => void;
+  onAddAvoidTopic: () => void;
+  onRemoveAvoidTopic: (topic: string) => void;
+  onAvoidTopicKeyDown: (e: React.KeyboardEvent) => void;
   // Termination
   terminationConfig: TerminationConfig;
   onTerminationConfigChange: (config: TerminationConfig) => void;
@@ -70,6 +82,16 @@ export function DiscussionOptionsPanel({
   onAddKeyword,
   onRemoveKeyword,
   onKeywordKeyDown,
+  focusAreaInput,
+  onFocusAreaInputChange,
+  onAddFocusArea,
+  onRemoveFocusArea,
+  onFocusAreaKeyDown,
+  avoidTopicInput,
+  onAvoidTopicInputChange,
+  onAddAvoidTopic,
+  onRemoveAvoidTopic,
+  onAvoidTopicKeyDown,
   terminationConfig,
   onTerminationConfigChange,
   termKeywordInput,
@@ -170,7 +192,7 @@ export function DiscussionOptionsPanel({
             currentDepthPreset={currentDepthPreset}
           />
 
-          {/* 注目キーワード */}
+          {/* 注目キーワード・深掘り領域・避けたいトピック */}
           <KeywordSection
             disabled={disabled}
             directionGuide={directionGuide}
@@ -179,6 +201,16 @@ export function DiscussionOptionsPanel({
             onAddKeyword={onAddKeyword}
             onRemoveKeyword={onRemoveKeyword}
             onKeywordKeyDown={onKeywordKeyDown}
+            focusAreaInput={focusAreaInput}
+            onFocusAreaInputChange={onFocusAreaInputChange}
+            onAddFocusArea={onAddFocusArea}
+            onRemoveFocusArea={onRemoveFocusArea}
+            onFocusAreaKeyDown={onFocusAreaKeyDown}
+            avoidTopicInput={avoidTopicInput}
+            onAvoidTopicInputChange={onAvoidTopicInputChange}
+            onAddAvoidTopic={onAddAvoidTopic}
+            onRemoveAvoidTopic={onRemoveAvoidTopic}
+            onAvoidTopicKeyDown={onAvoidTopicKeyDown}
           />
 
           {/* 終了条件 */}
@@ -631,6 +663,16 @@ interface KeywordSectionProps {
   onAddKeyword: () => void;
   onRemoveKeyword: (keyword: string) => void;
   onKeywordKeyDown: (e: React.KeyboardEvent) => void;
+  focusAreaInput: string;
+  onFocusAreaInputChange: (input: string) => void;
+  onAddFocusArea: () => void;
+  onRemoveFocusArea: (area: string) => void;
+  onFocusAreaKeyDown: (e: React.KeyboardEvent) => void;
+  avoidTopicInput: string;
+  onAvoidTopicInputChange: (input: string) => void;
+  onAddAvoidTopic: () => void;
+  onRemoveAvoidTopic: (topic: string) => void;
+  onAvoidTopicKeyDown: (e: React.KeyboardEvent) => void;
 }
 
 function KeywordSection({
@@ -641,52 +683,159 @@ function KeywordSection({
   onAddKeyword,
   onRemoveKeyword,
   onKeywordKeyDown,
+  focusAreaInput,
+  onFocusAreaInputChange,
+  onAddFocusArea,
+  onRemoveFocusArea,
+  onFocusAreaKeyDown,
+  avoidTopicInput,
+  onAvoidTopicInputChange,
+  onAddAvoidTopic,
+  onRemoveAvoidTopic,
+  onAvoidTopicKeyDown,
 }: KeywordSectionProps) {
   return (
-    <div className="space-y-2">
-      <label className="text-xs text-gray-400">注目キーワード（任意）</label>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={keywordInput}
-          onChange={(e) => onKeywordInputChange(e.target.value)}
-          onKeyDown={onKeywordKeyDown}
-          placeholder="キーワードを入力..."
-          disabled={disabled}
-          className="flex-1 px-2 py-1.5 bg-gray-600 border border-gray-500 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        />
-        <button
-          type="button"
-          onClick={onAddKeyword}
-          disabled={disabled || !keywordInput.trim()}
-          className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-500 text-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          追加
-        </button>
-      </div>
-      {directionGuide.keywords.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {directionGuide.keywords.map((keyword) => (
-            <span
-              key={keyword}
-              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-900/50 text-blue-300 text-xs rounded-full"
-            >
-              {keyword}
-              <button
-                type="button"
-                onClick={() => onRemoveKeyword(keyword)}
-                disabled={disabled}
-                className="hover:text-white"
-              >
-                ×
-              </button>
-            </span>
-          ))}
+    <div className="space-y-4">
+      {/* 注目キーワード */}
+      <div className="space-y-2">
+        <label className="text-xs text-gray-400">注目キーワード（任意）</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={keywordInput}
+            onChange={(e) => onKeywordInputChange(e.target.value)}
+            onKeyDown={onKeywordKeyDown}
+            placeholder="キーワードを入力..."
+            disabled={disabled}
+            className="flex-1 px-2 py-1.5 bg-gray-600 border border-gray-500 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+          <button
+            type="button"
+            onClick={onAddKeyword}
+            disabled={disabled || !keywordInput.trim()}
+            className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-500 text-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            追加
+          </button>
         </div>
-      )}
-      <p className="text-xs text-gray-500">
-        議論で特に注目してほしいキーワードを追加できます
-      </p>
+        {directionGuide.keywords.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {directionGuide.keywords.map((keyword) => (
+              <span
+                key={keyword}
+                className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-900/50 text-blue-300 text-xs rounded-full"
+              >
+                {keyword}
+                <button
+                  type="button"
+                  onClick={() => onRemoveKeyword(keyword)}
+                  disabled={disabled}
+                  className="hover:text-white"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-gray-500">
+          議論で特に注目してほしいキーワードを追加できます
+        </p>
+      </div>
+
+      {/* 深掘りしたい領域 */}
+      <div className="space-y-2">
+        <label className="text-xs text-gray-400">深掘りしたい領域（任意）</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={focusAreaInput}
+            onChange={(e) => onFocusAreaInputChange(e.target.value)}
+            onKeyDown={onFocusAreaKeyDown}
+            placeholder="深掘りしたい領域を入力..."
+            disabled={disabled}
+            className="flex-1 px-2 py-1.5 bg-gray-600 border border-gray-500 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:border-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+          <button
+            type="button"
+            onClick={onAddFocusArea}
+            disabled={disabled || !focusAreaInput.trim()}
+            className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-500 text-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            追加
+          </button>
+        </div>
+        {(directionGuide.focusAreas?.length ?? 0) > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {directionGuide.focusAreas!.map((area) => (
+              <span
+                key={area}
+                className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-900/50 text-green-300 text-xs rounded-full"
+              >
+                {area}
+                <button
+                  type="button"
+                  onClick={() => onRemoveFocusArea(area)}
+                  disabled={disabled}
+                  className="hover:text-white"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-gray-500">
+          特に深く議論してほしい領域を指定できます
+        </p>
+      </div>
+
+      {/* 避けたいトピック */}
+      <div className="space-y-2">
+        <label className="text-xs text-gray-400">避けたいトピック（任意）</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={avoidTopicInput}
+            onChange={(e) => onAvoidTopicInputChange(e.target.value)}
+            onKeyDown={onAvoidTopicKeyDown}
+            placeholder="避けたいトピックを入力..."
+            disabled={disabled}
+            className="flex-1 px-2 py-1.5 bg-gray-600 border border-gray-500 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:border-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+          <button
+            type="button"
+            onClick={onAddAvoidTopic}
+            disabled={disabled || !avoidTopicInput.trim()}
+            className="px-3 py-1.5 text-xs bg-gray-600 hover:bg-gray-500 text-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            追加
+          </button>
+        </div>
+        {(directionGuide.avoidTopics?.length ?? 0) > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {directionGuide.avoidTopics!.map((topic) => (
+              <span
+                key={topic}
+                className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-900/50 text-red-300 text-xs rounded-full"
+              >
+                {topic}
+                <button
+                  type="button"
+                  onClick={() => onRemoveAvoidTopic(topic)}
+                  disabled={disabled}
+                  className="hover:text-white"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-gray-500">
+          議論で触れてほしくないトピックを指定できます
+        </p>
+      </div>
     </div>
   );
 }

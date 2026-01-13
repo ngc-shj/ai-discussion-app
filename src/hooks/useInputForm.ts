@@ -19,16 +19,26 @@ export interface UseInputFormReturn {
   topic: string;
   isModeExpanded: boolean;
   keywordInput: string;
+  focusAreaInput: string;
+  avoidTopicInput: string;
   termKeywordInput: string;
   // Actions
   setTopic: (topic: string) => void;
   setIsModeExpanded: (expanded: boolean) => void;
   setKeywordInput: (input: string) => void;
+  setFocusAreaInput: (input: string) => void;
+  setAvoidTopicInput: (input: string) => void;
   setTermKeywordInput: (input: string) => void;
   handleSubmit: (e: FormEvent) => void;
   handleAddKeyword: () => void;
   handleRemoveKeyword: (keyword: string) => void;
   handleKeywordKeyDown: (e: React.KeyboardEvent) => void;
+  handleAddFocusArea: () => void;
+  handleRemoveFocusArea: (area: string) => void;
+  handleFocusAreaKeyDown: (e: React.KeyboardEvent) => void;
+  handleAddAvoidTopic: () => void;
+  handleRemoveAvoidTopic: (topic: string) => void;
+  handleAvoidTopicKeyDown: (e: React.KeyboardEvent) => void;
   handleAddTermKeyword: () => void;
   handleRemoveTermKeyword: (keyword: string) => void;
   handleTermKeywordKeyDown: (e: React.KeyboardEvent) => void;
@@ -47,6 +57,8 @@ export function useInputForm({
   const [topic, setTopic] = useState('');
   const [isModeExpanded, setIsModeExpanded] = useState(false);
   const [keywordInput, setKeywordInput] = useState('');
+  const [focusAreaInput, setFocusAreaInput] = useState('');
+  const [avoidTopicInput, setAvoidTopicInput] = useState('');
   const [termKeywordInput, setTermKeywordInput] = useState('');
 
   // プリセットトピックが設定されたら入力欄に反映
@@ -96,6 +108,66 @@ export function useInputForm({
     }
   }, [handleAddKeyword]);
 
+  // 深掘り領域追加
+  const handleAddFocusArea = useCallback(() => {
+    const trimmed = focusAreaInput.trim();
+    if (trimmed && !directionGuide.focusAreas?.includes(trimmed)) {
+      onDirectionGuideChange({
+        ...directionGuide,
+        focusAreas: [...(directionGuide.focusAreas || []), trimmed],
+      });
+      setFocusAreaInput('');
+    }
+  }, [focusAreaInput, directionGuide, onDirectionGuideChange]);
+
+  // 深掘り領域削除
+  const handleRemoveFocusArea = useCallback((area: string) => {
+    onDirectionGuideChange({
+      ...directionGuide,
+      focusAreas: (directionGuide.focusAreas || []).filter((a) => a !== area),
+    });
+  }, [directionGuide, onDirectionGuideChange]);
+
+  // Enterキーで深掘り領域追加
+  const handleFocusAreaKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // IME入力中（日本語変換中など）はスキップ
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddFocusArea();
+    }
+  }, [handleAddFocusArea]);
+
+  // 避けたいトピック追加
+  const handleAddAvoidTopic = useCallback(() => {
+    const trimmed = avoidTopicInput.trim();
+    if (trimmed && !directionGuide.avoidTopics?.includes(trimmed)) {
+      onDirectionGuideChange({
+        ...directionGuide,
+        avoidTopics: [...(directionGuide.avoidTopics || []), trimmed],
+      });
+      setAvoidTopicInput('');
+    }
+  }, [avoidTopicInput, directionGuide, onDirectionGuideChange]);
+
+  // 避けたいトピック削除
+  const handleRemoveAvoidTopic = useCallback((topic: string) => {
+    onDirectionGuideChange({
+      ...directionGuide,
+      avoidTopics: (directionGuide.avoidTopics || []).filter((t) => t !== topic),
+    });
+  }, [directionGuide, onDirectionGuideChange]);
+
+  // Enterキーで避けたいトピック追加
+  const handleAvoidTopicKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // IME入力中（日本語変換中など）はスキップ
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddAvoidTopic();
+    }
+  }, [handleAddAvoidTopic]);
+
   // 終了キーワード追加
   const handleAddTermKeyword = useCallback(() => {
     const trimmed = termKeywordInput.trim();
@@ -131,16 +203,26 @@ export function useInputForm({
     topic,
     isModeExpanded,
     keywordInput,
+    focusAreaInput,
+    avoidTopicInput,
     termKeywordInput,
     // Actions
     setTopic,
     setIsModeExpanded,
     setKeywordInput,
+    setFocusAreaInput,
+    setAvoidTopicInput,
     setTermKeywordInput,
     handleSubmit,
     handleAddKeyword,
     handleRemoveKeyword,
     handleKeywordKeyDown,
+    handleAddFocusArea,
+    handleRemoveFocusArea,
+    handleFocusAreaKeyDown,
+    handleAddAvoidTopic,
+    handleRemoveAvoidTopic,
+    handleAvoidTopicKeyDown,
     handleAddTermKeyword,
     handleRemoveTermKeyword,
     handleTermKeywordKeyDown,

@@ -50,15 +50,25 @@ export function InputForm({
     topic,
     isModeExpanded,
     keywordInput,
+    focusAreaInput,
+    avoidTopicInput,
     termKeywordInput,
     setTopic,
     setIsModeExpanded,
     setKeywordInput,
+    setFocusAreaInput,
+    setAvoidTopicInput,
     setTermKeywordInput,
     handleSubmit,
     handleAddKeyword,
     handleRemoveKeyword,
     handleKeywordKeyDown,
+    handleAddFocusArea,
+    handleRemoveFocusArea,
+    handleFocusAreaKeyDown,
+    handleAddAvoidTopic,
+    handleRemoveAvoidTopic,
+    handleAvoidTopicKeyDown,
     handleAddTermKeyword,
     handleRemoveTermKeyword,
     handleTermKeywordKeyDown,
@@ -144,6 +154,16 @@ export function InputForm({
             onAddKeyword={handleAddKeyword}
             onRemoveKeyword={handleRemoveKeyword}
             onKeywordKeyDown={handleKeywordKeyDown}
+            focusAreaInput={focusAreaInput}
+            onFocusAreaInputChange={setFocusAreaInput}
+            onAddFocusArea={handleAddFocusArea}
+            onRemoveFocusArea={handleRemoveFocusArea}
+            onFocusAreaKeyDown={handleFocusAreaKeyDown}
+            avoidTopicInput={avoidTopicInput}
+            onAvoidTopicInputChange={setAvoidTopicInput}
+            onAddAvoidTopic={handleAddAvoidTopic}
+            onRemoveAvoidTopic={handleRemoveAvoidTopic}
+            onAvoidTopicKeyDown={handleAvoidTopicKeyDown}
             terminationConfig={terminationConfig}
             onTerminationConfigChange={onTerminationConfigChange}
             termKeywordInput={termKeywordInput}
