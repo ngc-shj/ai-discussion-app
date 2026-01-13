@@ -66,14 +66,20 @@ export function ProviderSection({
 
   const handleHeaderClick = () => {
     if (!isAvailable) return;
-
-    if (!isExpanded) {
-      // 閉じている場合は開く
-      onToggleExpanded();
-    } else {
-      // 開いている場合は検索モードに切り替え
-      setIsSearchMode(true);
+    // ヘッダークリックは常に開閉トグル
+    onToggleExpanded();
+    if (isExpanded) {
+      setIsSearchMode(false);
+      setSearchQuery('');
     }
+  };
+
+  const handleSearchClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isExpanded) {
+      onToggleExpanded();
+    }
+    setIsSearchMode(true);
   };
 
   const handleSearchBlur = () => {
@@ -164,9 +170,24 @@ export function ProviderSection({
         )}
 
         {!isSearchMode && (
-          <span className="ml-auto text-xs text-gray-500">
-            {allModels.length}モデル
-          </span>
+          <>
+            <span className="ml-auto text-xs text-gray-500">
+              {allModels.length}モデル
+            </span>
+            {/* 検索ボタン（展開時のみ表示） */}
+            {isExpanded && allModels.length > 5 && (
+              <button
+                type="button"
+                onClick={handleSearchClick}
+                className="p-1 text-gray-400 hover:text-gray-200 hover:bg-gray-600 rounded"
+                title="モデルを検索"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+            )}
+          </>
         )}
 
         {isSearchMode && searchQuery && (
