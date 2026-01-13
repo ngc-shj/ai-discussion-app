@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, SearchUiProgress, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, formatParticipantDisplayName, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, SearchUiProgress, MessageVote, FollowUpQuestion, DeepDiveType, SummaryPhase, formatParticipantDisplayName, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FollowUpSuggestions } from './FollowUpSuggestions';
@@ -18,7 +18,7 @@ interface CurrentTurnDisplayProps {
   finalAnswer?: string;
   summaryPrompt?: string;
   isDiscussing: boolean;
-  summaryState?: SummaryState;
+  summaryPhase?: SummaryPhase;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
   searchProgress?: SearchUiProgress | null; // 検索進捗状態
@@ -47,7 +47,7 @@ export function CurrentTurnDisplay({
   finalAnswer,
   summaryPrompt,
   isDiscussing,
-  summaryState,
+  summaryPhase,
   searchResults: _searchResults, // 後方互換のため保持、searchKeywordsに統合済み
   searchKeywords,
   searchProgress,
@@ -157,7 +157,7 @@ export function CurrentTurnDisplay({
                   ({participantCount}<span className="hidden sm:inline">モデル</span> × {maxRound}<span className="hidden sm:inline">ラウンド</span>)
                 </span>
               )}
-              {isDiscussing && summaryState !== 'generating' && (
+              {isDiscussing && summaryPhase !== 'generating' && (
                 <div className="animate-spin w-3 h-3 border-2 border-gray-500 border-t-blue-400 rounded-full" />
               )}
             </button>
@@ -212,7 +212,7 @@ export function CurrentTurnDisplay({
       )}
 
       {/* 統合回答待ち状態（投票を促すUI） */}
-      {summaryState === 'awaiting' && !finalAnswer && (
+      {summaryPhase === 'awaiting' && !finalAnswer && (
         <div className="flex gap-2 md:gap-3">
           <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shrink-0">
             <span className="text-white text-base md:text-lg">✨</span>
@@ -282,7 +282,7 @@ export function CurrentTurnDisplay({
       )}
 
       {/* 統合回答または統合中表示 */}
-      {(finalAnswer || summaryState === 'generating') && (
+      {(finalAnswer || summaryPhase === 'generating') && (
         <div className="flex gap-2 md:gap-3">
           <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shrink-0">
             <span className="text-white text-base md:text-lg">✨</span>
@@ -292,7 +292,7 @@ export function CurrentTurnDisplay({
               <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
             </div>
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg p-2 md:p-3 text-gray-200 text-sm md:text-base">
-              {summaryState === 'generating' && !finalAnswer ? (
+              {summaryPhase === 'generating' && !finalAnswer ? (
                 <div className="flex items-center gap-2">
                   <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-purple-400 rounded-full" />
                   <span className="text-gray-400 text-sm md:text-base">議論を統合中...</span>
@@ -302,7 +302,7 @@ export function CurrentTurnDisplay({
               )}
             </div>
             {/* コピー・プロンプト表示ボタン（統合完了後のみ） */}
-            {finalAnswer && summaryState !== 'generating' && (
+            {finalAnswer && summaryPhase !== 'generating' && (
               <div className="flex items-center gap-1 mt-1.5">
                 <button
                   type="button"
@@ -356,7 +356,7 @@ export function CurrentTurnDisplay({
               </div>
             )}
             {/* アクションボタン（統合完了後のみ表示） */}
-            {finalAnswer && summaryState !== 'generating' && !isDiscussing && (onDeepDive || onCounterargument) && (
+            {finalAnswer && summaryPhase !== 'generating' && !isDiscussing && (onDeepDive || onCounterargument) && (
               <div className="mt-2 flex justify-end gap-2 flex-wrap">
                 {onDeepDive && (
                   <button
@@ -388,7 +388,7 @@ export function CurrentTurnDisplay({
               />
             )}
             {/* フォローアップ質問候補 */}
-            {finalAnswer && summaryState !== 'generating' && onFollowUp && (
+            {finalAnswer && summaryPhase !== 'generating' && onFollowUp && (
               <FollowUpSuggestions
                 questions={suggestedFollowUps || []}
                 onSelect={(question) => onFollowUp(question, finalAnswer)}

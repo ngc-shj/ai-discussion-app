@@ -124,7 +124,7 @@ export function useSessionManager(): UseSessionManagerState & UseSessionManagerA
           directionGuide: turn.directionGuide,
           terminationConfig: turn.terminationConfig,
           interruptedAt: turn.interruptedAt,
-          summaryState: turn.summaryState,
+          summaryPhase: turn.summaryPhase,
           startMarker: turn.startMarker,
           extensionMarkers: turn.extensionMarkers,
         };
@@ -167,7 +167,7 @@ export function useSessionManager(): UseSessionManagerState & UseSessionManagerA
         directionGuide: turn.directionGuide,
         terminationConfig: turn.terminationConfig,
         interruptedAt: turn.interruptedAt,
-        summaryState: turn.summaryState,
+        summaryPhase: turn.summaryPhase,
         startMarker: turn.startMarker,
         extensionMarkers: turn.extensionMarkers,
       };

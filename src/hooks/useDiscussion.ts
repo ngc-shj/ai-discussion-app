@@ -19,7 +19,7 @@ import {
   DirectionGuide,
   TerminationConfig,
   SearchConfig,
-  SummaryState,
+  SummaryPhase,
   ExtendDiscussionConfig,
   StartMarker,
   ExtensionMarker,
@@ -69,7 +69,7 @@ export interface UseDiscussionState {
   isSearching: boolean;
   isGeneratingFollowUps: boolean;
   isProcessing: boolean;
-  summaryState: SummaryState;
+  summaryPhase: SummaryPhase;
   discussionProgress: DiscussionUiProgress;
   searchProgress: SearchUiProgress | null;
   completedParticipants: Set<string>;
@@ -92,7 +92,7 @@ export interface RestoreDiscussionStateParams {
   messages: DiscussionMessage[];
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
-  summaryState?: SummaryState;
+  summaryPhase?: SummaryPhase;
   startMarker?: StartMarker;
   extensionMarkers?: ExtensionMarker[];
   discussionMode?: DiscussionMode;
@@ -269,7 +269,7 @@ interface CreateSSEHandlersParams {
   setCurrentSummaryPrompt: React.Dispatch<React.SetStateAction<string>>;
   setSuggestedFollowUps: React.Dispatch<React.SetStateAction<FollowUpQuestion[]>>;
   setIsGeneratingFollowUps: React.Dispatch<React.SetStateAction<boolean>>;
-  setSummaryState?: React.Dispatch<React.SetStateAction<SummaryState>>;
+  setSummaryPhase?: React.Dispatch<React.SetStateAction<SummaryPhase>>;
   setIsDiscussing?: React.Dispatch<React.SetStateAction<boolean>>;
   // isSearchingは不要（searchProgressから派生）
   setSearchUiProgress?: React.Dispatch<React.SetStateAction<SearchUiProgress | null>>;
@@ -298,7 +298,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     setCurrentSummaryPrompt,
     setSuggestedFollowUps,
     setIsGeneratingFollowUps,
-    setSummaryState,
+    setSummaryPhase,
     setIsDiscussing,
     setSearchUiProgress,
     setCurrentSearchResults,
@@ -382,7 +382,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
           directionGuide: context.directionGuide,
           terminationConfig: context.terminationConfig,
           interruptedAt: new Date(),
-          summaryState: isAllComplete ? 'awaiting' : 'idle',
+          summaryPhase: isAllComplete ? 'awaiting' : 'idle',
           startMarker: context.startMarker,
           extensionMarkers: context.extensionMarkers,
         };
@@ -429,11 +429,11 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     },
     onReadyForSummary: includeReadyForSummary
       ? () => {
-          setSummaryState?.('awaiting');
+          setSummaryPhase?.('awaiting');
           setIsDiscussing?.(false);
           const latestSession = currentSessionRef.current;
           if (latestSession) {
-            // summaryState: 'awaiting'状態を保持した中断状態を保存
+            // summaryPhase: 'awaiting'状態を保持した中断状態を保存
             const searchKeywordsForAwait = collectedSearchKeywordsRef?.current?.length ? collectedSearchKeywordsRef.current : context.searchKeywords;
             const completedKeywordIndexForAwait = searchKeywordsForAwait && searchKeywordsForAwait.length > 0 && searchKeywordsForAwait[0].keywords.length > 0
               ? searchKeywordsForAwait[0].keywords.length - 1
@@ -455,7 +455,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
               directionGuide: context.directionGuide,
               terminationConfig: context.terminationConfig,
               interruptedAt: new Date(),
-              summaryState: 'awaiting',
+              summaryPhase: 'awaiting',
               startMarker: context.startMarker,
               extensionMarkers: context.extensionMarkers,
             };
@@ -477,7 +477,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     onComplete: () => {
       setIsDiscussing?.(false);
       setIsGeneratingFollowUps(false);
-      // 注意: ここでsummaryStateを'idle'にしない
+      // 注意: ここでsummaryPhaseを'idle'にしない
       // startDiscussionの場合: onReadyForSummaryで'awaiting'に設定されるので、それを維持する
       // generateSummaryの場合: onSummaryで'idle'に設定されるので、ここでは不要
     },
@@ -550,7 +550,7 @@ export function useDiscussion(): UseDiscussionReturn {
   const [isDiscussing, setIsDiscussing] = useState(false);
   const [searchProgress, setSearchUiProgress] = useState<SearchUiProgress | null>(null);
   const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
-  const [summaryState, setSummaryState] = useState<SummaryState>('idle');
+  const [summaryPhase, setSummaryPhase] = useState<SummaryPhase>('idle');
   const [discussionProgress, setDiscussionUiProgress] = useState<DiscussionUiProgress>(INITIAL_PROGRESS);
   const [completedParticipants, setCompletedParticipants] = useState<Set<string>>(new Set());
   const [suggestedFollowUps, setSuggestedFollowUps] = useState<FollowUpQuestion[]>([]);
@@ -628,7 +628,7 @@ export function useDiscussion(): UseDiscussionReturn {
     // ローディング・進行状況
     setIsDiscussing(false);
     setIsGeneratingFollowUps(false);
-    setSummaryState('idle');
+    setSummaryPhase('idle');
     setDiscussionUiProgress(INITIAL_PROGRESS);
     setCompletedParticipants(new Set());
     setSearchUiProgress(null);
@@ -665,7 +665,7 @@ export function useDiscussion(): UseDiscussionReturn {
       results: params.searchResults || [],
       keywords: params.searchKeywords || [],
     });
-    setSummaryState(params.summaryState || 'idle');
+    setSummaryPhase(params.summaryPhase || 'idle');
     // マーカーと議論設定を復元
     setStartMarker(params.startMarker || null);
     setExtensionMarkers(params.extensionMarkers || []);
@@ -704,7 +704,7 @@ export function useDiscussion(): UseDiscussionReturn {
         updateAndSaveSession,
       } = params;
 
-      setSummaryState('generating');
+      setSummaryPhase('generating');
       setError(null);
       // 復元・破棄ボタンをすぐに非表示にする
       setInterruptedState(null);
@@ -790,7 +790,7 @@ export function useDiscussion(): UseDiscussionReturn {
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
             // 中断された場合は正常終了
-            setSummaryState('idle');
+            setSummaryPhase('idle');
             return;
           }
           console.error('beforeSummary search failed:', err);
@@ -800,12 +800,12 @@ export function useDiscussion(): UseDiscussionReturn {
       }
 
       // セッションのinterruptedTurnを統合回答生成中状態に更新
-      // クリアするのではなく、summaryState: 'generating'で更新することでリロード時に復元可能にする
+      // クリアするのではなく、summaryPhase: 'generating'で更新することでリロード時に復元可能にする
       if (currentSessionRef.current?.interruptedTurn) {
         await updateAndSaveSession({
           interruptedTurn: {
             ...currentSessionRef.current.interruptedTurn,
-            summaryState: 'generating',
+            summaryPhase: 'generating',
             interruptedAt: new Date(),
           },
         });
@@ -841,7 +841,7 @@ export function useDiscussion(): UseDiscussionReturn {
 
         const handlers: SSEEventHandlers = {
           onProgress: () => {
-            // Progress is tracked via summaryState
+            // Progress is tracked via summaryPhase
           },
           onSummaryChunk: (_chunk, accumulatedContent) => {
             // ストリーミング中のテキストをリアルタイム表示
@@ -854,14 +854,14 @@ export function useDiscussion(): UseDiscussionReturn {
             setCurrentSummaryPrompt(summaryPrompt || '');
             // 状態遷移: 'generating' → 'idle'
             // 統合回答の生成が完了したので、アクションボタンを表示可能にする
-            setSummaryState('idle');
+            setSummaryPhase('idle');
           },
           onError: (errorMsg) => {
             console.error('Summary error:', errorMsg);
             setError(errorMsg);
           },
           onComplete: () => {
-            setSummaryState('idle');
+            setSummaryPhase('idle');
           },
         };
 
@@ -873,7 +873,7 @@ export function useDiscussion(): UseDiscussionReturn {
 
         if (wasInterrupted) {
           // 中断された場合は状態をリセットして終了
-          setSummaryState('idle');
+          setSummaryPhase('idle');
           return;
         }
 
@@ -980,9 +980,9 @@ export function useDiscussion(): UseDiscussionReturn {
       } finally {
         // AbortControllerをクリア
         abortControllerRef.current = null;
-        // エラー時のフォールバック: summaryStateを確実にidleに戻す
+        // エラー時のフォールバック: summaryPhaseを確実にidleに戻す
         // 成功時はonSummaryで既にidleに設定されているので二重設定になるが問題ない
-        setSummaryState('idle');
+        setSummaryPhase('idle');
       }
     },
     [currentMessages, currentTopic, currentSearchResults, currentSearchKeywords, messageVotes, clearCurrentTurnState, startMarker, extensionMarkers]
@@ -1228,7 +1228,7 @@ export function useDiscussion(): UseDiscussionReturn {
                 directionGuide,
                 terminationConfig,
                 interruptedAt: new Date(),
-                summaryState: 'idle',
+                summaryPhase: 'idle',
                 // 検索中断時はまだ議論が開始されていないので、マーカーは未定義
                 startMarker: undefined,
                 extensionMarkers: undefined,
@@ -1324,7 +1324,7 @@ export function useDiscussion(): UseDiscussionReturn {
           setCurrentSummaryPrompt,
           setSuggestedFollowUps,
           setIsGeneratingFollowUps,
-          setSummaryState,
+          setSummaryPhase,
           setIsDiscussing,
           setSearchUiProgress,
           setCurrentSearchResults,
@@ -1724,7 +1724,7 @@ export function useDiscussion(): UseDiscussionReturn {
                 directionGuide: interruptedState.directionGuide,
                 terminationConfig: interruptedState.terminationConfig,
                 interruptedAt: new Date(),
-                summaryState: 'idle',
+                summaryPhase: 'idle',
                 startMarker: interruptedState.startMarker,
                 extensionMarkers: interruptedState.extensionMarkers,
               };
@@ -1823,7 +1823,7 @@ export function useDiscussion(): UseDiscussionReturn {
           setCurrentSummaryPrompt,
           setSuggestedFollowUps,
           setIsGeneratingFollowUps,
-          setSummaryState,
+          setSummaryPhase,
           setIsDiscussing,
           setSearchUiProgress,
           setCurrentSearchResults,
@@ -2107,7 +2107,7 @@ export function useDiscussion(): UseDiscussionReturn {
           maxRounds: newTotalRounds,
         },
         interruptedAt: new Date(),
-        summaryState: 'idle',
+        summaryPhase: 'idle',
         startMarker: startMarker || undefined,
         extensionMarkers: updatedExtensionMarkers,
       };
@@ -2116,7 +2116,7 @@ export function useDiscussion(): UseDiscussionReturn {
       setExtensionMarkers(updatedExtensionMarkers);
 
       // 統合回答待ち状態をリセット
-      setSummaryState('idle');
+      setSummaryPhase('idle');
       setCurrentFinalAnswer('');
       setSuggestedFollowUps([]);
 
@@ -2150,7 +2150,7 @@ export function useDiscussion(): UseDiscussionReturn {
 
   // 処理中フラグ（議論実行中、統合回答生成中、フォローアップ生成中）
   // 検索中はisDiscussingがtrueなのでisSearchingは不要
-  const isProcessing = isDiscussing || summaryState === 'generating' || isGeneratingFollowUps;
+  const isProcessing = isDiscussing || summaryPhase === 'generating' || isGeneratingFollowUps;
 
   return {
     currentMessages,
@@ -2163,7 +2163,7 @@ export function useDiscussion(): UseDiscussionReturn {
     isSearching,
     isGeneratingFollowUps,
     isProcessing,
-    summaryState,
+    summaryPhase,
     discussionProgress,
     searchProgress,
     completedParticipants,

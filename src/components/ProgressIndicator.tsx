@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AIProviderType, DiscussionParticipant, DEFAULT_PROVIDERS, getLocalModelColor, formatParticipantDisplayName } from '@/types';
+import { AIProviderType, DiscussionParticipant, DEFAULT_PROVIDERS, getLocalModelColor, formatParticipantDisplayName, SummaryPhase } from '@/types';
 import { useElapsedTime } from '@/hooks';
 import { ParticipantChip, SummaryChip, FollowUpChip, ProgressStatus, ProgressInfo, InterruptButton } from './progress-indicator';
 
@@ -13,9 +13,6 @@ export interface ParticipantProgress {
   status: ParticipantStatus;
   currentRound?: number;
 }
-
-// summaryStateの型定義
-export type SummaryStateType = 'idle' | 'generating' | 'awaiting';
 
 interface ProgressIndicatorProps {
   isActive: boolean;
@@ -30,7 +27,7 @@ interface ProgressIndicatorProps {
   /** メッセージストリーミング中かどうか */
   isStreaming?: boolean;
   isGeneratingFollowUps?: boolean;
-  summaryState?: SummaryStateType;
+  summaryPhase?: SummaryPhase;
   participants?: DiscussionParticipant[];
   completedParticipants?: Set<string>;
   onInterrupt?: () => void;
@@ -47,14 +44,14 @@ export function ProgressIndicator({
   isSearching = false,
   isStreaming = false,
   isGeneratingFollowUps = false,
-  summaryState = 'idle',
+  summaryPhase = 'idle',
   participants = [],
   completedParticipants = new Set(),
   onInterrupt,
 }: ProgressIndicatorProps) {
-  // summaryStateとisStreamingから派生
-  const isSummarizing = summaryState === 'generating' && !isStreaming;
-  const isSummaryStreaming = summaryState === 'generating' && isStreaming;
+  // summaryPhaseとisStreamingから派生
+  const isSummarizing = summaryPhase === 'generating' && !isStreaming;
+  const isSummaryStreaming = summaryPhase === 'generating' && isStreaming;
   const [isInterrupting, setIsInterrupting] = useState(false);
 
   // 参加者のキーを生成

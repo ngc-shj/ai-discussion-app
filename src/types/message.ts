@@ -3,8 +3,8 @@ import { DiscussionParticipant } from './participant';
 import { SearchResult, SearchKeywordInfo, SearchConfig, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig } from './config';
 import { FollowUpQuestion } from './followup';
 
-// 統合回答の状態
-export type SummaryState =
+// 統合回答のフェーズ
+export type SummaryPhase =
   | 'idle'           // 通常状態（議論中または議論前）
   | 'awaiting'       // 統合回答ボタン表示中（ユーザーのクリック待ち）
   | 'generating';    // 統合回答生成中
@@ -89,7 +89,7 @@ export interface InterruptedTurnSnapshot {
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
   interruptedAt: Date;
-  summaryState?: SummaryState; // 統合回答の状態
+  summaryPhase?: SummaryPhase; // 統合回答のフェーズ
   // 議論マーカー
   startMarker?: StartMarker;
   extensionMarkers?: ExtensionMarker[];
@@ -133,7 +133,7 @@ export interface InterruptedDiscussionSnapshot {
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
   interruptedAt: Date;
-  summaryState?: SummaryState; // 統合回答の状態
+  summaryPhase?: SummaryPhase; // 統合回答のフェーズ
   // 議論マーカー
   startMarker?: StartMarker;
   extensionMarkers?: ExtensionMarker[];

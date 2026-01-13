@@ -54,7 +54,7 @@ export default function Home() {
     searchProgress,
     isGeneratingFollowUps,
     isProcessing,
-    summaryState,
+    summaryPhase,
     discussionProgress,
     completedParticipants,
     suggestedFollowUps,
@@ -145,7 +145,7 @@ export default function Home() {
       searchResults: interruptedState.searchResults,
       searchKeywords: interruptedState.searchKeywords,
       // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
-      summaryState: interruptedState.summaryState === 'generating' ? 'awaiting' : interruptedState.summaryState,
+      summaryPhase: interruptedState.summaryPhase === 'generating' ? 'awaiting' : interruptedState.summaryPhase,
       startMarker: interruptedState.startMarker,
       extensionMarkers: interruptedState.extensionMarkers,
       discussionMode: interruptedState.discussionMode,
@@ -183,7 +183,7 @@ export default function Home() {
         directionGuide,
         terminationConfig,
         interruptedAt: new Date(),
-        summaryState: 'idle' as const,
+        summaryPhase: 'idle' as const,
         startMarker: startMarker || undefined,
         extensionMarkers: extensionMarkers.length > 0 ? extensionMarkers : undefined,
       };
@@ -233,14 +233,14 @@ export default function Home() {
         userProfile: turn.userProfile,
       });
 
-      // 議論の表示状態を復元（メッセージ、トピック、summaryState等）
+      // 議論の表示状態を復元（メッセージ、トピック、summaryPhase等）
       restoreDiscussionState({
         topic: turn.topic,
         messages: turn.messages,
         searchResults: turn.searchResults,
         searchKeywords: turn.searchKeywords,
         // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
-        summaryState: turn.summaryState === 'generating' ? 'awaiting' : turn.summaryState,
+        summaryPhase: turn.summaryPhase === 'generating' ? 'awaiting' : turn.summaryPhase,
         startMarker: turn.startMarker,
         extensionMarkers: turn.extensionMarkers,
         discussionMode: turn.discussionMode,
@@ -267,7 +267,7 @@ export default function Home() {
         terminationConfig: turn.terminationConfig,
         interruptedAt: turn.interruptedAt,
         // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
-        summaryState: turn.summaryState === 'generating' ? 'awaiting' : turn.summaryState,
+        summaryPhase: turn.summaryPhase === 'generating' ? 'awaiting' : turn.summaryPhase,
         // マーカーを復元
         startMarker: turn.startMarker,
         extensionMarkers: turn.extensionMarkers,
@@ -375,7 +375,7 @@ export default function Home() {
         directionGuide,
         terminationConfig,
         interruptedAt: new Date(),
-        summaryState: 'idle' as const,
+        summaryPhase: 'idle' as const,
         startMarker: startMarker || undefined,
         extensionMarkers: extensionMarkers.length > 0 ? extensionMarkers : undefined,
       };
@@ -640,7 +640,7 @@ export default function Home() {
         )}
 
         {/* 中断された議論の復元バナー */}
-        {interruptedState && !isDiscussing && interruptedState.summaryState !== 'awaiting' && interruptedState.summaryState !== 'generating' && (
+        {interruptedState && !isDiscussing && interruptedState.summaryPhase !== 'awaiting' && interruptedState.summaryPhase !== 'generating' && (
           <div className="mx-3 md:mx-4 mt-3 md:mt-4 p-3 bg-yellow-900/50 border border-yellow-700 rounded-lg shrink-0">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -696,7 +696,7 @@ export default function Home() {
           currentFinalAnswer={currentFinalAnswer}
           currentSummaryPrompt={currentSummaryPrompt}
           isDiscussing={isDiscussing}
-          summaryState={summaryState}
+          summaryPhase={summaryPhase}
           searchResults={currentSearchResults}
           searchKeywords={currentSearchKeywords}
           searchProgress={searchProgress}
@@ -732,8 +732,8 @@ export default function Home() {
           isSearching={isSearching}
           isStreaming={!!streamingMessage}
           isGeneratingFollowUps={isGeneratingFollowUps}
-          summaryState={summaryState}
-          participants={isDiscussing || summaryState !== 'idle' ? discussionParticipants : participants}
+          summaryPhase={summaryPhase}
+          participants={isDiscussing || summaryPhase !== 'idle' ? discussionParticipants : participants}
           completedParticipants={completedParticipants}
           onInterrupt={handleInterruptWithSave}
         />

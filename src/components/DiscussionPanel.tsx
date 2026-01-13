@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { DiscussionTurn, DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, SearchUiProgress, MessageVote, FollowUpQuestion, DeepDiveType, SummaryState, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
+import { DiscussionTurn, DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, SearchUiProgress, MessageVote, FollowUpQuestion, DeepDiveType, SummaryPhase, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { TurnDisplay } from './TurnDisplay';
 import { CurrentTurnDisplay } from './CurrentTurnDisplay';
@@ -26,7 +26,7 @@ interface DiscussionPanelProps {
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   suggestedFollowUps?: FollowUpQuestion[];
   isGeneratingFollowUps?: boolean;
-  summaryState?: SummaryState;
+  summaryPhase?: SummaryPhase;
   onGenerateSummary?: () => void;
   onExtendDiscussion?: (config: ExtendDiscussionConfig) => void;
   currentRounds?: number;
@@ -58,7 +58,7 @@ export function DiscussionPanel({
   onVote,
   suggestedFollowUps,
   isGeneratingFollowUps,
-  summaryState,
+  summaryPhase,
   onGenerateSummary,
   onExtendDiscussion,
   currentRounds,
@@ -118,7 +118,7 @@ export function DiscussionPanel({
           finalAnswer={currentFinalAnswer}
           summaryPrompt={currentSummaryPrompt}
           isDiscussing={isDiscussing}
-          summaryState={summaryState}
+          summaryPhase={summaryPhase}
           searchResults={searchResults}
           searchKeywords={searchKeywords}
           searchProgress={searchProgress}
