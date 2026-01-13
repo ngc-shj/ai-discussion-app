@@ -150,9 +150,7 @@ export async function* runDiscussion(
   };
 
   // 実際の最大ラウンド数
-  const effectiveMaxRounds = termConfig.condition === 'manual'
-    ? termConfig.maxRounds
-    : Math.min(rounds, termConfig.maxRounds);
+  const effectiveMaxRounds = Math.min(rounds, termConfig.maxRounds);
 
   // 各ラウンドで全参加者が発言
   for (let round = startRound; round <= effectiveMaxRounds && !terminated; round++) {

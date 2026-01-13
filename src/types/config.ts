@@ -294,8 +294,7 @@ export interface DirectionGuide {
 export type TerminationCondition =
   | 'rounds'       // 指定ラウンド数で終了（デフォルト）
   | 'consensus'    // 合意に達したら終了
-  | 'keyword'      // 特定キーワードで終了
-  | 'manual';      // 手動で終了
+  | 'keyword';     // 特定キーワードで終了
 
 // 終了条件の設定
 export interface TerminationConfig {
@@ -328,11 +327,6 @@ export const TERMINATION_PRESETS: TerminationPreset[] = [
     id: 'keyword',
     name: 'キーワード',
     description: '特定のキーワードが出たら終了',
-  },
-  {
-    id: 'manual',
-    name: '手動',
-    description: 'ユーザーが手動で終了',
   },
 ];
 
