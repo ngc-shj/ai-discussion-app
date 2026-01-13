@@ -10,6 +10,7 @@ import { ForkButton } from './ForkButton';
 import { ForkModal } from './ForkModal';
 import { MessageList } from './MessageList';
 import { SearchKeywordItem } from './SearchKeywordItem';
+import { SearchResultsAccordion } from './SearchResultsAccordion';
 
 interface TurnDisplayProps {
   turn: DiscussionTurn;
@@ -157,13 +158,6 @@ export function TurnDisplay({
         </div>
       )}
 
-      {/* 統合前の検索結果 */}
-      {turn.searchKeywords?.find(kw => kw.timing === 'summary') && (
-        <div className="ml-10 md:ml-13 mb-2 md:mb-3">
-          <SearchKeywordItem keyword={turn.searchKeywords.find(kw => kw.timing === 'summary')!} />
-        </div>
-      )}
-
       {/* 統合回答 */}
       {turn.finalAnswer && (
         <div className="flex gap-2 md:gap-3">
@@ -189,6 +183,12 @@ export function TurnDisplay({
             {isSummaryExpanded ? (
               <>
                 <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg p-2 md:p-3 text-gray-200 text-sm md:text-base">
+                  {/* 統合前検索（統合回答ブロック内に表示） */}
+                  {turn.searchKeywords?.find(kw => kw.timing === 'summary') && (
+                    <div className="mb-3">
+                      <SearchKeywordItem keyword={turn.searchKeywords.find(kw => kw.timing === 'summary')!} />
+                    </div>
+                  )}
                   <MarkdownRenderer content={turn.finalAnswer} />
                 </div>
               </>
@@ -302,6 +302,10 @@ export function TurnDisplay({
                 onCreateFork={(label, perspective) => onFork(turn.id, turn.topic, turn.finalAnswer, label, perspective)}
                 topic={turn.topic}
               />
+            )}
+            {/* 全検索結果のインライン展開 */}
+            {turn.searchKeywords && turn.searchKeywords.length > 0 && (
+              <SearchResultsAccordion searchKeywords={turn.searchKeywords} />
             )}
             {/* フォローアップ質問候補（常に表示） */}
             {turn.suggestedFollowUps && turn.suggestedFollowUps.length > 0 && onFollowUp ? (

@@ -10,6 +10,7 @@ import { ExtendDiscussionModal } from './ExtendDiscussionModal';
 import { CounterargumentButton } from './CounterargumentButton';
 import { MessageList } from './MessageList';
 import { SearchKeywordItem } from './SearchKeywordItem';
+import { SearchResultsAccordion } from './SearchResultsAccordion';
 
 interface CurrentTurnDisplayProps {
   topic: string;
@@ -274,13 +275,6 @@ export function CurrentTurnDisplay({
         </div>
       )}
 
-      {/* 統合前の検索結果 */}
-      {searchKeywords?.find(kw => kw.timing === 'summary') && (
-        <div className="ml-10 md:ml-13 mb-2 md:mb-3">
-          <SearchKeywordItem keyword={searchKeywords.find(kw => kw.timing === 'summary')!} />
-        </div>
-      )}
-
       {/* 統合回答または統合中表示 */}
       {(finalAnswer || summaryPhase === 'generating') && (
         <div className="flex gap-2 md:gap-3">
@@ -292,6 +286,12 @@ export function CurrentTurnDisplay({
               <span className="font-semibold text-purple-400 text-sm md:text-base">統合回答</span>
             </div>
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg p-2 md:p-3 text-gray-200 text-sm md:text-base">
+              {/* 統合前検索（統合回答ブロック内に表示） */}
+              {searchKeywords?.find(kw => kw.timing === 'summary') && (
+                <div className="mb-3">
+                  <SearchKeywordItem keyword={searchKeywords.find(kw => kw.timing === 'summary')!} />
+                </div>
+              )}
               {summaryPhase === 'generating' && !finalAnswer ? (
                 searchProgress ? (
                   // 統合回答生成中の検索進捗表示
@@ -435,6 +435,10 @@ export function CurrentTurnDisplay({
                 onStartDeepDive={(type, customPrompt) => onDeepDive(topic, finalAnswer, type, customPrompt)}
                 topic={topic}
               />
+            )}
+            {/* 全検索結果のインライン展開（統合完了後） */}
+            {finalAnswer && summaryPhase !== 'generating' && searchKeywords && searchKeywords.length > 0 && (
+              <SearchResultsAccordion searchKeywords={searchKeywords} />
             )}
             {/* フォローアップ質問候補 */}
             {finalAnswer && summaryPhase !== 'generating' && onFollowUp && (
