@@ -780,15 +780,15 @@ export function useDiscussion(): UseDiscussionReturn {
             }
           }
           // 最大件数に制限
-          summarySearchResults = summarySearchResults.slice(0, searchConfig.maxResults * 2); // 統合前は多めに
+          summarySearchResults = summarySearchResults.slice(0, searchConfig.maxResults);
           setCurrentSearchResults(summarySearchResults);
 
-          // 検索キーワード情報を追加（検索結果を含む）
+          // 検索キーワード情報を追加（検索結果を含む、最大件数に制限）
           summaryKeywordInfo = {
             timing: 'summary',
             keywords: searchKeywords,
             timestamp: new Date(),
-            results: summaryKeywordResults,
+            results: summaryKeywordResults.slice(0, searchConfig.maxResults),
           };
           setCurrentSearchKeywords(prev => [...prev, summaryKeywordInfo!]);
         } catch (err) {
