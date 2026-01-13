@@ -23,6 +23,7 @@ import {
   ExtendDiscussionConfig,
   StartMarker,
   ExtensionMarker,
+  formatTopicForDisplay,
 } from '@/types';
 import {
   getAllSessions,
@@ -1461,7 +1462,7 @@ export function useDiscussion(): UseDiscussionReturn {
       // 再開情報をログ出力
       console.log('[resumeDiscussion] Resuming discussion:', {
         sessionId: interruptedState.sessionId,
-        topic: interruptedState.topic,
+        topic: formatTopicForDisplay(interruptedState.topic, 100),
         currentRound: interruptedState.currentRound,
         totalRounds: interruptedState.totalRounds,
         currentParticipantIndex: interruptedState.currentParticipantIndex,

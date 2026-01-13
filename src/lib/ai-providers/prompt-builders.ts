@@ -11,6 +11,7 @@ import {
   FollowUpQuestion,
   FollowUpCategory,
   MessageVote,
+  parseStructuredTopic,
 } from '@/types';
 import {
   formatSearchResults,
@@ -141,6 +142,10 @@ function createFinalSummaryPrompt(
   userProfileContext: string,
   messageVotes?: MessageVote[]
 ): string {
+  // 構造化トピックを解析（本題維持の指示にはユーザーの質問部分のみ使用）
+  const structured = parseStructuredTopic(topic);
+  const focusPoint = structured.question;
+
   const allResponses = previousMessages
     .map((m) => {
       const roleLabel = m.role ? `（${m.role}）` : '';
@@ -168,7 +173,7 @@ ${votesContext}
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
 - 検索結果がある場合は、最新の情報を考慮して回答してください
 - ユーザーの投票がある場合は、同意された意見を重視してください
-- 【重要】元のトピック「${topic}」に対する回答であることを確認し、本題から逸れた内容は除外してください
+- 【重要】元のトピック「${focusPoint}」に対する回答であることを確認し、本題から逸れた内容は除外してください
 - 統合回答は日本語で記述してください`;
 }
 
@@ -187,6 +192,10 @@ function createFirstRoundPrompt(
   userProfileContext: string,
   wordCountInstruction: string
 ): string {
+  // 構造化トピックを解析（本題維持の指示にはユーザーの質問部分のみ使用）
+  const structured = parseStructuredTopic(topic);
+  const focusPoint = structured.question;
+
   return `あなたは議論に参加するAIアシスタントです。以下のトピックについて、あなたの見解を述べてください。
 ${discussionModePrompt}${depthPrompt}${directionGuidePrompt}${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
 【今回の議論のトピック】
@@ -197,7 +206,7 @@ ${topic}
 - 具体例があれば挙げてください
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
 - 検索結果がある場合は、最新の情報を参考にして回答してください
-- 【重要】常に元のトピック「${topic}」に立ち返り、本題から逸れないようにしてください
+- 【重要】常に元のトピック「${focusPoint}」に立ち返り、本題から逸れないようにしてください
 - 枝葉末節や各論に流されず、トピックの本質的な問いに答えることを優先してください
 - 回答は日本語で、簡潔にまとめてください（${wordCountInstruction}）`;
 }
@@ -218,6 +227,10 @@ function createSubsequentRoundPrompt(
   userProfileContext: string,
   wordCountInstruction: string
 ): string {
+  // 構造化トピックを解析（本題維持の指示にはユーザーの質問部分のみ使用）
+  const structured = parseStructuredTopic(topic);
+  const focusPoint = structured.question;
+
   const previousResponses = previousMessages
     .map((m) => {
       const roleLabel = m.role ? `（${m.role}）` : '';
@@ -241,7 +254,7 @@ ${previousResponses}
 - 建設的な議論を心がけてください
 - 過去の議論がある場合は、その文脈を踏まえて回答してください
 - 検索結果がある場合は、最新の情報を参考にして回答してください
-- 【重要】常に元のトピック「${topic}」に立ち返り、本題から逸れないようにしてください
+- 【重要】常に元のトピック「${focusPoint}」に立ち返り、本題から逸れないようにしてください
 - 枝葉末節や各論に流されず、トピックの本質的な問いに答えることを優先してください
 - 回答は日本語で、簡潔にまとめてください（${wordCountInstruction}）`;
 }

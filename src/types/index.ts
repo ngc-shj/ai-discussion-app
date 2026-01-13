@@ -8,6 +8,8 @@ export { ROLE_PRESETS, generateParticipantId, generateCustomRoleId, isCustomRole
 
 // Message types
 export type {
+  AttachedContent,
+  StructuredTopic,
   SummaryPhase,
   DiscussionMessage,
   PreviousTurnSummary,
@@ -21,6 +23,7 @@ export type {
   StartMarker,
   ExtensionMarker,
 } from './message';
+export { parseStructuredTopic, formatStructuredTopic, formatTopicForDisplay } from './message';
 
 // Session types
 export type { TurnBranch, DiscussionSession } from './session';

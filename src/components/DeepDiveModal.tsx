@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { DeepDiveType, DEEP_DIVE_PRESETS } from '@/types';
+import { DeepDiveType, DEEP_DIVE_PRESETS, formatTopicForDisplay } from '@/types';
 
 interface DeepDiveModalProps {
   isOpen: boolean;
@@ -64,7 +64,7 @@ export function DeepDiveModal({ isOpen, onClose, onStartDeepDive, topic }: DeepD
           {/* Topic Preview */}
           <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700">
             <div className="text-xs text-gray-500 mb-1">現在のトピック</div>
-            <div className="text-sm text-gray-300 line-clamp-2">{topic}</div>
+            <div className="text-sm text-gray-300 line-clamp-2">{formatTopicForDisplay(topic, 200)}</div>
           </div>
 
           {/* Preset Selection */}
