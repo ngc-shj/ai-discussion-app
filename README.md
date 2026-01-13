@@ -25,8 +25,11 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 - **Integrated Answer Generation**: Automatically generates an answer integrating all opinions after the discussion
 - **Real-time Streaming**: Display each AI's response in real-time
 - **Web Search Integration**: Search for the latest information using multiple providers (Tavily, SearXNG, DuckDuckGo, Brave, Serper) and reflect it in the discussion
+- **Relevance Filtering**: AI-powered filtering to exclude low-relevance search results
+- **Topic Focus Maintenance**: Keeps discussions on track by maintaining focus on the main topic
 - **Progress Visualization**: Visual display of selected models and their execution status (pending/active/completed)
 - **Session Management**: Save discussion history to IndexedDB, manage multiple sessions
+- **Model Search Filter**: Filter models by name within each provider for quick selection
 - **Responsive Design**: UI compatible with both PC and mobile devices
 
 ### Discussion Modes
@@ -44,7 +47,7 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 - **User Profile**: Configure technical level, response style, and interests
 - **Custom Roles**: Define custom roles with personalized prompts for participants
 - **Discussion Depth**: 5 levels from overview to thorough analysis
-- **Direction Guide**: Guide discussions with keywords and additional instructions
+- **Direction Guide**: Guide discussions with keywords, focus areas, and topics to avoid
 
 ### Advanced Features
 
@@ -54,7 +57,7 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 - **Discussion Extension**: Extend completed discussions with additional rounds and modified settings
 - **Message Voting**: Rate individual messages in discussions
 - **Interrupted Discussion Recovery**: Resume discussions that were interrupted
-- **Termination Conditions**: End discussions by rounds, consensus detection, or manually
+- **Termination Conditions**: End discussions by rounds, consensus detection, or keyword triggers
 
 ## Supported AI Providers
 
