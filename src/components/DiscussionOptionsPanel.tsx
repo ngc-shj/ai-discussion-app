@@ -28,6 +28,7 @@ interface SearchProviderInfo {
 
 interface DiscussionOptionsPanelProps {
   disabled?: boolean;
+  onClose?: () => void;
   // Search
   searchConfig: SearchConfig;
   onSearchConfigChange: (config: SearchConfig) => void;
@@ -56,6 +57,7 @@ interface DiscussionOptionsPanelProps {
 
 export function DiscussionOptionsPanel({
   disabled,
+  onClose,
   searchConfig,
   onSearchConfigChange,
   discussionMode,
@@ -91,9 +93,9 @@ export function DiscussionOptionsPanel({
     terminationConfig.condition !== 'rounds';
 
   return (
-    <div className="mt-2">
+    <div>
       {/* タブヘッダー */}
-      <div className="flex border-b border-gray-700 mb-3">
+      <div className="flex items-center border-b border-gray-700 mb-3">
         <button
           type="button"
           onClick={() => setActiveTab('search')}
@@ -124,6 +126,19 @@ export function DiscussionOptionsPanel({
           議論設定
           {hasDiscussionCustom && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
         </button>
+        {/* 閉じるボタン */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="ml-auto p-1 text-gray-500 hover:text-gray-300 transition-colors"
+            aria-label="議論オプションを閉じる"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* タブコンテンツ - 高さ固定でスクロール、両方レンダリングしてhiddenで切り替え（カクカク防止） */}

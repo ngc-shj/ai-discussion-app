@@ -128,9 +128,10 @@ export function InputForm({
 
         {/* 展開時の設定パネル */}
         {isModeExpanded && (
-          <div>
+          <div className="mt-2 p-3 bg-gray-900 rounded-lg border border-gray-600">
           <DiscussionOptionsPanel
             disabled={disabled}
+            onClose={() => setIsModeExpanded(false)}
             searchConfig={searchConfig}
             onSearchConfigChange={onSearchConfigChange}
             discussionMode={discussionMode}
