@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
 import { AIProviderType, ModelInfo, getLocalModelColor } from '@/types';
 import { ModelFilterType } from '@/hooks/useAISelector';
 
@@ -37,58 +38,165 @@ export function ProviderSection({
   onAddParticipant,
   getParticipantCount,
 }: ProviderSectionProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // 検索モードに入ったらinputにフォーカス
+  useEffect(() => {
+    if (isSearchMode && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchMode]);
+
+  // 折りたたみ時に検索モードをリセット
+  useEffect(() => {
+    if (!isExpanded) {
+      setIsSearchMode(false);
+      setSearchQuery('');
+    }
+  }, [isExpanded]);
+
+  // 検索クエリでフィルタリング
+  const searchFilteredModels = searchQuery
+    ? filteredModels.filter((model) =>
+        model.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : filteredModels;
+
+  const handleHeaderClick = () => {
+    if (!isAvailable) return;
+
+    if (!isExpanded) {
+      // 閉じている場合は開く
+      onToggleExpanded();
+    } else {
+      // 開いている場合は検索モードに切り替え
+      setIsSearchMode(true);
+    }
+  };
+
+  const handleSearchBlur = () => {
+    // 検索クエリが空なら検索モードを終了
+    if (!searchQuery) {
+      setIsSearchMode(false);
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setSearchQuery('');
+      setIsSearchMode(false);
+    }
+  };
+
   return (
     <div
       className={`rounded-lg bg-gray-800 overflow-hidden ${
         !isAvailable ? 'opacity-50' : ''
       }`}
     >
-      {/* プロバイダーヘッダー（クリックで折りたたみ） */}
-      <button
-        type="button"
-        onClick={() => isAvailable && onToggleExpanded()}
-        disabled={!isAvailable}
+      {/* プロバイダーヘッダー */}
+      <div
         className={`w-full flex items-center gap-2 p-3 ${
           isAvailable ? 'hover:bg-gray-700/50 cursor-pointer' : 'cursor-not-allowed'
         } transition-colors`}
+        onClick={handleHeaderClick}
       >
         {/* 折りたたみ矢印 */}
-        <svg
-          className={`w-4 h-4 text-gray-400 transition-transform ${
-            isExpanded ? 'rotate-90' : ''
-          }`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (isAvailable) {
+              onToggleExpanded();
+              if (isExpanded) {
+                setIsSearchMode(false);
+                setSearchQuery('');
+              }
+            }
+          }}
+          disabled={!isAvailable}
+          className="p-0 bg-transparent border-none"
+          title={isExpanded ? '折りたたむ' : '展開する'}
+          aria-label={isExpanded ? '折りたたむ' : '展開する'}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${
+              isExpanded ? 'rotate-90' : ''
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+
         <div
           className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold"
           style={{ backgroundColor: provider.color }}
         >
           {provider.name.charAt(0)}
         </div>
-        <span className="text-gray-200 font-medium">{provider.name}</span>
-        {selectedCount > 0 && (
+
+        {/* 検索モード時は検索入力を表示 */}
+        {isSearchMode ? (
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onBlur={handleSearchBlur}
+            onKeyDown={handleSearchKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            placeholder={`${provider.name}のモデルを検索...`}
+            className="flex-1 bg-gray-700 text-gray-200 text-sm px-2 py-1 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+          />
+        ) : (
+          <span className="text-gray-200 font-medium">{provider.name}</span>
+        )}
+
+        {selectedCount > 0 && !isSearchMode && (
           <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded-full">
             {selectedCount}
           </span>
         )}
-        <span className="ml-auto text-xs text-gray-500">
-          {allModels.length}モデル
-        </span>
+
+        {!isSearchMode && (
+          <span className="ml-auto text-xs text-gray-500">
+            {allModels.length}モデル
+          </span>
+        )}
+
+        {isSearchMode && searchQuery && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSearchQuery('');
+              searchInputRef.current?.focus();
+            }}
+            className="p-1 text-gray-400 hover:text-gray-200"
+            title="クリア"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+
         {!isAvailable && (
           <span className="text-xs text-red-400">利用不可</span>
         )}
-      </button>
+      </div>
 
       {/* モデル一覧（折りたたみ可能） */}
       {isAvailable && isExpanded && (
         <div className="px-3 pb-3 space-y-1 ml-6 max-h-48 overflow-y-auto">
-          {filteredModels.length > 0 ? (
+          {searchFilteredModels.length > 0 ? (
             <>
-              {filteredModels.map((model) => {
+              {searchFilteredModels.map((model) => {
                 const modelColor = provider.isLocal ? getLocalModelColor(model.id) : provider.color;
                 const displayName = model.name;
                 const count = getParticipantCount(model.id);
@@ -123,12 +231,21 @@ export function ProviderSection({
                   </div>
                 );
               })}
-              {modelFilter !== 'all' && allModels.length > filteredModels.length && (
+              {searchQuery && searchFilteredModels.length < filteredModels.length && (
+                <div className="text-xs text-gray-500 pl-2 pt-1">
+                  {searchFilteredModels.length}/{filteredModels.length} 件表示
+                </div>
+              )}
+              {!searchQuery && modelFilter !== 'all' && allModels.length > filteredModels.length && (
                 <div className="text-xs text-gray-500 pl-2 pt-1">
                   他 {allModels.length - filteredModels.length} モデル（「すべて」で表示）
                 </div>
               )}
             </>
+          ) : searchQuery ? (
+            <div className="text-xs text-gray-400 p-2">
+              「{searchQuery}」に一致するモデルがありません
+            </div>
           ) : (
             <div className="text-xs text-gray-400 flex items-center gap-2 p-2">
               <div className="animate-spin w-3 h-3 border-2 border-gray-500 border-t-gray-300 rounded-full" />
