@@ -85,7 +85,7 @@ export function ProviderSection({
 
       {/* モデル一覧（折りたたみ可能） */}
       {isAvailable && isExpanded && (
-        <div className="px-3 pb-3 space-y-1 ml-6">
+        <div className="px-3 pb-3 space-y-1 ml-6 max-h-48 overflow-y-auto">
           {filteredModels.length > 0 ? (
             <>
               {filteredModels.map((model) => {
