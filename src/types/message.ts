@@ -71,6 +71,9 @@ export function formatStructuredTopic(structured: StructuredTopic): string {
     : pastedParts;
 }
 
+// ログ出力用のトピック最大長
+export const LOG_TOPIC_MAX_LENGTH = 200;
+
 // トピックを表示用にフォーマット（添付コンテンツを省略）
 export function formatTopicForDisplay(topic: string, maxLength: number = 100): string {
   const structured = parseStructuredTopic(topic);
