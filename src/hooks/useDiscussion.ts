@@ -11,8 +11,8 @@ import {
   SearchWarning,
   MessageVote,
   FollowUpQuestion,
-  InterruptedDiscussionState,
-  InterruptedTurnState,
+  InterruptedDiscussionSnapshot,
+  InterruptedTurnSnapshot,
   UserProfile,
   DiscussionMode,
   DiscussionDepth,
@@ -39,7 +39,7 @@ import {
   getPreviousTurns,
 } from '@/lib/sse-utils';
 
-export interface DiscussionProgress {
+export interface DiscussionUiProgress {
   currentRound: number;
   totalRounds: number;
   currentParticipantIndex: number;
@@ -70,7 +70,7 @@ export interface UseDiscussionState {
   isGeneratingFollowUps: boolean;
   isProcessing: boolean;
   summaryState: SummaryState;
-  discussionProgress: DiscussionProgress;
+  discussionProgress: DiscussionUiProgress;
   searchProgress: SearchProgress | null;
   completedParticipants: Set<string>;
   suggestedFollowUps: FollowUpQuestion[];
@@ -136,12 +136,12 @@ export interface StartDiscussionParams {
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
-  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  setInterruptedState: (state: InterruptedDiscussionSnapshot | null) => void;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
 }
 
 export interface ResumeDiscussionParams {
-  interruptedState: InterruptedDiscussionState;
+  interruptedState: InterruptedDiscussionSnapshot;
   restoreFromSession: (session: {
     participants: DiscussionParticipant[];
     discussionMode?: DiscussionMode;
@@ -153,7 +153,7 @@ export interface ResumeDiscussionParams {
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
-  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  setInterruptedState: (state: InterruptedDiscussionSnapshot | null) => void;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
 }
 
@@ -165,7 +165,7 @@ export interface GenerateSummaryParams {
   directionGuide: DirectionGuide;
   searchConfig: SearchConfig;
   currentSessionRef: React.RefObject<DiscussionSession | null>;
-  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  setInterruptedState: (state: InterruptedDiscussionSnapshot | null) => void;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
 }
 
@@ -187,11 +187,11 @@ export interface ExtendDiscussionParams {
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
-  setInterruptedState: (state: InterruptedDiscussionState | null) => void;
+  setInterruptedState: (state: InterruptedDiscussionSnapshot | null) => void;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
 }
 
-const INITIAL_PROGRESS: DiscussionProgress = {
+const INITIAL_PROGRESS: DiscussionUiProgress = {
   currentRound: 0,
   totalRounds: 0,
   currentParticipantIndex: 0,
@@ -262,7 +262,7 @@ interface CreateSSEHandlersParams {
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
   setCurrentSession?: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
-  setDiscussionProgress: React.Dispatch<React.SetStateAction<DiscussionProgress>>;
+  setDiscussionUiProgress: React.Dispatch<React.SetStateAction<DiscussionUiProgress>>;
   setCurrentMessages: React.Dispatch<React.SetStateAction<DiscussionMessage[]>>;
   setCompletedParticipants: React.Dispatch<React.SetStateAction<Set<string>>>;
   setCurrentFinalAnswer: React.Dispatch<React.SetStateAction<string>>;
@@ -281,7 +281,7 @@ interface CreateSSEHandlersParams {
   collectedFinalAnswerRef: { current: string };
   collectedSummaryPromptRef: { current: string };
   collectedSearchKeywordsRef?: { current: SearchKeywordInfo[] };
-  currentDiscussionProgressRef: { current: { currentRound: number; currentParticipantIndex: number } };
+  currentDiscussionUiProgressRef: { current: { currentRound: number; currentParticipantIndex: number } };
   includeReadyForSummary?: boolean;
 }
 
@@ -291,7 +291,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     currentSessionRef,
     setSessions,
     setCurrentSession,
-    setDiscussionProgress,
+    setDiscussionUiProgress,
     setCurrentMessages,
     setCompletedParticipants,
     setCurrentFinalAnswer,
@@ -309,17 +309,17 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     collectedFinalAnswerRef,
     collectedSummaryPromptRef,
     collectedSearchKeywordsRef,
-    currentDiscussionProgressRef,
+    currentDiscussionUiProgressRef,
     includeReadyForSummary = false,
   } = params;
 
   return {
     onProgress: (progressData) => {
-      currentDiscussionProgressRef.current = {
+      currentDiscussionUiProgressRef.current = {
         currentRound: progressData.currentRound,
         currentParticipantIndex: progressData.currentParticipantIndex,
       };
-      setDiscussionProgress({
+      setDiscussionUiProgress({
         currentRound: progressData.currentRound,
         totalRounds: progressData.totalRounds,
         currentParticipantIndex: progressData.currentParticipantIndex,
@@ -338,8 +338,8 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       });
       // 自動保存
       // 次に発言すべきAIの位置を計算
-      const currentRound = currentDiscussionProgressRef.current.currentRound;
-      const currentPIndex = currentDiscussionProgressRef.current.currentParticipantIndex;
+      const currentRound = currentDiscussionUiProgressRef.current.currentRound;
+      const currentPIndex = currentDiscussionUiProgressRef.current.currentParticipantIndex;
       const totalParticipants = context.participants.length;
 
       // 次の位置を計算（ラウンド内で最後の参加者なら次のラウンドへ）
@@ -366,7 +366,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
           ? searchKeywordsForSave[0].keywords.length - 1  // 議論中なので検索は完了している
           : undefined;
 
-        const interruptedTurn: InterruptedTurnState = {
+        const interruptedTurn: InterruptedTurnSnapshot = {
           topic: context.topic,
           participants: context.participants,
           messages: collectedMessagesRef.current,
@@ -401,7 +401,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     },
     onMessageChunk: (messageId, _chunk, accumulatedContent, provider, model, round) => {
       // 現在の参加者IDを取得
-      const currentParticipantIndex = currentDiscussionProgressRef.current.currentParticipantIndex;
+      const currentParticipantIndex = currentDiscussionUiProgressRef.current.currentParticipantIndex;
       const currentParticipant = context.participants[currentParticipantIndex];
       const participantId = currentParticipant?.id || '';
 
@@ -439,12 +439,12 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
               ? searchKeywordsForAwait[0].keywords.length - 1
               : undefined;
 
-            const interruptedTurn: InterruptedTurnState = {
+            const interruptedTurn: InterruptedTurnSnapshot = {
               topic: context.topic,
               participants: context.participants,
               messages: collectedMessagesRef.current,
-              currentRound: currentDiscussionProgressRef.current.currentRound,
-              currentParticipantIndex: currentDiscussionProgressRef.current.currentParticipantIndex,
+              currentRound: currentDiscussionUiProgressRef.current.currentRound,
+              currentParticipantIndex: currentDiscussionUiProgressRef.current.currentParticipantIndex,
               totalRounds: context.totalRounds,
               searchResults: context.searchResults,
               searchKeywords: searchKeywordsForAwait,
@@ -551,7 +551,7 @@ export function useDiscussion(): UseDiscussionReturn {
   const [searchProgress, setSearchProgress] = useState<SearchProgress | null>(null);
   const [isGeneratingFollowUps, setIsGeneratingFollowUps] = useState(false);
   const [summaryState, setSummaryState] = useState<SummaryState>('idle');
-  const [discussionProgress, setDiscussionProgress] = useState<DiscussionProgress>(INITIAL_PROGRESS);
+  const [discussionProgress, setDiscussionUiProgress] = useState<DiscussionUiProgress>(INITIAL_PROGRESS);
   const [completedParticipants, setCompletedParticipants] = useState<Set<string>>(new Set());
   const [suggestedFollowUps, setSuggestedFollowUps] = useState<FollowUpQuestion[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -629,7 +629,7 @@ export function useDiscussion(): UseDiscussionReturn {
     setIsDiscussing(false);
     setIsGeneratingFollowUps(false);
     setSummaryState('idle');
-    setDiscussionProgress(INITIAL_PROGRESS);
+    setDiscussionUiProgress(INITIAL_PROGRESS);
     setCompletedParticipants(new Set());
     setSearchProgress(null);
     // フォローアップ・投票
@@ -1038,7 +1038,7 @@ export function useDiscussion(): UseDiscussionReturn {
       interruptRequestedRef.current = false;
       // AbortControllerを初期化
       abortControllerRef.current = new AbortController();
-      setDiscussionProgress({
+      setDiscussionUiProgress({
         currentRound: 1,
         totalRounds: terminationConfig.maxRounds,
         currentParticipantIndex: 0,
@@ -1211,7 +1211,7 @@ export function useDiscussion(): UseDiscussionReturn {
             // 中断された場合：検索進捗を保存してセッションに記録
             const latestSession = currentSessionRef.current || sessionAtStart;
             if (latestSession && collectedSearchKeywords.length > 0) {
-              const interruptedTurn: InterruptedTurnState = {
+              const interruptedTurn: InterruptedTurnSnapshot = {
                 topic,
                 participants,
                 messages: [],
@@ -1260,7 +1260,7 @@ export function useDiscussion(): UseDiscussionReturn {
       const collectedFinalAnswerRef = { current: '' };
       const collectedSummaryPromptRef = { current: '' };
       const collectedSearchKeywordsRef = { current: collectedSearchKeywords };
-      const currentDiscussionProgressRef = { current: { currentRound: 1, currentParticipantIndex: 0 } };
+      const currentDiscussionUiProgressRef = { current: { currentRound: 1, currentParticipantIndex: 0 } };
 
       // 開始マーカーを作成（context用）
       const turnStartMarker: StartMarker = {
@@ -1317,7 +1317,7 @@ export function useDiscussion(): UseDiscussionReturn {
           currentSessionRef,
           setSessions,
           setCurrentSession,
-          setDiscussionProgress,
+          setDiscussionUiProgress,
           setCurrentMessages,
           setCompletedParticipants,
           setCurrentFinalAnswer,
@@ -1335,7 +1335,7 @@ export function useDiscussion(): UseDiscussionReturn {
           collectedFinalAnswerRef,
           collectedSummaryPromptRef,
           collectedSearchKeywordsRef,
-          currentDiscussionProgressRef,
+          currentDiscussionUiProgressRef,
           includeReadyForSummary: true,
         });
 
@@ -1365,8 +1365,8 @@ export function useDiscussion(): UseDiscussionReturn {
             topic,
             participants,
             messages: collectedMessagesRef.current,
-            currentRound: currentDiscussionProgressRef.current.currentRound,
-            currentParticipantIndex: currentDiscussionProgressRef.current.currentParticipantIndex,
+            currentRound: currentDiscussionUiProgressRef.current.currentRound,
+            currentParticipantIndex: currentDiscussionUiProgressRef.current.currentParticipantIndex,
             totalRounds: terminationConfig.maxRounds,
             searchResults: searchResults.length > 0 ? searchResults : undefined,
             searchKeywords: searchKeywordsForInterrupted.length > 0 ? searchKeywordsForInterrupted : undefined,
@@ -1500,7 +1500,7 @@ export function useDiscussion(): UseDiscussionReturn {
       // AbortControllerを初期化
       abortControllerRef.current = new AbortController();
       setCompletedParticipants(new Set());
-      setDiscussionProgress({
+      setDiscussionUiProgress({
         currentRound: interruptedState.currentRound,
         totalRounds: interruptedState.totalRounds,
         currentParticipantIndex: interruptedState.currentParticipantIndex,
@@ -1707,7 +1707,7 @@ export function useDiscussion(): UseDiscussionReturn {
             // 中断された場合：検索進捗を保存してセッションに記録
             const latestSession = currentSessionRef.current;
             if (latestSession && collectedSearchKeywords.length > 0) {
-              const interruptedTurn: InterruptedTurnState = {
+              const interruptedTurn: InterruptedTurnSnapshot = {
                 topic: interruptedState.topic,
                 participants: interruptedState.participants,
                 messages: interruptedState.messages,
@@ -1758,7 +1758,7 @@ export function useDiscussion(): UseDiscussionReturn {
       const collectedFinalAnswerRef = { current: '' };
       const collectedSummaryPromptRef = { current: '' };
       const collectedSearchKeywordsRef = { current: collectedSearchKeywords };
-      const currentDiscussionProgressRef = {
+      const currentDiscussionUiProgressRef = {
         current: {
           currentRound: interruptedState.currentRound,
           currentParticipantIndex: interruptedState.currentParticipantIndex,
@@ -1816,7 +1816,7 @@ export function useDiscussion(): UseDiscussionReturn {
           currentSessionRef,
           setSessions,
           setCurrentSession,
-          setDiscussionProgress,
+          setDiscussionUiProgress,
           setCurrentMessages,
           setCompletedParticipants,
           setCurrentFinalAnswer,
@@ -1834,7 +1834,7 @@ export function useDiscussion(): UseDiscussionReturn {
           collectedFinalAnswerRef,
           collectedSummaryPromptRef,
           collectedSearchKeywordsRef,
-          currentDiscussionProgressRef,
+          currentDiscussionUiProgressRef,
           includeReadyForSummary: true,
         });
 
@@ -1850,8 +1850,8 @@ export function useDiscussion(): UseDiscussionReturn {
             topic: interruptedState.topic,
             participants: interruptedState.participants,
             messages: collectedMessagesRef.current,
-            currentRound: currentDiscussionProgressRef.current.currentRound,
-            currentParticipantIndex: currentDiscussionProgressRef.current.currentParticipantIndex,
+            currentRound: currentDiscussionUiProgressRef.current.currentRound,
+            currentParticipantIndex: currentDiscussionUiProgressRef.current.currentParticipantIndex,
             totalRounds: interruptedState.totalRounds,
             searchResults: interruptedState.searchResults,
             searchKeywords: collectedSearchKeywordsRef.current.length > 0 ? collectedSearchKeywordsRef.current : undefined,
@@ -2019,7 +2019,7 @@ export function useDiscussion(): UseDiscussionReturn {
         updateAndSaveSession,
       } = params;
 
-      // 現在の状態から延長用のInterruptedTurnStateを構築
+      // 現在の状態から延長用のInterruptedTurnSnapshotを構築
       const currentSession = currentSessionRef.current;
       if (!currentSession) {
         setError('セッションが見つかりません');
@@ -2081,12 +2081,12 @@ export function useDiscussion(): UseDiscussionReturn {
       // 延長マーカーリストを更新
       const updatedExtensionMarkers = [...extensionMarkers, newMarker];
 
-      // InterruptedDiscussionStateを作成（マーカーを含める）
+      // InterruptedDiscussionSnapshotを作成（マーカーを含める）
       // 検索キーワードがある場合、全て完了しているとみなす（延長時点では検索済み）
       const completedKeywordIndexForExtend = currentSearchKeywords.length > 0 && currentSearchKeywords[0].keywords.length > 0
         ? currentSearchKeywords[0].keywords.length - 1
         : undefined;
-      const interruptedState: InterruptedDiscussionState = {
+      const interruptedState: InterruptedDiscussionSnapshot = {
         sessionId: currentSession.id,
         topic: currentTopic,
         participants,

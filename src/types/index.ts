@@ -14,10 +14,10 @@ export type {
   DiscussionRequest,
   SearchBasedDiscussionRequest,
   DiscussionTurn,
-  InterruptedTurnState,
+  InterruptedTurnSnapshot,
   MessageVote,
   MessageRating,
-  InterruptedDiscussionState,
+  InterruptedDiscussionSnapshot,
   StartMarker,
   ExtensionMarker,
 } from './message';

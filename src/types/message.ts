@@ -69,10 +69,10 @@ export interface DiscussionTurn {
 
 // 中断された議論の進行状態（セッション内保存用）
 // 注意: フィールドを追加・変更した場合、以下も合わせて更新すること:
-//   - InterruptedDiscussionState（同ファイル内）
+//   - InterruptedDiscussionSnapshot（同ファイル内）
 //   - useSessionManager.ts の selectSession と初期ロード処理
 //   - session-storage.ts の serializeSession / deserializeSession
-export interface InterruptedTurnState {
+export interface InterruptedTurnSnapshot {
   topic: string;
   participants: DiscussionParticipant[]; // 中断時の参加者（セッションの参加者と同期するために保存）
   messages: DiscussionMessage[];
@@ -112,10 +112,10 @@ export interface MessageRating {
 
 // 中断された議論の状態
 // 注意: フィールドを追加・変更した場合、以下も合わせて更新すること:
-//   - InterruptedTurnState（同ファイル内）
+//   - InterruptedTurnSnapshot（同ファイル内）
 //   - useSessionManager.ts の selectSession と初期ロード処理
 //   - session-storage.ts の serializeInterruptedState / deserializeInterruptedState
-export interface InterruptedDiscussionState {
+export interface InterruptedDiscussionSnapshot {
   sessionId: string;
   topic: string;
   participants: DiscussionParticipant[];

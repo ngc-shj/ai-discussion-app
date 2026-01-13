@@ -1,4 +1,4 @@
-import { DiscussionSession, DiscussionTurn, SearchResult, SearchKeywordInfo, InterruptedDiscussionState, DiscussionMessage, StartMarker, ExtensionMarker } from '@/types';
+import { DiscussionSession, DiscussionTurn, SearchResult, SearchKeywordInfo, InterruptedDiscussionSnapshot, DiscussionMessage, StartMarker, ExtensionMarker } from '@/types';
 
 const DB_NAME = 'ai-discussion-db';
 const DB_VERSION = 1;
@@ -294,7 +294,7 @@ export function createNewTurn(
 const INTERRUPTED_STORAGE_KEY = 'ai-discussion-interrupted';
 
 // 中断状態をシリアライズ（Date型を文字列に変換）
-function serializeInterruptedState(state: InterruptedDiscussionState): Record<string, unknown> {
+function serializeInterruptedState(state: InterruptedDiscussionSnapshot): Record<string, unknown> {
   return {
     ...state,
     interruptedAt: toISOString(state.interruptedAt),
@@ -315,7 +315,7 @@ function serializeInterruptedState(state: InterruptedDiscussionState): Record<st
 }
 
 // 中断状態をデシリアライズ（文字列をDate型に変換）
-function deserializeInterruptedState(data: Record<string, unknown>): InterruptedDiscussionState {
+function deserializeInterruptedState(data: Record<string, unknown>): InterruptedDiscussionSnapshot {
   const startMarkerData = data.startMarker as Record<string, unknown> | undefined;
   const extensionMarkersData = data.extensionMarkers as Array<Record<string, unknown>> | undefined;
 
@@ -335,11 +335,11 @@ function deserializeInterruptedState(data: Record<string, unknown>): Interrupted
       ...marker,
       timestamp: new Date(marker.timestamp as string),
     })),
-  } as InterruptedDiscussionState;
+  } as InterruptedDiscussionSnapshot;
 }
 
 // 中断された議論状態を保存
-export function saveInterruptedState(state: InterruptedDiscussionState): void {
+export function saveInterruptedState(state: InterruptedDiscussionSnapshot): void {
   try {
     const serialized = serializeInterruptedState(state);
     localStorage.setItem(INTERRUPTED_STORAGE_KEY, JSON.stringify(serialized));
@@ -349,7 +349,7 @@ export function saveInterruptedState(state: InterruptedDiscussionState): void {
 }
 
 // 中断された議論状態を取得
-export function getInterruptedState(): InterruptedDiscussionState | null {
+export function getInterruptedState(): InterruptedDiscussionSnapshot | null {
   try {
     const saved = localStorage.getItem(INTERRUPTED_STORAGE_KEY);
     if (saved) {
