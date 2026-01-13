@@ -22,6 +22,7 @@ import {
   getDepthPrompt,
   formatDirectionGuide,
   formatMessageVotes,
+  formatDiscussionHistoryXml,
 } from './prompt-formatters';
 
 // 過去のターンの要約
@@ -146,12 +147,8 @@ function createFinalSummaryPrompt(
   const structured = parseStructuredTopic(topic);
   const focusPoint = structured.question;
 
-  const allResponses = previousMessages
-    .map((m) => {
-      const roleLabel = m.role ? `（${m.role}）` : '';
-      return `【${m.provider}${roleLabel}の意見】\n${m.content}`;
-    })
-    .join('\n\n');
+  // XML形式で議論履歴をフォーマット
+  const discussionHistoryXml = formatDiscussionHistoryXml(previousMessages, topic);
 
   // ユーザー投票情報を取得
   const votesContext = formatMessageVotes(messageVotes, previousMessages);
@@ -162,8 +159,9 @@ ${discussionModePrompt}${depthPrompt}${directionGuidePrompt}${userProfileContext
 【今回の議論のトピック】
 ${topic}
 
-【各AIの意見】
-${allResponses}
+【各AIの意見（XML形式）】
+以下の議論履歴はXML形式で構造化されています。各<message>要素には話者（speaker）、役割（role）などの属性が含まれています。
+${discussionHistoryXml}
 ${votesContext}
 【指示】
 - 各AIの意見の良い点を取り入れてください
@@ -231,23 +229,20 @@ function createSubsequentRoundPrompt(
   const structured = parseStructuredTopic(topic);
   const focusPoint = structured.question;
 
-  const previousResponses = previousMessages
-    .map((m) => {
-      const roleLabel = m.role ? `（${m.role}）` : '';
-      return `【${m.provider}${roleLabel}】: ${m.content}`;
-    })
-    .join('\n\n');
+  // XML形式で議論履歴をフォーマット
+  const discussionHistoryXml = formatDiscussionHistoryXml(previousMessages, topic);
 
   return `あなたは議論に参加するAIアシスタントです。以下のトピックについて議論が進行中です。
 ${discussionModePrompt}${depthPrompt}${directionGuidePrompt}${rolePrompt}${participantsContext}${userProfileContext}${previousContext}${searchContext}
 【今回の議論のトピック】
 ${topic}
 
-【これまでの議論】
-${previousResponses}
+【これまでの議論（XML形式）】
+以下の議論履歴はXML形式で構造化されています。各<message>要素には話者（speaker）、役割（role）などの属性が含まれています。
+${discussionHistoryXml}
 
 【指示】
-- 上記「これまでの議論」に登場した参加者の意見を参照する際は、名前を挙げてコメントしてください（例: 「〇〇さんの意見に同意しますが...」）
+- 上記の議論履歴に登場した参加者の意見を参照する際は、名前を挙げてコメントしてください（例: 「〇〇さんの意見に同意しますが...」）
 - 発言していない参加者には言及しないでください
 - 同意する点、異なる視点、追加すべき観点などを明確にしてください
 - 特に議論を深めたい相手がいれば、その人に向けて質問や意見を述べてください

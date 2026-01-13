@@ -13,6 +13,7 @@ import {
   DirectionGuide,
   MessageVote,
   isCustomRoleId,
+  parseStructuredTopic,
 } from '@/types';
 
 // 全文コンテンツの最大文字数（1件あたり）
@@ -287,6 +288,59 @@ export function formatMessageVotes(
   }
 
   return `\n${lines.join('\n')}\n\n※ユーザーの投票を考慮して、同意された意見を重視し、反対された意見については批判的に検討してください。中立の意見は参考程度に扱ってください。\n`;
+}
+
+/**
+ * XML形式で議論履歴をフォーマット
+ * LLMにとってより構造化された形式で議論の文脈を伝える
+ */
+export function formatDiscussionHistoryXml(
+  messages: Array<{ provider: string; content: string; role?: string; round?: number }>,
+  topic: string
+): string {
+  if (!messages || messages.length === 0) {
+    return '';
+  }
+
+  // トピックから添付コンテンツを除いた質問部分のみを抽出
+  const structured = parseStructuredTopic(topic);
+  const topicForAttr = structured.question;
+
+  const messagesXml = messages
+    .map((m, index) => {
+      const roleAttr = m.role ? ` role="${escapeXmlAttr(m.role)}"` : '';
+      const roundAttr = m.round ? ` round="${m.round}"` : '';
+      return `  <message index="${index + 1}" speaker="${escapeXmlAttr(m.provider)}"${roleAttr}${roundAttr}>
+${escapeXmlContent(m.content)}
+  </message>`;
+    })
+    .join('\n');
+
+  return `<discussion-history topic="${escapeXmlAttr(topicForAttr)}" message_count="${messages.length}">
+${messagesXml}
+</discussion-history>`;
+}
+
+/**
+ * XML属性値をエスケープ
+ */
+function escapeXmlAttr(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * XMLコンテンツをエスケープ
+ */
+function escapeXmlContent(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 /**
