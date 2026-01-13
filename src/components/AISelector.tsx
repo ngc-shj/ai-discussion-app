@@ -147,7 +147,7 @@ export function AISelector({
         </label>
       </div>
 
-      <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+      <div className="space-y-2">
         {DEFAULT_PROVIDERS.map((provider) => {
           const isAvailable = availability[provider.id];
           const allModels = availableModels[provider.id] || [];
