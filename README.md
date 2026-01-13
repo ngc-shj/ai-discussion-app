@@ -24,6 +24,7 @@ A Web UI application where multiple AIs (Claude, Ollama, OpenAI, Gemini) discuss
 - **Round-Robin Format**: Each AI speaks in turn for the specified number of rounds
 - **Integrated Answer Generation**: Automatically generates an answer integrating all opinions after the discussion
 - **Real-time Streaming**: Display each AI's response in real-time
+- **Text File Attachment**: Attach text files or paste long content as reference material for discussions
 - **Web Search Integration**: Search for the latest information using multiple providers (Tavily, SearXNG, DuckDuckGo, Brave, Serper) and reflect it in the discussion
 - **Relevance Filtering**: AI-powered filtering to exclude low-relevance search results
 - **Topic Focus Maintenance**: Keeps discussions on track by maintaining focus on the main topic

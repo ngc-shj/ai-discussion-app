@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, SearchUiProgress, MessageVote, FollowUpQuestion, DeepDiveType, SummaryPhase, formatParticipantDisplayName, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, SearchResult, SearchKeywordInfo, SearchUiProgress, MessageVote, FollowUpQuestion, DeepDiveType, SummaryPhase, formatParticipantDisplayName, ExtendDiscussionConfig, DiscussionMode, DiscussionDepth, StartMarker, ExtensionMarker, parseStructuredTopic } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FollowUpSuggestions } from './FollowUpSuggestions';
@@ -11,6 +11,7 @@ import { CounterargumentButton } from './CounterargumentButton';
 import { MessageList } from './MessageList';
 import { SearchKeywordItem } from './SearchKeywordItem';
 import { SearchResultsAccordion } from './SearchResultsAccordion';
+import { AttachedTextChip } from './AttachedTextChip';
 
 interface CurrentTurnDisplayProps {
   topic: string;
@@ -129,7 +130,32 @@ export function CurrentTurnDisplay({
             <span className="font-semibold text-blue-400 text-sm md:text-base">あなた</span>
           </div>
           <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-2 md:p-3 text-gray-200 text-sm md:text-base">
-            <div className="whitespace-pre-wrap">{topic}</div>
+            {(() => {
+              const structured = parseStructuredTopic(topic);
+              const hasAttached = structured.attachedContents && structured.attachedContents.length > 0;
+              return (
+                <>
+                  {/* 質問部分 */}
+                  {structured.question && structured.question !== '（貼り付けコンテンツの分析）' && (
+                    <div className="whitespace-pre-wrap">{structured.question}</div>
+                  )}
+                  {/* 添付コンテンツ（AttachedTextChip形式） */}
+                  {hasAttached && (
+                    <div className={`flex flex-wrap gap-2 ${structured.question && structured.question !== '（貼り付けコンテンツの分析）' ? 'mt-2' : ''}`}>
+                      {structured.attachedContents!.map((item, index) => (
+                        <AttachedTextChip
+                          key={index}
+                          text={item.content}
+                          source={item.fileName ? 'file' : 'pasted'}
+                          fileName={item.fileName}
+                          readOnly
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>

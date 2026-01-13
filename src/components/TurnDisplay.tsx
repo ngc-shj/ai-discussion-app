@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { DiscussionTurn, MessageVote, DeepDiveType } from '@/types';
+import { DiscussionTurn, MessageVote, DeepDiveType, parseStructuredTopic } from '@/types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { FollowUpSuggestions } from './FollowUpSuggestions';
 import { DeepDiveModal } from './DeepDiveModal';
@@ -11,6 +11,7 @@ import { ForkModal } from './ForkModal';
 import { MessageList } from './MessageList';
 import { SearchKeywordItem } from './SearchKeywordItem';
 import { SearchResultsAccordion } from './SearchResultsAccordion';
+import { AttachedTextChip } from './AttachedTextChip';
 
 interface TurnDisplayProps {
   turn: DiscussionTurn;
@@ -87,7 +88,32 @@ export function TurnDisplay({
             <span className="font-semibold text-blue-400 text-sm md:text-base">あなた</span>
           </div>
           <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-2 md:p-3 text-gray-200 text-sm md:text-base">
-            <div className="whitespace-pre-wrap">{turn.topic}</div>
+            {(() => {
+              const structured = parseStructuredTopic(turn.topic);
+              const hasAttached = structured.attachedContents && structured.attachedContents.length > 0;
+              return (
+                <>
+                  {/* 質問部分 */}
+                  {structured.question && structured.question !== '（貼り付けコンテンツの分析）' && (
+                    <div className="whitespace-pre-wrap">{structured.question}</div>
+                  )}
+                  {/* 添付コンテンツ（AttachedTextChip形式） */}
+                  {hasAttached && (
+                    <div className={`flex flex-wrap gap-2 ${structured.question && structured.question !== '（貼り付けコンテンツの分析）' ? 'mt-2' : ''}`}>
+                      {structured.attachedContents!.map((item, index) => (
+                        <AttachedTextChip
+                          key={index}
+                          text={item.content}
+                          source={item.fileName ? 'file' : 'pasted'}
+                          fileName={item.fileName}
+                          readOnly
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>

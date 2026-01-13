@@ -3,6 +3,101 @@ import { DiscussionParticipant } from './participant';
 import { SearchResult, SearchKeywordInfo, SearchConfig, UserProfile, DiscussionMode, DiscussionDepth, DirectionGuide, TerminationConfig } from './config';
 import { FollowUpQuestion } from './followup';
 
+// 添付コンテンツ（ファイルまたは貼り付け）
+export interface AttachedContent {
+  content: string;
+  fileName?: string;  // ファイル名（ファイル添付の場合のみ）
+}
+
+// 構造化トピック（貼り付けコンテンツとユーザーの質問を分離）
+export interface StructuredTopic {
+  pastedContents?: string[];  // 貼り付けられたコンテンツ（複数可）- 後方互換性のため維持
+  attachedContents?: AttachedContent[];  // 添付コンテンツ（ファイル名情報付き）
+  question: string;           // ユーザーの質問/コメント
+}
+
+// トピック文字列から構造化トピックを抽出
+export function parseStructuredTopic(topic: string): StructuredTopic {
+  const attachedContents: AttachedContent[] = [];
+
+  // attached-fileタグを抽出（ファイル名付き）
+  const attachedFileRegex = /<attached-file\s+name="([^"]+)">([\s\S]*?)<\/attached-file>/g;
+  let match;
+  while ((match = attachedFileRegex.exec(topic)) !== null) {
+    attachedContents.push({
+      content: match[2].trim(),
+      fileName: match[1],
+    });
+  }
+
+  // pasted-contentタグを抽出
+  const pastedContentRegex = /<pasted-content[^>]*>([\s\S]*?)<\/pasted-content>/g;
+  while ((match = pastedContentRegex.exec(topic)) !== null) {
+    attachedContents.push({
+      content: match[1].trim(),
+    });
+  }
+
+  // タグを除去した残りがユーザーの質問
+  let question = topic
+    .replace(attachedFileRegex, '')
+    .replace(pastedContentRegex, '')
+    .trim();
+
+  // 後方互換性のためpastedContentsも設定
+  const pastedContents = attachedContents.map(a => a.content);
+
+  return {
+    pastedContents: pastedContents.length > 0 ? pastedContents : undefined,
+    attachedContents: attachedContents.length > 0 ? attachedContents : undefined,
+    question: question || '（貼り付けコンテンツの分析）',
+  };
+}
+
+// 構造化トピックをフォーマット（プロンプト用）
+export function formatStructuredTopic(structured: StructuredTopic): string {
+  if (!structured.pastedContents || structured.pastedContents.length === 0) {
+    return structured.question;
+  }
+  const pastedParts = structured.pastedContents.map((content, index) => {
+    if (structured.pastedContents!.length === 1) {
+      return `<pasted-content>\n${content}\n</pasted-content>`;
+    }
+    return `<pasted-content id="${index + 1}">\n${content}\n</pasted-content>`;
+  }).join('\n\n');
+  // 質問を先に、添付コンテンツを後に配置
+  return structured.question
+    ? `${structured.question}\n\n${pastedParts}`
+    : pastedParts;
+}
+
+// UI表示用のトピック最大長
+export const UI_TOPIC_MAX_LENGTH = 100;
+
+// ログ出力用のトピック最大長
+export const LOG_TOPIC_MAX_LENGTH = 200;
+
+// トピックを表示用にフォーマット（添付コンテンツを省略）
+export function formatTopicForDisplay(topic: string, maxLength: number = UI_TOPIC_MAX_LENGTH): string {
+  const structured = parseStructuredTopic(topic);
+  const question = structured.question;
+  const hasPasted = structured.pastedContents && structured.pastedContents.length > 0;
+
+  let displayText = question;
+  if (hasPasted) {
+    const count = structured.pastedContents!.length;
+    const suffix = count === 1 ? '（添付コンテンツあり）' : `（添付コンテンツ${count}件）`;
+    displayText = question !== '（貼り付けコンテンツの分析）'
+      ? `${question} ${suffix}`
+      : suffix;
+  }
+
+  if (displayText.length > maxLength) {
+    return displayText.slice(0, maxLength) + '...';
+  }
+  return displayText;
+}
+
 // 統合回答のフェーズ
 export type SummaryPhase =
   | 'idle'           // 通常状態（議論中または議論前）
