@@ -1,4 +1,4 @@
-import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile, SearchResult, SearchConfig, formatParticipantDisplayName } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, TerminationConfig, ROLE_PRESETS, UserProfile, SearchResult, SearchConfig, formatParticipantDisplayName, formatTopicForDisplay } from '@/types';
 import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from '../ai-providers';
 import { createSearchKeywordPrompt, SearchKeywordTiming } from '../ai-providers/prompt-formatters';
 import { DiscussionSSEEvent, DiscussionRequest, getProviderDisplayName } from './types';
@@ -96,7 +96,7 @@ async function generateSearchKeywords(
     const keywords = parseKeywordsResponse(response.content);
     return keywords.length > 0 ? keywords : [topic];
   } catch (error) {
-    log.error('Failed to generate search keywords', error, { topic, timing });
+    log.error('Failed to generate search keywords', error, { topic: formatTopicForDisplay(topic, 200), timing });
     return [topic]; // フォールバック
   }
 }
@@ -125,7 +125,7 @@ export async function* runDiscussion(
   } = request;
 
   const startTime = Date.now();
-  log.info('Discussion started', { topic, participantCount: participants.length, rounds, resumeFrom: !!resumeFrom });
+  log.info('Discussion started', { topic: formatTopicForDisplay(topic, 200), participantCount: participants.length, rounds, resumeFrom: !!resumeFrom });
 
   // 検索結果を動的に更新できるように変数化
   let currentSearchResults: SearchResult[] = initialSearchResults ? [...initialSearchResults] : [];
@@ -446,7 +446,7 @@ export async function* runDiscussion(
   // skipSummaryがtrueの場合、統合回答生成をスキップ
   if (skipSummary) {
     const duration = Date.now() - startTime;
-    log.info('Discussion completed (skip summary)', { topic, messageCount: messages.length, duration });
+    log.info('Discussion completed (skip summary)', { topic: formatTopicForDisplay(topic, 200), messageCount: messages.length, duration });
     yield {
       type: 'ready_for_summary',
       messages: messages,
@@ -461,7 +461,7 @@ export async function* runDiscussion(
   yield* generateSummary(messages, participants, topic, rounds, turnContext, currentSearchResults.length > 0 ? currentSearchResults : undefined, userProfile, discussionMode, discussionDepth, directionGuide, messageVotes);
 
   const duration = Date.now() - startTime;
-  log.info('Discussion completed', { topic, messageCount: messages.length, duration });
+  log.info('Discussion completed', { topic: formatTopicForDisplay(topic, 200), messageCount: messages.length, duration });
 }
 
 /**
