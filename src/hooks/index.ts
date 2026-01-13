@@ -1,8 +1,8 @@
 export { useLocalStorage, useLocalStorageString } from './useLocalStorage';
 export { useDiscussionSettings } from './useDiscussionSettings';
-export type { DiscussionSettingsState, DiscussionSettingsActions } from './useDiscussionSettings';
+export type { UseDiscussionSettingsState, UseDiscussionSettingsActions } from './useDiscussionSettings';
 export { useSessionManager } from './useSessionManager';
-export type { SessionManagerState, SessionManagerActions } from './useSessionManager';
+export type { UseSessionManagerState, UseSessionManagerActions } from './useSessionManager';
 export { useDiscussion } from './useDiscussion';
 export type { UseDiscussionState, UseDiscussionActions, UseDiscussionReturn, DiscussionProgress, StreamingMessage, ExtendDiscussionParams } from './useDiscussion';
 export { useInputForm } from './useInputForm';
@@ -11,4 +11,4 @@ export { useCustomRoles } from './useCustomRoles';
 export { usePresetManager } from './usePresetManager';
 export type { UsePresetManagerReturn } from './usePresetManager';
 export { useElapsedTime } from './useElapsedTime';
-export type { ElapsedTimeState } from './useElapsedTime';
+export type { UseElapsedTimeState } from './useElapsedTime';

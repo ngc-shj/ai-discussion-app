@@ -52,7 +52,7 @@ const DEFAULT_SEARCH_CONFIG: SearchConfig = {
   fullContentMaxResults: 3,
 };
 
-export interface DiscussionSettingsState {
+export interface UseDiscussionSettingsState {
   participants: DiscussionParticipant[];
   availableModels: Record<AIProviderType, ModelInfo[]>;
   availability: Record<AIProviderType, boolean>;
@@ -64,7 +64,7 @@ export interface DiscussionSettingsState {
   terminationConfig: TerminationConfig;
 }
 
-export interface DiscussionSettingsActions {
+export interface UseDiscussionSettingsActions {
   setParticipants: (participants: DiscussionParticipant[]) => void;
   setSearchConfig: (config: SearchConfig) => void;
   setUserProfile: (profile: UserProfile) => void;
@@ -83,7 +83,7 @@ export interface DiscussionSettingsActions {
   }) => void;
 }
 
-export function useDiscussionSettings(): DiscussionSettingsState & DiscussionSettingsActions {
+export function useDiscussionSettings(): UseDiscussionSettingsState & UseDiscussionSettingsActions {
   // 設定状態
   const [participants, setParticipantsState] = useState<DiscussionParticipant[]>([]);
   const [availableModels, setAvailableModels] = useState<Record<AIProviderType, ModelInfo[]>>({

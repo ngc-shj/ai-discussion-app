@@ -17,7 +17,7 @@ import {
   saveInterruptedState,
 } from '@/lib/session-storage';
 
-export interface SessionManagerState {
+export interface UseSessionManagerState {
   sessions: DiscussionSession[];
   currentSession: DiscussionSession | null;
   interruptedState: InterruptedDiscussionState | null;
@@ -25,7 +25,7 @@ export interface SessionManagerState {
   isInitialLoadComplete: boolean;
 }
 
-export interface SessionManagerActions {
+export interface UseSessionManagerActions {
   // Low-level setters (for direct state manipulation in handlers)
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
   setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
@@ -43,7 +43,7 @@ export interface SessionManagerActions {
   discardInterrupted: () => void;
 }
 
-export function useSessionManager(): SessionManagerState & SessionManagerActions {
+export function useSessionManager(): UseSessionManagerState & UseSessionManagerActions {
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
   const [currentSession, setCurrentSession] = useState<DiscussionSession | null>(null);
   const [interruptedState, setInterruptedStateInternal] = useState<InterruptedDiscussionState | null>(null);
