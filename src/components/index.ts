@@ -20,3 +20,5 @@ export { ForkButton } from './ForkButton';
 export { ForkModal } from './ForkModal';
 export { PresetButton } from './PresetButton';
 export { PresetManagerModal } from './PresetManagerModal';
+export { SettingsContent } from './SettingsContent';
+export type { SettingsTab } from './SettingsContent';

@@ -11,13 +11,14 @@ import {
 import {
   DiscussionPanel,
   SettingsPanel,
+  SettingsContent,
   InputForm,
   ProgressIndicator,
   SessionSidebar,
   MobileHeader,
   PresetManagerModal,
 } from '@/components';
-import { useDiscussionSettings, useSessionManager, useDiscussion, usePresetManager } from '@/hooks';
+import { useDiscussionSettings, useSessionManager, useDiscussion, usePresetManager, useApiKeys } from '@/hooks';
 
 export default function Home() {
   // 設定関連（カスタムフックを使用）
@@ -105,12 +106,22 @@ export default function Home() {
     validatePreset,
   } = usePresetManager();
 
+  // APIキー管理
+  const {
+    apiKeys,
+    setApiKey,
+    saveApiKeys,
+    hasUnsavedChanges: hasUnsavedApiKeyChanges,
+  } = useApiKeys();
+
   // サイドバー・設定パネルの開閉状態
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   // PC用サイドバー折りたたみ状態
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsCollapsed, setIsSettingsCollapsed] = useState(false);
+  // 設定モード（右パネルの表示切り替え）
+  const [isSettingsMode, setIsSettingsMode] = useState(false);
   // フォローアップ用のプリセットトピック
   const [presetTopic, setPresetTopic] = useState<string>('');
   // プリセットモーダルの開閉状態
@@ -539,6 +550,7 @@ export default function Home() {
             onRenameSession={handleRenameSession}
             disabled={isSessionSelectionDisabled}
             onCollapse={() => setIsSidebarCollapsed(true)}
+            onOpenSettings={() => setIsSettingsMode(true)}
           />
         </div>
       )}
@@ -562,6 +574,10 @@ export default function Home() {
           disabled={isSessionSelectionDisabled}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
+          onOpenSettings={() => {
+            setIsSidebarOpen(false);
+            setIsSettingsMode(true);
+          }}
         />
       </div>
 
@@ -759,9 +775,60 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 参加者パネル - デスクトップ */}
+      {/* 右パネル - デスクトップ */}
       {!isSettingsCollapsed && (
-        <div className="hidden md:block">
+        <div className="hidden md:block w-80">
+          {isSettingsMode ? (
+            <SettingsContent
+              apiKeys={apiKeys}
+              onApiKeyChange={setApiKey}
+              onSaveApiKeys={saveApiKeys}
+              hasUnsavedChanges={hasUnsavedApiKeyChanges}
+              userProfile={userProfile}
+              onProfileChange={setUserProfile}
+              onBack={() => setIsSettingsMode(false)}
+              disabled={isSettingsDisabled}
+            />
+          ) : (
+            <SettingsPanel
+              participants={participants}
+              onParticipantsChange={setParticipants}
+              availableModels={availableModels}
+              availability={availability}
+              userProfile={userProfile}
+              onUserProfileChange={setUserProfile}
+              disabled={isSettingsDisabled}
+            />
+          )}
+        </div>
+      )}
+
+      {/* モバイル用パネル（オーバーレイ）- md以下でのみ表示 */}
+      <div className="md:hidden">
+        {isSettingsMode ? (
+          <div className={`fixed inset-0 z-50 ${isSettingsOpen ? '' : 'pointer-events-none'}`}>
+            {isSettingsOpen && (
+              <>
+                <div className="absolute inset-0 bg-black/50" onClick={() => setIsSettingsOpen(false)} />
+                <div className="absolute right-0 top-0 bottom-0 w-80 bg-gray-900">
+                  <SettingsContent
+                    apiKeys={apiKeys}
+                    onApiKeyChange={setApiKey}
+                    onSaveApiKeys={saveApiKeys}
+                    hasUnsavedChanges={hasUnsavedApiKeyChanges}
+                    userProfile={userProfile}
+                    onProfileChange={setUserProfile}
+                    onBack={() => {
+                      setIsSettingsMode(false);
+                      setIsSettingsOpen(false);
+                    }}
+                    disabled={isSettingsDisabled}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
           <SettingsPanel
             participants={participants}
             onParticipantsChange={setParticipants}
@@ -770,23 +837,10 @@ export default function Home() {
             userProfile={userProfile}
             onUserProfileChange={setUserProfile}
             disabled={isSettingsDisabled}
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
           />
-        </div>
-      )}
-
-      {/* モバイル用参加者パネル（オーバーレイ）- md以下でのみ表示 */}
-      <div className="md:hidden">
-        <SettingsPanel
-          participants={participants}
-          onParticipantsChange={setParticipants}
-          availableModels={availableModels}
-          availability={availability}
-          userProfile={userProfile}
-          onUserProfileChange={setUserProfile}
-          disabled={isSettingsDisabled}
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-        />
+        )}
       </div>
 
       {/* プリセット管理モーダル */}
