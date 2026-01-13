@@ -56,7 +56,8 @@ export interface StreamingMessage {
   round: number;
 }
 
-export interface DiscussionState {
+/** useDiscussion フックが提供する状態 */
+export interface UseDiscussionState {
   currentMessages: DiscussionMessage[];
   currentFinalAnswer: string;
   currentSummaryPrompt: string;
@@ -100,7 +101,8 @@ export interface RestoreDiscussionStateParams {
   terminationConfig?: TerminationConfig;
 }
 
-export interface DiscussionActions {
+/** useDiscussion フックが提供するアクション */
+export interface UseDiscussionActions {
   setCurrentMessages: (updater: DiscussionMessage[] | ((prev: DiscussionMessage[]) => DiscussionMessage[])) => void;
   setCurrentFinalAnswer: (updater: string | ((prev: string) => string)) => void;
   setCurrentTopic: (updater: string | ((prev: string) => string)) => void;
@@ -118,6 +120,9 @@ export interface DiscussionActions {
   generateSummary: (params: GenerateSummaryParams) => Promise<void>;
   generateFollowUps: (params: GenerateFollowUpsParams) => Promise<void>;
 }
+
+/** useDiscussion フックの戻り値 */
+export type UseDiscussionReturn = UseDiscussionState & UseDiscussionActions;
 
 export interface StartDiscussionParams {
   topic: string;
@@ -535,7 +540,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
 // ============================================
 // useDiscussion フック
 // ============================================
-export function useDiscussion(): DiscussionState & DiscussionActions {
+export function useDiscussion(): UseDiscussionReturn {
   const [currentMessages, setCurrentMessages] = useState<DiscussionMessage[]>([]);
   // 統合回答データ（回答とプロンプト）- 統合
   const [summaryData, setSummaryData] = useState<SummaryData>(INITIAL_SUMMARY_DATA);
