@@ -715,6 +715,7 @@ export function useDiscussion(): UseDiscussionReturn {
 
       // beforeSummary検索
       let summarySearchResults = currentSearchResults;
+      let summaryKeywordInfo: SearchKeywordInfo | null = null; // 統合前検索のキーワード情報（後でターンに保存）
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
       if (searchConfig.enabled && timing.beforeSummary) {
         setSearchUiProgress({
@@ -750,15 +751,8 @@ export function useDiscussion(): UseDiscussionReturn {
             }
           }
 
-          // 検索キーワード情報を追加
-          const keywordInfo: SearchKeywordInfo = {
-            timing: 'summary',
-            keywords: searchKeywords,
-            timestamp: new Date(),
-          };
-          setCurrentSearchKeywords(prev => [...prev, keywordInfo]);
-
           // 生成されたキーワードで検索
+          const summaryKeywordResults: SearchResult[] = [];
           for (const keyword of searchKeywords) {
             const searchResponse = await fetch('/api/search', {
               method: 'POST',
@@ -782,11 +776,21 @@ export function useDiscussion(): UseDiscussionReturn {
               const existingUrls = new Set(summarySearchResults.map(r => r.url));
               const uniqueNewResults = newResults.filter((r: SearchResult) => !existingUrls.has(r.url));
               summarySearchResults = [...summarySearchResults, ...uniqueNewResults];
+              summaryKeywordResults.push(...newResults);
             }
           }
           // 最大件数に制限
           summarySearchResults = summarySearchResults.slice(0, searchConfig.maxResults * 2); // 統合前は多めに
           setCurrentSearchResults(summarySearchResults);
+
+          // 検索キーワード情報を追加（検索結果を含む）
+          summaryKeywordInfo = {
+            timing: 'summary',
+            keywords: searchKeywords,
+            timestamp: new Date(),
+            results: summaryKeywordResults,
+          };
+          setCurrentSearchKeywords(prev => [...prev, summaryKeywordInfo!]);
         } catch (err) {
           if (err instanceof Error && err.name === 'AbortError') {
             // 中断された場合は正常終了
@@ -880,6 +884,10 @@ export function useDiscussion(): UseDiscussionReturn {
         // 統合回答が生成されたらすぐにセッションに保存
         // これにより、フォローアップ生成中に中断/リロードしても統合回答は保持される
         if (collectedFinalAnswer) {
+          // 統合前検索キーワードを含む完全なキーワードリストを作成
+          const allSearchKeywords = summaryKeywordInfo
+            ? [...currentSearchKeywords, summaryKeywordInfo]
+            : currentSearchKeywords;
           const newTurn = createNewTurn(
             currentTopic,
             currentMessages,
@@ -889,7 +897,7 @@ export function useDiscussion(): UseDiscussionReturn {
             undefined, // フォローアップはまだない
             startMarker || undefined,
             extensionMarkers.length > 0 ? extensionMarkers : undefined,
-            currentSearchKeywords.length > 0 ? currentSearchKeywords : undefined
+            allSearchKeywords.length > 0 ? allSearchKeywords : undefined
           );
           const latestSession = currentSessionRef.current;
 
