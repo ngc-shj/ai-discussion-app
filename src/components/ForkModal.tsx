@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FORK_PRESETS, ForkPreset, formatTopicForDisplay } from '@/types';
+import { FORK_PRESETS, ForkPreset, formatTopicForDisplay, LOG_TOPIC_MAX_LENGTH } from '@/types';
 
 interface ForkModalProps {
   isOpen: boolean;
@@ -76,7 +76,7 @@ export function ForkModal({ isOpen, onClose, onCreateFork, topic }: ForkModalPro
           {/* Topic Preview */}
           <div className="bg-gray-900/50 rounded-lg p-3 border border-gray-700">
             <div className="text-xs text-gray-500 mb-1">分岐元のトピック</div>
-            <div className="text-sm text-gray-300 line-clamp-2">{formatTopicForDisplay(topic, 200)}</div>
+            <div className="text-sm text-gray-300 line-clamp-2">{formatTopicForDisplay(topic, LOG_TOPIC_MAX_LENGTH)}</div>
           </div>
 
           {/* Mode Toggle */}

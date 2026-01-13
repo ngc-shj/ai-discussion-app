@@ -24,6 +24,7 @@ import {
   StartMarker,
   ExtensionMarker,
   formatTopicForDisplay,
+  UI_TOPIC_MAX_LENGTH,
 } from '@/types';
 import {
   getAllSessions,
@@ -1462,7 +1463,7 @@ export function useDiscussion(): UseDiscussionReturn {
       // 再開情報をログ出力
       console.log('[resumeDiscussion] Resuming discussion:', {
         sessionId: interruptedState.sessionId,
-        topic: formatTopicForDisplay(interruptedState.topic, 100),
+        topic: formatTopicForDisplay(interruptedState.topic, UI_TOPIC_MAX_LENGTH),
         currentRound: interruptedState.currentRound,
         totalRounds: interruptedState.totalRounds,
         currentParticipantIndex: interruptedState.currentParticipantIndex,

@@ -23,7 +23,7 @@ export type {
   StartMarker,
   ExtensionMarker,
 } from './message';
-export { parseStructuredTopic, formatStructuredTopic, formatTopicForDisplay, LOG_TOPIC_MAX_LENGTH } from './message';
+export { parseStructuredTopic, formatStructuredTopic, formatTopicForDisplay, UI_TOPIC_MAX_LENGTH, LOG_TOPIC_MAX_LENGTH } from './message';
 
 // Session types
 export type { TurnBranch, DiscussionSession } from './session';

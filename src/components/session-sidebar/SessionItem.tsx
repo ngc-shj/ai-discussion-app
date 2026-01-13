@@ -1,6 +1,6 @@
 'use client';
 
-import { DiscussionSession, formatTopicForDisplay } from '@/types';
+import { DiscussionSession, formatTopicForDisplay, UI_TOPIC_MAX_LENGTH } from '@/types';
 import { formatDate } from '@/hooks/useSessionSidebar';
 
 interface SessionItemProps {
@@ -135,10 +135,10 @@ export function SessionItem({
                   }`}
                   title={
                     session.interruptedTurn.summaryPhase === 'generating'
-                      ? `統合中: ${formatTopicForDisplay(session.interruptedTurn.topic, 100)}`
+                      ? `統合中: ${formatTopicForDisplay(session.interruptedTurn.topic, UI_TOPIC_MAX_LENGTH)}`
                       : session.interruptedTurn.summaryPhase === 'awaiting'
-                        ? `投票待ち: ${formatTopicForDisplay(session.interruptedTurn.topic, 100)}`
-                        : `中断中: ${formatTopicForDisplay(session.interruptedTurn.topic, 100)}`
+                        ? `投票待ち: ${formatTopicForDisplay(session.interruptedTurn.topic, UI_TOPIC_MAX_LENGTH)}`
+                        : `中断中: ${formatTopicForDisplay(session.interruptedTurn.topic, UI_TOPIC_MAX_LENGTH)}`
                   }
                 >
                   {session.interruptedTurn.summaryPhase === 'generating'

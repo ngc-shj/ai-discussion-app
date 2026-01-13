@@ -71,11 +71,14 @@ export function formatStructuredTopic(structured: StructuredTopic): string {
     : pastedParts;
 }
 
+// UI表示用のトピック最大長
+export const UI_TOPIC_MAX_LENGTH = 100;
+
 // ログ出力用のトピック最大長
 export const LOG_TOPIC_MAX_LENGTH = 200;
 
 // トピックを表示用にフォーマット（添付コンテンツを省略）
-export function formatTopicForDisplay(topic: string, maxLength: number = 100): string {
+export function formatTopicForDisplay(topic: string, maxLength: number = UI_TOPIC_MAX_LENGTH): string {
   const structured = parseStructuredTopic(topic);
   const question = structured.question;
   const hasPasted = structured.pastedContents && structured.pastedContents.length > 0;
