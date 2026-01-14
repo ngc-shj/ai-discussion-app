@@ -23,8 +23,6 @@ import {
   ExtendDiscussionConfig,
   StartMarker,
   ExtensionMarker,
-  formatTopicForDisplay,
-  UI_TOPIC_MAX_LENGTH,
 } from '@/types';
 import {
   getAllSessions,
@@ -270,6 +268,7 @@ interface DiscussionContext {
   totalRounds: number;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
+  searchConfig?: SearchConfig;
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
   discussionDepth?: DiscussionDepth;
@@ -307,6 +306,8 @@ interface CreateSSEHandlersParams {
   collectedSummaryPromptRef: { current: string };
   collectedSearchKeywordsRef?: { current: SearchKeywordInfo[] };
   currentDiscussionUiProgressRef: { current: { currentRound: number; currentParticipantIndex: number } };
+  lastSearchTimingRef?: { current: 'start' | 'round' | 'summary' | undefined };
+  lastSearchRoundRef?: { current: number | undefined };
   includeReadyForSummary?: boolean;
 }
 
@@ -335,6 +336,8 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
     collectedSummaryPromptRef,
     collectedSearchKeywordsRef,
     currentDiscussionUiProgressRef,
+    lastSearchTimingRef,
+    lastSearchRoundRef,
     includeReadyForSummary = false,
   } = params;
 
@@ -383,6 +386,14 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
         }
       }
 
+      // 次の位置をrefに反映（中断時の状態保存に使用）
+      if (!isAllComplete) {
+        currentDiscussionUiProgressRef.current = {
+          currentRound: nextRound,
+          currentParticipantIndex: nextParticipantIndex,
+        };
+      }
+
       const latestSession = currentSessionRef.current;
       if (latestSession) {
         // 検索キーワードと完了インデックスを決定
@@ -390,6 +401,9 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
         const completedKeywordIndexForSave = searchKeywordsForSave && searchKeywordsForSave.length > 0 && searchKeywordsForSave[0].keywords.length > 0
           ? searchKeywordsForSave[0].keywords.length - 1  // 議論中なので検索は完了している
           : undefined;
+
+        // 既存のsearchConfigを保持（メッセージ完了後もeachRound検索設定を維持）
+        const existingSearchConfig = latestSession.interruptedTurn?.searchConfig;
 
         const interruptedTurn: InterruptedTurnSnapshot = {
           topic: context.topic,
@@ -401,6 +415,8 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
           searchResults: context.searchResults,
           searchKeywords: searchKeywordsForSave,
           completedSearchKeywordIndex: completedKeywordIndexForSave,
+          searchConfig: existingSearchConfig, // 検索設定を保持
+          // searchTimingは設定しない（メッセージ完了時点で検索フェーズは終了）
           userProfile: context.userProfile,
           discussionMode: context.discussionMode,
           discussionDepth: context.discussionDepth,
@@ -506,7 +522,7 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       // startDiscussionの場合: onReadyForSummaryで'awaiting'に設定されるので、それを維持する
       // generateSummaryの場合: onSummaryで'idle'に設定されるので、ここでは不要
     },
-    onSearching: () => {
+    onSearching: (_searchResults, searchTiming, searchRound) => {
       // 検索開始時はキーワード生成中フェーズとして表示
       setSearchUiProgress?.({
         phase: 'keywords',
@@ -514,6 +530,84 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
         totalKeywords: 0,
         completedKeywords: [],
       });
+      // 検索タイミングを記録（中断時の状態保存用）
+      if (lastSearchTimingRef && searchTiming) {
+        lastSearchTimingRef.current = searchTiming;
+      }
+      // ラウンド検索の場合、ラウンド番号も記録（progressイベントより先に来るため）
+      // 注: 参加者インデックスは更新しない（既存の発言済み参加者を保持するため）
+      if (searchTiming === 'round' && searchRound !== undefined) {
+        if (lastSearchRoundRef) {
+          lastSearchRoundRef.current = searchRound;
+        }
+        currentDiscussionUiProgressRef.current.currentRound = searchRound;
+
+        // ラウンド検索開始時にセッションを即座に保存（中断→リロード対策）
+        const latestSession = currentSessionRef.current;
+        if (latestSession) {
+          // searchConfigはcontextから取得（既存のinterruptedTurnからはフォールバック）
+          const searchConfigToSave = context.searchConfig || latestSession.interruptedTurn?.searchConfig;
+          const interruptedTurn: InterruptedTurnSnapshot = {
+            topic: context.topic,
+            participants: context.participants,
+            messages: collectedMessagesRef.current,
+            currentRound: searchRound,
+            currentParticipantIndex: 0, // ラウンド検索中は参加者0から開始
+            totalRounds: context.totalRounds,
+            searchResults: context.searchResults,
+            searchKeywords: collectedSearchKeywordsRef?.current,
+            searchTiming: 'round',
+            searchConfig: searchConfigToSave, // 検索設定を保存
+            userProfile: context.userProfile,
+            discussionMode: context.discussionMode,
+            discussionDepth: context.discussionDepth,
+            directionGuide: context.directionGuide,
+            terminationConfig: context.terminationConfig,
+            interruptedAt: new Date(),
+            summaryPhase: 'idle',
+            startMarker: context.startMarker,
+            extensionMarkers: context.extensionMarkers,
+          };
+          const updatedSession: DiscussionSession = {
+            ...latestSession,
+            interruptedTurn,
+            updatedAt: new Date(),
+          };
+          // currentSessionRefを即座に更新（中断処理で最新状態を参照するため）
+          currentSessionRef.current = updatedSession;
+
+          // localStorageにも即座に保存（リロード対策 - IndexedDBは非同期のため完了前にリロードされる可能性がある）
+          const interruptedForStorage = createInterruptedState({
+            sessionId: latestSession.id,
+            topic: context.topic,
+            participants: context.participants,
+            messages: collectedMessagesRef.current,
+            currentRound: searchRound,
+            currentParticipantIndex: 0,
+            totalRounds: context.totalRounds,
+            searchResults: context.searchResults,
+            searchKeywords: collectedSearchKeywordsRef?.current,
+            searchTiming: 'round',
+            searchConfig: searchConfigToSave,
+            userProfile: context.userProfile,
+            discussionMode: context.discussionMode,
+            discussionDepth: context.discussionDepth,
+            directionGuide: context.directionGuide,
+            terminationConfig: context.terminationConfig,
+            startMarker: context.startMarker,
+            extensionMarkers: context.extensionMarkers,
+          });
+          saveInterruptedState(interruptedForStorage);
+
+          saveSession(updatedSession).catch((err) =>
+            console.error('Failed to save search state:', err)
+          );
+          setCurrentSession?.(updatedSession);
+          setSessions((prev) =>
+            prev.map((s) => (s.id === updatedSession.id ? updatedSession : s))
+          );
+        }
+      }
     },
     onSearchResults: (searchResults, searchResultsAccumulated) => {
       setSearchUiProgress?.(null);
@@ -534,6 +628,10 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       // refにも追加して、クロージャ内でも最新の値を参照できるようにする
       if (collectedSearchKeywordsRef) {
         collectedSearchKeywordsRef.current = [...collectedSearchKeywordsRef.current, searchKeywords];
+      }
+      // 最後に受信した検索タイミングを記録（中断時の状態保存用）
+      if (lastSearchTimingRef) {
+        lastSearchTimingRef.current = searchKeywords.timing;
       }
       // 検索進捗を更新（キーワードが確定したので検索フェーズへ）
       setSearchUiProgress?.({
@@ -805,6 +903,17 @@ export function useDiscussion(): UseDiscussionReturn {
           completedKeywords: [],
           warnings: [],
         });
+
+        // キーワード生成直後に検索キーワード情報を設定（検索結果はundefined、後で更新）
+        const earlyKeywordInfo: SearchKeywordInfo = {
+          timing,
+          round,
+          keywords: searchKeywords,
+          timestamp: new Date(),
+          prompt: keywordPrompt,
+          // results は undefined のまま（検索中は結果部分を表示しない）
+        };
+        setCurrentSearchKeywords(prev => [...prev, earlyKeywordInfo]);
       }
 
       // 警告を収集
@@ -909,7 +1018,20 @@ export function useDiscussion(): UseDiscussionReturn {
         resultsByUrl.set(r.url, r);
       }
       setCurrentSearchResults(Array.from(resultsByUrl.values()));
-      setCurrentSearchKeywords(prev => [...prev, keywordInfo]);
+      // キーワード情報の結果を更新（早期追加時は空だった）
+      // 復元時は既に結果がある場合もあるため、更新または追加
+      setCurrentSearchKeywords(prev => {
+        const existingIndex = prev.findIndex(kw => kw.timing === timing && kw.round === round);
+        if (existingIndex >= 0) {
+          // 既存のキーワード情報を更新
+          return prev.map((kw, i) =>
+            i === existingIndex ? { ...kw, results: searchResults } : kw
+          );
+        } else {
+          // 新規追加（復元時などで早期追加されていなかった場合）
+          return [...prev, keywordInfo];
+        }
+      });
 
       return {
         results: searchResults,
@@ -1314,6 +1436,10 @@ export function useDiscussion(): UseDiscussionReturn {
       const collectedSummaryPromptRef = { current: '' };
       const collectedSearchKeywordsRef = { current: collectedSearchKeywords };
       const currentDiscussionUiProgressRef = { current: { currentRound: 1, currentParticipantIndex: 0 } };
+      // 最後に受信した検索タイミングを追跡（中断時の状態保存用）
+      const lastSearchTimingRef = { current: undefined as 'start' | 'round' | 'summary' | undefined };
+      // 最後に受信した検索ラウンドを追跡（ラウンド検索中断時の状態保存用）
+      const lastSearchRoundRef = { current: undefined as number | undefined };
 
       // 開始マーカーを作成（context用）
       const turnStartMarker: StartMarker = {
@@ -1330,6 +1456,7 @@ export function useDiscussion(): UseDiscussionReturn {
         totalRounds: terminationConfig.maxRounds,
         searchResults: searchResults.length > 0 ? searchResults : undefined,
         searchKeywords: collectedSearchKeywords.length > 0 ? collectedSearchKeywords : undefined,
+        searchConfig,
         userProfile,
         discussionMode,
         discussionDepth,
@@ -1389,6 +1516,8 @@ export function useDiscussion(): UseDiscussionReturn {
           collectedSummaryPromptRef,
           collectedSearchKeywordsRef,
           currentDiscussionUiProgressRef,
+          lastSearchTimingRef,
+          lastSearchRoundRef,
           includeReadyForSummary: true,
         });
 
@@ -1413,17 +1542,36 @@ export function useDiscussion(): UseDiscussionReturn {
             ? searchKeywordsForInterrupted[0].keywords.length - 1  // 最後のキーワードまで完了
             : undefined;
 
+          // ラウンド検索中に中断した場合、正しいラウンド番号を取得
+          // 優先順位: lastSearchRoundRef > 検索キーワードのround > currentDiscussionUiProgressRef
+          let interruptedRound = currentDiscussionUiProgressRef.current.currentRound;
+          if (lastSearchTimingRef.current === 'round') {
+            // searchingイベントから直接取得したラウンド番号を優先
+            if (lastSearchRoundRef.current !== undefined) {
+              interruptedRound = lastSearchRoundRef.current;
+            } else {
+              // フォールバック: 検索キーワードから取得
+              const roundKeywords = collectedSearchKeywordsRef.current.filter(kw => kw.timing === 'round');
+              const lastRoundKeyword = roundKeywords.length > 0 ? roundKeywords[roundKeywords.length - 1] : undefined;
+              if (lastRoundKeyword?.round) {
+                interruptedRound = lastRoundKeyword.round;
+              }
+            }
+          }
+
           const interrupted = createInterruptedState({
             sessionId: sessionAtStart?.id || '',
             topic,
             participants,
             messages: collectedMessagesRef.current,
-            currentRound: currentDiscussionUiProgressRef.current.currentRound,
+            currentRound: interruptedRound,
+            // 参加者インデックスは実際の進捗を保存（検索再開はsearchTimingで判断）
             currentParticipantIndex: currentDiscussionUiProgressRef.current.currentParticipantIndex,
             totalRounds: terminationConfig.maxRounds,
             searchResults: searchResults.length > 0 ? searchResults : undefined,
             searchKeywords: searchKeywordsForInterrupted.length > 0 ? searchKeywordsForInterrupted : undefined,
             completedSearchKeywordIndex: completedKeywordIndexForInterrupted,
+            searchTiming: lastSearchTimingRef.current,
             searchConfig,
             userProfile,
             discussionMode,
@@ -1501,25 +1649,8 @@ export function useDiscussion(): UseDiscussionReturn {
         updateAndSaveSession,
       } = params;
 
-      // 再開情報をログ出力
-      console.log('[resumeDiscussion] Resuming discussion:', {
-        sessionId: interruptedState.sessionId,
-        topic: formatTopicForDisplay(interruptedState.topic, UI_TOPIC_MAX_LENGTH),
-        currentRound: interruptedState.currentRound,
-        totalRounds: interruptedState.totalRounds,
-        currentParticipantIndex: interruptedState.currentParticipantIndex,
-        totalParticipants: interruptedState.participants.length,
-        messagesCount: interruptedState.messages.length,
-        searchResultsCount: interruptedState.searchResults?.length || 0,
-        searchKeywordsCount: interruptedState.searchKeywords?.length || 0,
-        completedSearchKeywordIndex: interruptedState.completedSearchKeywordIndex ?? -1,
-        interruptedAt: interruptedState.interruptedAt,
-        summaryPhase: interruptedState.summaryPhase,
-      });
-
       // 統合回答待ち状態の場合は議論を再開せず、状態のみ復元
       if (interruptedState.summaryPhase === 'awaiting') {
-        console.log('[resumeDiscussion] Restoring to awaiting summary state');
         clearInterruptedState();
         setInterruptedState(null);
 
@@ -1734,6 +1865,10 @@ export function useDiscussion(): UseDiscussionReturn {
           currentParticipantIndex: interruptedState.currentParticipantIndex,
         },
       };
+      // 最後に受信した検索タイミングを追跡（中断時の状態保存用）
+      const lastSearchTimingRef = { current: interruptedState.searchTiming as 'start' | 'round' | 'summary' | undefined };
+      // 最後に受信した検索ラウンドを追跡（ラウンド検索中断時の状態保存用）
+      const lastSearchRoundRef = { current: interruptedState.currentRound as number | undefined };
 
       const context: DiscussionContext = {
         topic: interruptedState.topic,
@@ -1741,6 +1876,7 @@ export function useDiscussion(): UseDiscussionReturn {
         totalRounds: interruptedState.totalRounds,
         searchResults: searchResults.length > 0 ? searchResults : undefined,
         searchKeywords: collectedSearchKeywords.length > 0 ? collectedSearchKeywords : undefined,
+        searchConfig: interruptedState.searchConfig,
         userProfile: interruptedState.userProfile,
         discussionMode: interruptedState.discussionMode,
         discussionDepth: interruptedState.discussionDepth,
@@ -1751,6 +1887,12 @@ export function useDiscussion(): UseDiscussionReturn {
       };
 
       try {
+        console.log('[resumeDiscussion] Calling /api/discuss with resumeFrom:', {
+          currentRound: interruptedState.currentRound,
+          currentParticipantIndex: interruptedState.currentParticipantIndex,
+          searchTiming: interruptedState.searchTiming,
+          messagesCount: interruptedState.messages.length,
+        });
         const response = await fetch('/api/discuss', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1771,6 +1913,7 @@ export function useDiscussion(): UseDiscussionReturn {
               messages: interruptedState.messages,
               currentRound: interruptedState.currentRound,
               currentParticipantIndex: interruptedState.currentParticipantIndex,
+              searchTiming: interruptedState.searchTiming,
             },
             skipSummary: true,
           }),
@@ -1805,6 +1948,8 @@ export function useDiscussion(): UseDiscussionReturn {
           collectedSummaryPromptRef,
           collectedSearchKeywordsRef,
           currentDiscussionUiProgressRef,
+          lastSearchTimingRef,
+          lastSearchRoundRef,
           includeReadyForSummary: true,
         });
 
@@ -1815,16 +1960,44 @@ export function useDiscussion(): UseDiscussionReturn {
         );
 
         if (wasInterrupted) {
+          // ラウンド検索中に中断した場合、正しいラウンド番号を取得
+          // 優先順位: lastSearchRoundRef > 検索キーワードのround > currentDiscussionUiProgressRef
+          let interruptedRound = currentDiscussionUiProgressRef.current.currentRound;
+          console.log('[resumeDiscussion Interrupt] Initial state:', {
+            lastSearchTiming: lastSearchTimingRef.current,
+            lastSearchRound: lastSearchRoundRef.current,
+            currentRound: currentDiscussionUiProgressRef.current.currentRound,
+            currentParticipantIndex: currentDiscussionUiProgressRef.current.currentParticipantIndex,
+          });
+          if (lastSearchTimingRef.current === 'round') {
+            // searchingイベントから直接取得したラウンド番号を優先
+            if (lastSearchRoundRef.current !== undefined) {
+              interruptedRound = lastSearchRoundRef.current;
+              console.log('[resumeDiscussion Interrupt] Using lastSearchRoundRef:', interruptedRound);
+            } else {
+              // フォールバック: 最後のラウンド検索キーワードを取得
+              const roundKeywords = collectedSearchKeywordsRef.current.filter(kw => kw.timing === 'round');
+              const lastRoundKeyword = roundKeywords.length > 0 ? roundKeywords[roundKeywords.length - 1] : undefined;
+              if (lastRoundKeyword?.round) {
+                interruptedRound = lastRoundKeyword.round;
+                console.log('[resumeDiscussion Interrupt] Using roundKeyword round:', interruptedRound);
+              }
+            }
+          }
+          console.log('[resumeDiscussion Interrupt] Final interruptedRound:', interruptedRound);
+
           const newInterruptedState = createInterruptedState({
             sessionId: resumeSession?.id || '',
             topic: interruptedState.topic,
             participants: interruptedState.participants,
             messages: collectedMessagesRef.current,
-            currentRound: currentDiscussionUiProgressRef.current.currentRound,
+            currentRound: interruptedRound,
+            // 参加者インデックスは実際の進捗を保存（検索再開はsearchTimingで判断）
             currentParticipantIndex: currentDiscussionUiProgressRef.current.currentParticipantIndex,
             totalRounds: interruptedState.totalRounds,
             searchResults: interruptedState.searchResults,
             searchKeywords: collectedSearchKeywordsRef.current.length > 0 ? collectedSearchKeywordsRef.current : undefined,
+            searchTiming: lastSearchTimingRef.current,
             searchConfig: interruptedState.searchConfig,
             userProfile: interruptedState.userProfile,
             discussionMode: interruptedState.discussionMode,

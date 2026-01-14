@@ -68,17 +68,22 @@ function parseKeywordsResponse(content: string): string[] {
 /**
  * AIを使って検索キーワードを生成
  */
+interface GenerateSearchKeywordsResult {
+  keywords: string[];
+  prompt?: string;
+}
+
 async function generateSearchKeywords(
   topic: string,
   messages: DiscussionMessage[],
   timing: SearchKeywordTiming,
   participant: DiscussionParticipant
-): Promise<string[]> {
+): Promise<GenerateSearchKeywordsResult> {
   try {
     const provider = createProvider(participant.provider, participant.model);
     const isAvailable = await provider.isAvailable();
     if (!isAvailable) {
-      return [topic]; // フォールバック
+      return { keywords: [topic] }; // フォールバック
     }
 
     const messagesForPrompt = messages.map(m => ({
@@ -90,14 +95,17 @@ async function generateSearchKeywords(
     const response = await provider.generate({ prompt });
 
     if (response.error) {
-      return [topic]; // フォールバック
+      return { keywords: [topic], prompt }; // フォールバック
     }
 
     const keywords = parseKeywordsResponse(response.content);
-    return keywords.length > 0 ? keywords : [topic];
+    return {
+      keywords: keywords.length > 0 ? keywords : [topic],
+      prompt,
+    };
   } catch (error) {
     log.error('Failed to generate search keywords', error, { topic: formatTopicForDisplay(topic, LOG_TOPIC_MAX_LENGTH), timing });
-    return [topic]; // フォールバック
+    return { keywords: [topic] }; // フォールバック
   }
 }
 
@@ -156,22 +164,27 @@ export async function* runDiscussion(
   for (let round = startRound; round <= effectiveMaxRounds && !terminated; round++) {
     const pStartIndex = (round === startRound) ? startParticipantIndex : 0;
 
-    // eachRound検索: ラウンド開始時に検索を実行（2ラウンド目以降、または再開時の最初のラウンドで参加者0から開始の場合）
+    // eachRound検索: ラウンド開始時に検索を実行
+    // - 通常: 2ラウンド目以降、参加者0から開始の場合
+    // - 再開時: searchTiming === 'round' で中断されたラウンドの場合、検索を再実行（pStartIndexに関係なく）
+    const isResumedRoundSearch = round === startRound && resumeFrom?.searchTiming === 'round';
     const shouldSearchEachRound = searchConfig?.enabled &&
       searchConfig?.timing?.eachRound &&
-      ((round > 1 && pStartIndex === 0) || (round === startRound && pStartIndex === 0 && round > 1));
+      ((round > 1 && pStartIndex === 0) || isResumedRoundSearch);
 
     if (shouldSearchEachRound) {
       yield {
         type: 'searching',
         searchResults: currentSearchResults,
+        searchTiming: 'round' as const,
+        searchRound: round,
       };
 
       // 直前のラウンドのメッセージを取得
       const previousRoundMessages = messages.filter(m => m.round === round - 1);
 
       // AIにキーワードを生成させる
-      const searchKeywords = await generateSearchKeywords(
+      const { keywords: searchKeywords, prompt: keywordPrompt } = await generateSearchKeywords(
         topic,
         previousRoundMessages.length > 0 ? previousRoundMessages : messages,
         'round',
@@ -185,6 +198,7 @@ export async function* runDiscussion(
           timing: 'round',
           round: round,
           keywords: searchKeywords,
+          prompt: keywordPrompt,
           timestamp: new Date(),
         },
       };

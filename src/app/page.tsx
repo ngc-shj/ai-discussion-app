@@ -271,6 +271,7 @@ export default function Home() {
         totalRounds: turn.totalRounds,
         searchResults: turn.searchResults,
         searchKeywords: turn.searchKeywords,
+        searchTiming: turn.searchTiming, // 検索タイミングを復元
         searchConfig: turn.searchConfig,
         userProfile: turn.userProfile,
         discussionMode: turn.discussionMode,

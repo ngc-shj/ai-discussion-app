@@ -200,16 +200,41 @@ export async function getSession(id: string): Promise<DiscussionSession | null> 
   });
 }
 
-export async function saveSession(session: DiscussionSession): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.put(serializeSession(session));
+// 保存キュー: 同じセッションIDへの並列書き込みを防止
+const saveQueue: Map<string, Promise<void>> = new Map();
 
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+export async function saveSession(session: DiscussionSession): Promise<void> {
+  const sessionId = session.id;
+
+  // 既存の保存処理があれば待機
+  const existingPromise = saveQueue.get(sessionId);
+  if (existingPromise) {
+    await existingPromise;
+  }
+
+  // 新しい保存処理を開始
+  const savePromise = (async () => {
+    const db = await openDB();
+    return new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.put(serializeSession(session));
+
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  })();
+
+  saveQueue.set(sessionId, savePromise);
+
+  try {
+    await savePromise;
+  } finally {
+    // 完了後にキューから削除（ただし、自分自身の場合のみ）
+    if (saveQueue.get(sessionId) === savePromise) {
+      saveQueue.delete(sessionId);
+    }
+  }
 }
 
 export async function deleteSession(id: string): Promise<void> {
