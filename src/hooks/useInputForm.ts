@@ -54,6 +54,7 @@ export interface UseInputFormReturn {
   setAvoidTopicInput: (input: string) => void;
   setTermKeywordInput: (input: string) => void;
   handleSubmit: (e: FormEvent) => void;
+  handlePaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   handleAddKeyword: () => void;
   handleRemoveKeyword: (keyword: string) => void;
   handleKeywordKeyDown: (e: React.KeyboardEvent) => void;
@@ -88,19 +89,24 @@ export function useInputForm({
   const [termKeywordInput, setTermKeywordInput] = useState('');
   const [attachedTexts, setAttachedTexts] = useState<AttachedTextItem[]>([]);
 
-  // トピック設定時に長文は添付テキストに変換
+  // トピック設定（通常の入力用、長文判定なし）
   const setTopic = useCallback((newTopic: string) => {
-    if (newTopic.length >= LONG_TEXT_THRESHOLD) {
+    setTopicInternal(newTopic);
+  }, []);
+
+  // ペースト時の処理（長文は添付テキストに変換）
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pastedText = e.clipboardData.getData('text');
+    if (pastedText.length >= LONG_TEXT_THRESHOLD) {
+      e.preventDefault();
       const newItem: AttachedTextItem = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-        text: newTopic,
+        text: pastedText,
         source: 'pasted',
       };
       setAttachedTexts((prev) => [...prev, newItem]);
-      setTopicInternal('');
-    } else {
-      setTopicInternal(newTopic);
     }
+    // 短いテキストは通常のペースト動作（デフォルト）に任せる
   }, []);
 
   // 添付テキスト削除
@@ -315,6 +321,7 @@ export function useInputForm({
     setAvoidTopicInput,
     setTermKeywordInput,
     handleSubmit,
+    handlePaste,
     handleAddKeyword,
     handleRemoveKeyword,
     handleKeywordKeyDown,
