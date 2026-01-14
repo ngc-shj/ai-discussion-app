@@ -140,8 +140,8 @@ export function MessageList({
 
   return (
     <>
-      {/* 議論開始セパレーター */}
-      {startMarker && (isDiscussing || messages.length > 0 || streamingMessage) && (
+      {/* 議論開始セパレーター（議論中またはメッセージがある場合に表示） */}
+      {startMarker && (isDiscussing || messages.length > 0) && (
         <StartSeparatorInline marker={startMarker} />
       )}
 
@@ -183,7 +183,7 @@ export function MessageList({
         const pendingExtensionMarker = lastMessage
           ? extensionMarkers.find(m => m.afterRound === lastMessage.round)
           : null;
-        if (pendingExtensionMarker && (isDiscussing || streamingMessage || searchProgress)) {
+        if (pendingExtensionMarker && isDiscussing) {
           const hasMessageAfterExtension = messages.some(msg => msg.round > pendingExtensionMarker.afterRound);
           if (!hasMessageAfterExtension) {
             return <ExtensionSeparatorInline marker={pendingExtensionMarker} />;
