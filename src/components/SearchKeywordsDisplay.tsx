@@ -18,10 +18,19 @@ export function SearchKeywordsDisplay({ keywords }: SearchKeywordsDisplayProps) 
   const [isExpanded, setIsExpanded] = useState(false);
   const [showPromptIndex, setShowPromptIndex] = useState<number | null>(null);
 
-  if (keywords.length === 0) return null;
+  // 検索が完了していないキーワード情報をフィルタリング
+  // completedKeywordIndexが設定されていて、keywords.length - 1未満の場合は検索途中
+  const completedKeywords = keywords.filter(info => {
+    // completedKeywordIndexが未設定の場合は完了とみなす（後方互換）
+    if (info.completedKeywordIndex === undefined) return true;
+    // completedKeywordIndexがキーワード数-1と同じなら全キーワード完了
+    return info.completedKeywordIndex >= info.keywords.length - 1;
+  });
 
-  // 総検索結果件数を計算
-  const totalResults = keywords.reduce((sum, info) => sum + (info.results?.length || 0), 0);
+  if (completedKeywords.length === 0) return null;
+
+  // 総検索結果件数を計算（完了したキーワード情報のみ）
+  const totalResults = completedKeywords.reduce((sum, info) => sum + (info.results?.length || 0), 0);
 
   return (
     <div className="ml-10 md:ml-13 mb-2 md:mb-3">
@@ -43,14 +52,14 @@ export function SearchKeywordsDisplay({ keywords }: SearchKeywordsDisplayProps) 
         </svg>
         <span>Web検索を{isExpanded ? '折りたたむ' : '展開'}</span>
         <span className="text-xs text-gray-500">
-          ({keywords.length}回検索
+          ({completedKeywords.length}回検索
           {totalResults > 0 && `・${totalResults}件取得`})
         </span>
       </button>
 
       {isExpanded && (
         <div className="mt-2 pl-3 md:pl-4 pr-1 md:pr-2 border-l-2 border-purple-700/50 space-y-3">
-          {keywords.map((info, index) => (
+          {completedKeywords.map((info, index) => (
             <div
               key={`${info.timing}-${info.round || 0}-${index}`}
               className="bg-purple-900/20 border border-purple-700/30 rounded-lg p-2 md:p-3"
