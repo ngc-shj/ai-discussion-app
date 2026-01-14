@@ -142,7 +142,13 @@ export function DiscussionOptionsModal({
       >
         {/* ヘッダー */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <h2 id="discussion-options-title" className="text-lg font-semibold text-white">
+            議論設定
+          </h2>
           <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">
+              自動保存
+            </span>
             <button
               type="button"
               onClick={onClose}
@@ -153,13 +159,7 @@ export function DiscussionOptionsModal({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <h2 id="discussion-options-title" className="text-lg font-semibold text-white">
-              議論設定
-            </h2>
           </div>
-          <span className="text-sm text-gray-500">
-            自動保存
-          </span>
         </div>
 
         {/* コンテンツ */}
