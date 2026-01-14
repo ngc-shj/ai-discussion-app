@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FORK_PRESETS, ForkPreset, formatTopicForDisplay, LOG_TOPIC_MAX_LENGTH } from '@/types';
 
 interface ForkModalProps {
@@ -15,6 +15,18 @@ export function ForkModal({ isOpen, onClose, onCreateFork, topic }: ForkModalPro
   const [customLabel, setCustomLabel] = useState('');
   const [customPerspective, setCustomPerspective] = useState('');
   const [isCustomMode, setIsCustomMode] = useState(false);
+
+  // ESCキーで閉じる
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
