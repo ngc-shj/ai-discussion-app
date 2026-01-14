@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+
 interface PastedContentModalProps {
   text: string;
   onClose: () => void;
@@ -8,6 +10,17 @@ interface PastedContentModalProps {
 }
 
 export function PastedContentModal({ text, onClose, fileName }: PastedContentModalProps) {
+  // ESCキーで閉じる
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const charCount = text.length;
   const lineCount = text.split('\n').length;
   const byteSize = new Blob([text]).size;

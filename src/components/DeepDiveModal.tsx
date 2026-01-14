@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DeepDiveType, DEEP_DIVE_PRESETS, formatTopicForDisplay, LOG_TOPIC_MAX_LENGTH } from '@/types';
 
 interface DeepDiveModalProps {
@@ -13,6 +13,18 @@ interface DeepDiveModalProps {
 export function DeepDiveModal({ isOpen, onClose, onStartDeepDive, topic }: DeepDiveModalProps) {
   const [selectedType, setSelectedType] = useState<DeepDiveType>('technical');
   const [customPrompt, setCustomPrompt] = useState('');
+
+  // ESCキーで閉じる
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
