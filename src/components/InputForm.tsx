@@ -58,6 +58,7 @@ export function InputForm({
     setAvoidTopicInput,
     setTermKeywordInput,
     handleSubmit,
+    handlePaste,
     handleAddKeyword,
     handleRemoveKeyword,
     handleKeywordKeyDown,
@@ -214,6 +215,7 @@ export function InputForm({
           ref={textareaRef}
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
+          onPaste={handlePaste}
           onKeyDown={(e) => {
             // IME入力中（日本語変換中など）はsubmitしない
             if (e.nativeEvent.isComposing) return;
