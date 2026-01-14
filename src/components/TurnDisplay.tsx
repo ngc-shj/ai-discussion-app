@@ -210,9 +210,16 @@ export function TurnDisplay({
               <>
                 <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg p-2 md:p-3 text-gray-200 text-sm md:text-base">
                   {/* 統合前検索（統合回答ブロック内に表示） */}
-                  {turn.searchKeywords?.find(kw => kw.timing === 'summary') && (
+                  {/* 検索が完了しているもののみ表示 */}
+                  {turn.searchKeywords?.find(kw =>
+                    kw.timing === 'summary' &&
+                    (kw.completedKeywordIndex === undefined || kw.completedKeywordIndex >= kw.keywords.length - 1)
+                  ) && (
                     <div className="mb-3">
-                      <SearchKeywordItem keyword={turn.searchKeywords.find(kw => kw.timing === 'summary')!} />
+                      <SearchKeywordItem keyword={turn.searchKeywords.find(kw =>
+                        kw.timing === 'summary' &&
+                        (kw.completedKeywordIndex === undefined || kw.completedKeywordIndex >= kw.keywords.length - 1)
+                      )!} />
                     </div>
                   )}
                   <MarkdownRenderer content={turn.finalAnswer} />

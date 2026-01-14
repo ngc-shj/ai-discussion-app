@@ -719,56 +719,83 @@ export function useDiscussion(): UseDiscussionReturn {
       // beforeSummary検索
       let summarySearchResults = currentSearchResults;
       let summaryKeywordInfo: SearchKeywordInfo | null = null; // 統合前検索のキーワード情報（後でターンに保存）
+      // beforeSummary検索用の変数（catchブロックでアクセスするためtry外で宣言）
+      let summarySearchKeywords: string[] = [];
+      let summaryKeywordResults: SearchResult[] = [];
+      let lastCompletedSummaryKeywordIndex = -1;
       const timing = searchConfig.timing || { onStart: true, beforeSummary: false, onDemand: false };
       if (searchConfig.enabled && timing.beforeSummary) {
-        setSearchUiProgress({
-          phase: 'keywords',
-          currentKeywordIndex: 0,
-          totalKeywords: 0,
-          completedKeywords: [],
-        });
-        try {
-          // 議論内容をAIに渡してキーワードを生成
-          const messagesForKeywords = currentMessages.map(m => ({
-            provider: m.displayName || `${m.provider}/${m.model}`,
-            content: m.content,
-          }));
+        // 中断からの復元かどうかをチェック（フック内部の状態から取得）
+        const existingSummaryKeywordInfo = currentSearchKeywords.find((k: SearchKeywordInfo) => k.timing === 'summary');
+        const existingCompletedIndex = existingSummaryKeywordInfo?.completedKeywordIndex ?? -1;
+        const resumeFromIndex = existingSummaryKeywordInfo ? existingCompletedIndex + 1 : 0;
+        const isResuming = existingSummaryKeywordInfo && resumeFromIndex > 0 && resumeFromIndex < existingSummaryKeywordInfo.keywords.length;
 
-          const keywordsResponse = await fetch('/api/generate-search-keywords', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              topic: currentTopic,
-              messages: messagesForKeywords,
-              timing: 'summary',
-              participant: participants[0],
-              maxKeywords: searchConfig.maxKeywords || 3,
-            }),
-            signal: abortControllerRef.current.signal,
-          });
-
-          let searchKeywords: string[] = [currentTopic]; // フォールバック
-          if (keywordsResponse.ok) {
-            const keywordsData = await keywordsResponse.json();
-            if (keywordsData.keywords && keywordsData.keywords.length > 0) {
-              searchKeywords = keywordsData.keywords;
-            }
-          }
-
-          // キーワード数が確定したので進捗を更新
+        if (isResuming) {
+          // 復元時: 既存のキーワードと結果を使用
+          summarySearchKeywords = existingSummaryKeywordInfo.keywords;
+          summaryKeywordResults = [...(existingSummaryKeywordInfo.results || [])];
+          lastCompletedSummaryKeywordIndex = existingCompletedIndex;
+          // 復元時の進捗表示
           setSearchUiProgress({
             phase: 'searching',
+            currentKeywordIndex: resumeFromIndex,
+            totalKeywords: summarySearchKeywords.length,
+            completedKeywords: summarySearchKeywords.slice(0, resumeFromIndex),
+          });
+        } else {
+          // 新規検索時: キーワードを生成
+          setSearchUiProgress({
+            phase: 'keywords',
             currentKeywordIndex: 0,
-            totalKeywords: searchKeywords.length,
+            totalKeywords: 0,
             completedKeywords: [],
           });
+        }
 
-          // 生成されたキーワードで検索
-          const summaryKeywordResults: SearchResult[] = [];
+        try {
+          if (!isResuming) {
+            // 議論内容をAIに渡してキーワードを生成
+            const messagesForKeywords = currentMessages.map(m => ({
+              provider: m.displayName || `${m.provider}/${m.model}`,
+              content: m.content,
+            }));
+
+            const keywordsResponse = await fetch('/api/generate-search-keywords', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                topic: currentTopic,
+                messages: messagesForKeywords,
+                timing: 'summary',
+                participant: participants[0],
+                maxKeywords: searchConfig.maxKeywords || 3,
+              }),
+              signal: abortControllerRef.current.signal,
+            });
+
+            summarySearchKeywords = [currentTopic]; // フォールバック
+            if (keywordsResponse.ok) {
+              const keywordsData = await keywordsResponse.json();
+              if (keywordsData.keywords && keywordsData.keywords.length > 0) {
+                summarySearchKeywords = keywordsData.keywords;
+              }
+            }
+
+            // キーワード数が確定したので進捗を更新
+            setSearchUiProgress({
+              phase: 'searching',
+              currentKeywordIndex: 0,
+              totalKeywords: summarySearchKeywords.length,
+              completedKeywords: [],
+            });
+          }
+
+          // 生成されたキーワードで検索（復元時は途中から）
           // デフォルトAI設定を取得（関連性フィルタ用）
           const defaultParticipant = participants[0];
-          for (let i = 0; i < searchKeywords.length; i++) {
-            const keyword = searchKeywords[i];
+          for (let i = resumeFromIndex; i < summarySearchKeywords.length; i++) {
+            const keyword = summarySearchKeywords[i];
             // 進捗を更新
             setSearchUiProgress(prev => prev ? {
               ...prev,
@@ -782,7 +809,7 @@ export function useDiscussion(): UseDiscussionReturn {
               body: JSON.stringify({
                 query: keyword,
                 type: searchConfig.searchType,
-                limit: Math.ceil(searchConfig.maxResults / searchKeywords.length),
+                limit: Math.ceil(searchConfig.maxResults / summarySearchKeywords.length),
                 language: searchConfig.language || 'ja',
                 provider: searchConfig.provider,
                 engines: searchConfig.engines,
@@ -803,6 +830,7 @@ export function useDiscussion(): UseDiscussionReturn {
             }
 
             // 完了したキーワードを進捗に追加
+            lastCompletedSummaryKeywordIndex = i;
             setSearchUiProgress(prev => prev ? {
               ...prev,
               completedKeywords: [...prev.completedKeywords, keyword],
@@ -828,7 +856,7 @@ export function useDiscussion(): UseDiscussionReturn {
           // 検索キーワード情報を追加（検索結果を含む）
           summaryKeywordInfo = {
             timing: 'summary',
-            keywords: searchKeywords,
+            keywords: summarySearchKeywords,
             timestamp: new Date(),
             results: limitedSummaryKeywordResults,
           };
@@ -837,13 +865,26 @@ export function useDiscussion(): UseDiscussionReturn {
           if (err instanceof Error && err.name === 'AbortError') {
             // 中断された場合は統合回答待ち状態に戻す
             setSummaryPhase('awaiting');
-            // セッションの中断状態を更新（統合回答ボタンを表示するため）
+            // beforeSummary検索のキーワード情報を作成（途中まで完了した分）
+            const partialSummaryKeywordInfo: SearchKeywordInfo = {
+              timing: 'summary',
+              keywords: summarySearchKeywords,
+              timestamp: new Date(),
+              results: summaryKeywordResults,
+              completedKeywordIndex: lastCompletedSummaryKeywordIndex,
+            };
+            // 既存のキーワード情報にbeforeSummary検索を追加
+            const updatedSearchKeywords = [...(currentSessionRef.current?.interruptedTurn?.searchKeywords || []), partialSummaryKeywordInfo];
+            setCurrentSearchKeywords(updatedSearchKeywords);
+            // セッションの中断状態を更新（検索進捗を保存）
             if (currentSessionRef.current?.interruptedTurn) {
               await updateAndSaveSession({
                 interruptedTurn: {
                   ...currentSessionRef.current.interruptedTurn,
                   summaryPhase: 'awaiting',
                   searchResults: summarySearchResults,
+                  searchKeywords: updatedSearchKeywords,
+                  completedSearchKeywordIndex: lastCompletedSummaryKeywordIndex,
                   interruptedAt: new Date(),
                 },
               });
