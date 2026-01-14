@@ -35,6 +35,8 @@ export interface DiscussionSSEEvent {
     currentKeyword: string;
     completedKeyword?: string;
   };
+  searchTiming?: 'start' | 'round' | 'summary'; // searching イベント時の検索タイミング
+  searchRound?: number; // searching イベント時のラウンド番号（round検索時のみ）
   terminationReason?: string;
   suggestedFollowUps?: FollowUpQuestion[];
   messages?: DiscussionMessage[]; // ready_for_summary時に議論メッセージを含める
@@ -54,6 +56,7 @@ export interface ResumeFromParams {
   messages: DiscussionMessage[];
   currentRound: number;
   currentParticipantIndex: number;
+  searchTiming?: 'start' | 'round' | 'summary'; // 中断時の検索タイミング（検索中断時のみ設定）
 }
 
 /**

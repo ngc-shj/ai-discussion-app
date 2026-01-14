@@ -378,10 +378,14 @@ export function createSearchKeywordPrompt(
 ["キーワード1", "キーワード2", "キーワード3"]`;
   }
 
-  // 各ラウンド・統合回答前
-  const formattedMessages = messages
-    ?.map((m) => `【${m.provider}】\n${m.content}`)
-    .join('\n\n') || '';
+  // 各ラウンド・統合回答前：メッセージ部分のみXML形式
+  const messagesXml = messages
+    ?.map((m) => `  <message provider="${escapeXmlAttr(m.provider)}">\n${escapeXmlContent(m.content)}\n  </message>`)
+    .join('\n') || '';
+
+  const formattedMessages = messages && messages.length > 0
+    ? `<discussion-history message_count="${messages.length}">\n${messagesXml}\n</discussion-history>`
+    : '';
 
   const timingLabel = timing === 'round' ? '追加調査' : 'ファクトチェック';
 

@@ -117,6 +117,7 @@ export function useSessionManager(): UseSessionManagerState & UseSessionManagerA
           searchResults: turn.searchResults,
           searchKeywords: turn.searchKeywords,
           completedSearchKeywordIndex: turn.completedSearchKeywordIndex,
+          searchTiming: turn.searchTiming, // 検索タイミングを復元
           searchConfig: turn.searchConfig,
           userProfile: turn.userProfile,
           discussionMode: turn.discussionMode,

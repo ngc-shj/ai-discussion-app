@@ -17,6 +17,7 @@ import {
   TerminationConfig,
   StartMarker,
   ExtensionMarker,
+  SummaryPhase,
 } from '@/types';
 
 // SSEイベントの型定義
@@ -79,6 +80,8 @@ export interface SSECompleteEvent {
 export interface SSESearchingEvent {
   type: 'searching';
   searchResults?: SearchResult[];
+  searchTiming?: 'start' | 'round' | 'summary';
+  searchRound?: number;
 }
 
 export interface SSESearchResultsEvent {
@@ -128,7 +131,7 @@ export interface SSEEventHandlers {
   onError?: (error: string) => void;
   onReadyForSummary?: () => void;
   onComplete?: () => void;
-  onSearching?: (searchResults?: SearchResult[]) => void;
+  onSearching?: (searchResults?: SearchResult[], searchTiming?: 'start' | 'round' | 'summary', searchRound?: number) => void;
   onSearchResults?: (searchResults: SearchResult[], searchResultsAccumulated?: SearchResult[]) => void;
   onSearchKeywords?: (searchKeywords: SearchKeywordInfo) => void;
   onSearchProgress?: (searchProgress: SSESearchProgressEvent['searchProgress']) => void;
@@ -173,7 +176,7 @@ export function parseSSELine(line: string, handlers: SSEEventHandlers): void {
         handlers.onComplete?.();
         break;
       case 'searching':
-        handlers.onSearching?.(event.searchResults);
+        handlers.onSearching?.(event.searchResults, event.searchTiming, event.searchRound);
         break;
       case 'search_results':
         handlers.onSearchResults?.(event.searchResults, event.searchResultsAccumulated);
@@ -270,12 +273,14 @@ export interface CreateInterruptedStateParams {
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
   completedSearchKeywordIndex?: number; // 完了した検索キーワードのインデックス（再開時に続きから検索）
+  searchTiming?: 'start' | 'round' | 'summary'; // 中断時の検索タイミング
   searchConfig?: SearchConfig;
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
   discussionDepth?: DiscussionDepth;
   directionGuide?: DirectionGuide;
   terminationConfig?: TerminationConfig;
+  summaryPhase?: SummaryPhase; // 統合回答のフェーズ
   // 議論マーカー
   startMarker?: StartMarker;
   extensionMarkers?: ExtensionMarker[];
@@ -299,6 +304,7 @@ export function createInterruptedState(
     searchResults: params.searchResults,
     searchKeywords: params.searchKeywords,
     completedSearchKeywordIndex: params.completedSearchKeywordIndex,
+    searchTiming: params.searchTiming,
     searchConfig: params.searchConfig,
     userProfile: params.userProfile,
     discussionMode: params.discussionMode,
@@ -306,6 +312,7 @@ export function createInterruptedState(
     directionGuide: params.directionGuide,
     terminationConfig: params.terminationConfig,
     interruptedAt: new Date(),
+    summaryPhase: params.summaryPhase,
     startMarker: params.startMarker,
     extensionMarkers: params.extensionMarkers,
   };

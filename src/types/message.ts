@@ -102,6 +102,7 @@ export function formatTopicForDisplay(topic: string, maxLength: number = UI_TOPI
 export type SummaryPhase =
   | 'idle'           // 通常状態（議論中または議論前）
   | 'awaiting'       // 統合回答ボタン表示中（ユーザーのクリック待ち）
+  | 'searching'      // 統合前検索中
   | 'generating';    // 統合回答生成中
 
 // 議論メッセージ
@@ -177,6 +178,7 @@ export interface InterruptedTurnSnapshot {
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[]; // 検索キーワード
   completedSearchKeywordIndex?: number; // 完了した検索キーワードのインデックス（再開時に続きから検索）
+  searchTiming?: 'start' | 'round' | 'summary'; // 中断時の検索タイミング（検索中断時のみ設定）
   searchConfig?: SearchConfig; // 検索設定（再開時に検索を実行するために必要）
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;
@@ -221,6 +223,7 @@ export interface InterruptedDiscussionSnapshot {
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[]; // 検索キーワード
   completedSearchKeywordIndex?: number; // 完了した検索キーワードのインデックス（再開時に続きから検索）
+  searchTiming?: 'start' | 'round' | 'summary'; // 中断時の検索タイミング（検索中断時のみ設定）
   searchConfig?: SearchConfig;
   userProfile?: UserProfile;
   discussionMode?: DiscussionMode;

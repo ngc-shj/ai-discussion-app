@@ -27,7 +27,7 @@ interface DiscussionPanelProps {
   suggestedFollowUps?: FollowUpQuestion[];
   isGeneratingFollowUps?: boolean;
   summaryPhase?: SummaryPhase;
-  onGenerateSummary?: () => void;
+  onFinalizeDiscussion?: () => void;
   onExtendDiscussion?: (config: ExtendDiscussionConfig) => void;
   currentRounds?: number;
   currentMode?: DiscussionMode;
@@ -59,7 +59,7 @@ export function DiscussionPanel({
   suggestedFollowUps,
   isGeneratingFollowUps,
   summaryPhase,
-  onGenerateSummary,
+  onFinalizeDiscussion,
   onExtendDiscussion,
   currentRounds,
   currentMode,
@@ -129,7 +129,7 @@ export function DiscussionPanel({
           onVote={onVote}
           suggestedFollowUps={suggestedFollowUps}
           isGeneratingFollowUps={isGeneratingFollowUps}
-          onGenerateSummary={onGenerateSummary}
+          onFinalizeDiscussion={onFinalizeDiscussion}
           onExtendDiscussion={onExtendDiscussion}
           currentRounds={currentRounds}
           currentMode={currentMode}

@@ -1,7 +1,7 @@
 'use client';
 
 import { RefObject } from 'react';
-import { DiscussionMessage, DiscussionParticipant, MessageVote, StartMarker, ExtensionMarker, SearchKeywordInfo, SearchUiProgress } from '@/types';
+import { DiscussionMessage, DiscussionParticipant, MessageVote, StartMarker, ExtensionMarker, SearchKeywordInfo, SearchUiProgress, SummaryPhase } from '@/types';
 import { StreamingMessage } from '@/hooks';
 import { MessageBubble } from './MessageBubble';
 import { StartSeparatorInline, ExtensionSeparatorInline } from './ExtensionSeparator';
@@ -85,6 +85,8 @@ interface MessageListProps {
   bottomRef?: RefObject<HTMLDivElement | null>;
   // 検索中状態の表示用
   searchProgress?: SearchUiProgress | null;
+  // 統合回答フェーズ（統合前検索中はMessageList内の検索インジケーターを非表示にする）
+  summaryPhase?: SummaryPhase;
 }
 
 export function MessageList({
@@ -99,6 +101,7 @@ export function MessageList({
   isDiscussing,
   bottomRef,
   searchProgress,
+  summaryPhase,
 }: MessageListProps) {
   // 延長セパレーターを表示すべきか判定するヘルパー関数
   const getExtensionMarkerForMessage = (
@@ -137,8 +140,8 @@ export function MessageList({
 
   return (
     <>
-      {/* 議論開始セパレーター */}
-      {startMarker && (isDiscussing || messages.length > 0 || streamingMessage) && (
+      {/* 議論開始セパレーター（議論中またはメッセージがある場合に表示） */}
+      {startMarker && (isDiscussing || messages.length > 0) && (
         <StartSeparatorInline marker={startMarker} />
       )}
 
@@ -180,7 +183,7 @@ export function MessageList({
         const pendingExtensionMarker = lastMessage
           ? extensionMarkers.find(m => m.afterRound === lastMessage.round)
           : null;
-        if (pendingExtensionMarker && (isDiscussing || streamingMessage || searchProgress)) {
+        if (pendingExtensionMarker && isDiscussing) {
           const hasMessageAfterExtension = messages.some(msg => msg.round > pendingExtensionMarker.afterRound);
           if (!hasMessageAfterExtension) {
             return <ExtensionSeparatorInline marker={pendingExtensionMarker} />;
@@ -189,8 +192,8 @@ export function MessageList({
         return null;
       })()}
 
-      {/* 検索キーワード生成中インジケーター */}
-      {!pendingSearchKeyword && searchProgress?.phase === 'keywords' && (
+      {/* 検索キーワード生成中インジケーター（統合前検索中は統合回答セクションで表示するため非表示） */}
+      {!pendingSearchKeyword && searchProgress?.phase === 'keywords' && summaryPhase !== 'searching' && (
         <KeywordGeneratingIndicator />
       )}
 
@@ -199,8 +202,8 @@ export function MessageList({
         <SearchKeywordItem keyword={pendingSearchKeyword} />
       )}
 
-      {/* 検索進捗インジケーター */}
-      {searchProgress?.phase === 'searching' && (
+      {/* 検索進捗インジケーター（統合前検索中は統合回答セクションで表示するため非表示） */}
+      {searchProgress?.phase === 'searching' && summaryPhase !== 'searching' && (
         <SearchUiProgressIndicator searchProgress={searchProgress} />
       )}
 

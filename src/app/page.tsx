@@ -69,7 +69,7 @@ export default function Home() {
     startDiscussion,
     resumeDiscussion,
     extendDiscussion,
-    generateSummary,
+    finalizeDiscussion,
     generateFollowUps,
     streamingMessage,
     startMarker,
@@ -271,6 +271,7 @@ export default function Home() {
         totalRounds: turn.totalRounds,
         searchResults: turn.searchResults,
         searchKeywords: turn.searchKeywords,
+        searchTiming: turn.searchTiming, // 検索タイミングを復元
         searchConfig: turn.searchConfig,
         userProfile: turn.userProfile,
         discussionMode: turn.discussionMode,
@@ -454,9 +455,9 @@ export default function Home() {
     return validatePreset(preset, availableModels);
   }, [validatePreset, availableModels]);
 
-  // 統合回答を生成
-  const handleGenerateSummary = useCallback(async () => {
-    await generateSummary({
+  // 議論を最終化（検索→統合回答→フォローアップ）
+  const handleFinalizeDiscussion = useCallback(async () => {
+    await finalizeDiscussion({
       participants,
       userProfile,
       discussionMode,
@@ -467,7 +468,7 @@ export default function Home() {
       setInterruptedState,
       updateAndSaveSession,
     });
-  }, [participants, userProfile, discussionMode, discussionDepth, directionGuide, searchConfig, currentSessionRef, setInterruptedState, updateAndSaveSession, generateSummary]);
+  }, [participants, userProfile, discussionMode, discussionDepth, directionGuide, searchConfig, currentSessionRef, setInterruptedState, updateAndSaveSession, finalizeDiscussion]);
 
   // フォローアップ質問を生成
   const handleGenerateFollowUps = useCallback(async (turnId: string, topic: string, finalAnswer: string) => {
@@ -795,7 +796,7 @@ export default function Home() {
           onVote={handleVote}
           suggestedFollowUps={suggestedFollowUps}
           isGeneratingFollowUps={isGeneratingFollowUps}
-          onGenerateSummary={handleGenerateSummary}
+          onFinalizeDiscussion={handleFinalizeDiscussion}
           onExtendDiscussion={handleExtendDiscussion}
           currentRounds={discussionProgress.currentRound}
           currentMode={currentDiscussionMode || discussionMode}
