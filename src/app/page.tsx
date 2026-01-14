@@ -304,7 +304,11 @@ export default function Home() {
     if (currentSession?.id === id) {
       clearCurrentTurnState();
     }
-  }, [currentSession, sessionManagerDeleteSession, clearCurrentTurnState]);
+    // 削除されたセッションの中断状態もクリア
+    if (interruptedState?.sessionId === id) {
+      setInterruptedState(null);
+    }
+  }, [currentSession, interruptedState, sessionManagerDeleteSession, clearCurrentTurnState, setInterruptedState]);
 
   // セッションを一括削除
   const handleBulkDeleteSessions = useCallback(async (ids: string[]) => {
@@ -312,7 +316,11 @@ export default function Home() {
     if (currentSession && ids.includes(currentSession.id)) {
       clearCurrentTurnState();
     }
-  }, [currentSession, sessionManagerBulkDeleteSessions, clearCurrentTurnState]);
+    // 削除されたセッションの中断状態もクリア
+    if (interruptedState && ids.includes(interruptedState.sessionId)) {
+      setInterruptedState(null);
+    }
+  }, [currentSession, interruptedState, sessionManagerBulkDeleteSessions, clearCurrentTurnState, setInterruptedState]);
 
   // セッションの名前を変更
   const handleRenameSession = useCallback(async (id: string, newTitle: string) => {
@@ -726,8 +734,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* 中断された議論の復元バナー */}
-        {interruptedState && !isDiscussing && interruptedState.summaryPhase !== 'awaiting' && interruptedState.summaryPhase !== 'generating' && (
+        {/* 中断された議論の復元バナー（該当セッションが選択されている場合のみ表示） */}
+        {interruptedState && !isDiscussing && currentSession?.id === interruptedState.sessionId && interruptedState.summaryPhase !== 'awaiting' && interruptedState.summaryPhase !== 'generating' && (
           <div className="mx-3 md:mx-4 mt-3 md:mt-4 p-3 bg-yellow-900/50 border border-yellow-700 rounded-lg shrink-0">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
