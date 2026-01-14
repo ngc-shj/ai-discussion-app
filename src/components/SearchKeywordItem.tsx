@@ -191,6 +191,15 @@ function InlineSearchResults({ results }: { results: SearchResult[] }) {
                       全文取得済
                     </button>
                   )}
+                  {/* AI要約済みだが元の全文がない場合 */}
+                  {relevance?.isExtracted && !isFiltered && !result.originalFullContent && (
+                    <span
+                      className="bg-gray-700/50 text-gray-400 px-1.5 py-0.5 rounded text-xs"
+                      title="全文取得できませんでした"
+                    >
+                      全文なし
+                    </span>
+                  )}
                   {relevance?.isExtracted && !isFiltered && result.fullContent && (
                     <button
                       type="button"
