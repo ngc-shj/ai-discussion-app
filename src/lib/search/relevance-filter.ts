@@ -166,6 +166,10 @@ export async function filterByRelevance(
 
     // 関連している場合、抽出されたコンテンツがあれば使用
     if (!isFiltered && judgment.extractedContent) {
+      // 元の全文を保存してから、要約で上書き
+      if (result.fullContent) {
+        processedResult.originalFullContent = result.fullContent;
+      }
       processedResult.fullContent = judgment.extractedContent;
     }
 
