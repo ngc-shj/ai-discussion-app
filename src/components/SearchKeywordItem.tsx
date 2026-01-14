@@ -72,9 +72,9 @@ function RelevanceBadge({ score, reason, isExtracted, isFiltered }: {
       {isExtracted && (
         <span
           className="bg-purple-900/30 text-purple-400 px-1.5 py-0.5 rounded text-xs border border-purple-600/50"
-          title="トピックに関連する部分のみ抽出済み"
+          title="AIがトピックに関連する内容を要約"
         >
-          抽出済
+          AI要約済
         </span>
       )}
     </div>
@@ -192,8 +192,8 @@ function InlineSearchResults({ results }: { results: SearchResult[] }) {
                     </span>
                   )}
                   {result.fullContent && !isFiltered && (
-                    <span className="bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded" title="詳細コンテンツあり">
-                      詳細あり
+                    <span className="bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded" title="ページ全文を取得済み">
+                      全文取得済
                     </span>
                   )}
                 </div>
