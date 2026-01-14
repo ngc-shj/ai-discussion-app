@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { SearchResult } from '@/types';
+import { FullContentModal } from './FullContentModal';
 
 interface SearchResultsDisplayProps {
   results: SearchResult[];
@@ -25,61 +26,9 @@ function getRelevanceColor(score: number, isFiltered: boolean): { bg: string; te
   }
 }
 
-/**
- * 関連性スコアのバッジを表示
- */
-function RelevanceBadge({ score, reason, isExtracted, isFiltered }: {
-  score: number;
-  reason?: string;
-  isExtracted?: boolean;
-  isFiltered?: boolean;
-}) {
-  const percentage = Math.round(score * 100);
-
-  if (isFiltered) {
-    // 除外された結果用のバッジ
-    return (
-      <div className="flex items-center gap-1.5">
-        <span
-          className="bg-gray-700/50 text-gray-400 px-1.5 py-0.5 rounded text-xs font-medium border border-gray-600/50"
-          title={reason || '関連性が低いため除外'}
-        >
-          関連性 {percentage}%
-        </span>
-        <span
-          className="bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded text-xs border border-red-600/50"
-          title="議論では使用されません"
-        >
-          除外
-        </span>
-      </div>
-    );
-  }
-
-  const colors = getRelevanceColor(score, false);
-
-  return (
-    <div className="flex items-center gap-1.5">
-      <span
-        className={`${colors.bg} ${colors.text} px-1.5 py-0.5 rounded text-xs font-medium border ${colors.border}`}
-        title={reason || '関連性スコア'}
-      >
-        関連性 {percentage}%
-      </span>
-      {isExtracted && (
-        <span
-          className="bg-purple-900/30 text-purple-400 px-1.5 py-0.5 rounded text-xs border border-purple-600/50"
-          title="AIがトピックに関連する内容を要約"
-        >
-          AI要約済
-        </span>
-      )}
-    </div>
-  );
-}
-
 export function SearchResultsDisplay({ results }: SearchResultsDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [fullContentResult, setFullContentResult] = useState<SearchResult | null>(null);
 
   if (results.length === 0) return null;
 
@@ -141,44 +90,46 @@ export function SearchResultsDisplay({ results }: SearchResultsDisplayProps) {
             const cardColors = relevance
               ? getRelevanceColor(relevance.score, isFiltered)
               : { bg: 'bg-cyan-900/20', text: '', border: 'border-cyan-700/30' };
+            const percentage = relevance ? Math.round(relevance.score * 100) : null;
 
             return (
               <div
                 key={`${result.url}-${index}`}
                 className={`${cardColors.bg} border ${cardColors.border} rounded-lg p-2 md:p-3 ${isFiltered ? 'opacity-60' : ''}`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <a
-                    href={result.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`font-medium text-sm md:text-base line-clamp-1 flex-1 ${
-                      isFiltered
-                        ? 'text-gray-400 hover:text-gray-300'
-                        : 'text-cyan-400 hover:text-cyan-300'
-                    }`}
-                  >
-                    {result.title}
-                  </a>
-                  {relevance && (
-                    <RelevanceBadge
-                      score={relevance.score}
-                      reason={relevance.reason}
-                      isExtracted={relevance.isExtracted}
-                      isFiltered={isFiltered}
-                    />
-                  )}
-                </div>
+                {/* タイトル */}
+                <a
+                  href={result.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`font-medium text-sm md:text-base line-clamp-1 block ${
+                    isFiltered
+                      ? 'text-gray-400 hover:text-gray-300'
+                      : 'text-cyan-400 hover:text-cyan-300'
+                  }`}
+                >
+                  {result.title}
+                </a>
+
+                {/* スニペット */}
                 <p className={`text-xs mt-1 line-clamp-2 ${isFiltered ? 'text-gray-500' : 'text-gray-400'}`}>
                   {result.content}
                 </p>
-                {/* 判定理由を表示 */}
+
+                {/* AI評価理由（背景色＋左ボーダーで強調） */}
                 {relevance?.reason && (
-                  <p className={`text-xs mt-1 italic ${isFiltered ? 'text-gray-600' : 'text-gray-500'}`}>
-                    → {relevance.reason}
-                  </p>
+                  <div className={`mt-2 text-xs rounded-r pl-3 py-1.5 border-l-4 ${
+                    isFiltered
+                      ? 'bg-gray-800/50 border-gray-500 text-gray-400'
+                      : 'bg-cyan-900/40 border-cyan-400 text-gray-200'
+                  }`}>
+                    <span className={`font-semibold ${isFiltered ? 'text-gray-300' : 'text-cyan-300'}`}>AI判定:</span>{' '}
+                    {relevance.reason}
+                  </div>
                 )}
-                <div className={`flex items-center gap-2 mt-1 text-xs ${isFiltered ? 'text-gray-600' : 'text-gray-500'}`}>
+
+                {/* フッター: メタ情報 + バッジ */}
+                <div className={`flex flex-wrap items-center gap-2 mt-2 text-xs ${isFiltered ? 'text-gray-600' : 'text-gray-500'}`}>
                   {result.engine && (
                     <span className="bg-gray-700/50 px-1.5 py-0.5 rounded">
                       {result.engine}
@@ -187,16 +138,67 @@ export function SearchResultsDisplay({ results }: SearchResultsDisplayProps) {
                   {result.publishedDate && (
                     <span>{result.publishedDate}</span>
                   )}
-                  {result.fullContent && !isFiltered && (
-                    <span className="bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded" title="ページ全文を取得済み">
-                      全文取得済
+                  {/* 関連性バッジ */}
+                  {relevance && (
+                    <span
+                      className={`px-2 py-1 rounded font-bold text-xs border ${
+                        isFiltered
+                          ? 'bg-gray-700/70 text-gray-300 border-gray-500'
+                          : `${cardColors.bg} ${cardColors.text} ${cardColors.border}`
+                      }`}
+                      title={relevance.reason || '関連性スコア'}
+                    >
+                      関連性 {percentage}%
                     </span>
+                  )}
+                  {/* 除外バッジ */}
+                  {isFiltered && (
+                    <span
+                      className="bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded border border-red-600/50"
+                      title="議論では使用されません"
+                    >
+                      除外
+                    </span>
+                  )}
+                  {/* 全文取得済バッジ（クリックで全文表示、AI要約済みでない場合） */}
+                  {result.fullContent && !isFiltered && !relevance?.isExtracted && (
+                    <button
+                      type="button"
+                      onClick={() => setFullContentResult(result)}
+                      className="bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded hover:bg-blue-800/60 hover:text-blue-300 transition-colors cursor-pointer"
+                      title="クリックして全文を表示"
+                    >
+                      全文取得済
+                    </button>
+                  )}
+                  {/* AI要約済バッジ（クリックで要約を表示） */}
+                  {relevance?.isExtracted && !isFiltered && result.fullContent && (
+                    <button
+                      type="button"
+                      onClick={() => setFullContentResult(result)}
+                      className="bg-purple-900/30 text-purple-400 px-1.5 py-0.5 rounded border border-purple-600/50 hover:bg-purple-800/40 hover:text-purple-300 transition-colors cursor-pointer"
+                      title="クリックしてAI要約を表示"
+                    >
+                      AI要約済
+                    </button>
                   )}
                 </div>
               </div>
             );
           })}
         </div>
+      )}
+
+      {/* 全文/AI要約表示モーダル */}
+      {fullContentResult && fullContentResult.fullContent && (
+        <FullContentModal
+          title={fullContentResult.title}
+          url={fullContentResult.url}
+          content={fullContentResult.fullContent}
+          originalFullContent={fullContentResult.originalFullContent}
+          isExtracted={fullContentResult.relevance?.isExtracted}
+          onClose={() => setFullContentResult(null)}
+        />
       )}
     </div>
   );

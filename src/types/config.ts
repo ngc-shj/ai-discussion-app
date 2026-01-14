@@ -5,7 +5,8 @@ export interface SearchResult {
   content: string;
   engine?: string;
   publishedDate?: string;
-  fullContent?: string;  // Jina Readerで取得した詳細コンテンツ
+  fullContent?: string;  // Jina Readerで取得した詳細コンテンツ（AI要約時は要約内容）
+  originalFullContent?: string;  // AI要約前の元の全文コンテンツ
   // 関連性フィルタリング結果
   relevance?: {
     score: number;       // 関連性スコア（0-1）
