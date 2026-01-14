@@ -756,6 +756,8 @@ export function useDiscussion(): UseDiscussionReturn {
 
           // 生成されたキーワードで検索
           const summaryKeywordResults: SearchResult[] = [];
+          // デフォルトAI設定を取得（関連性フィルタ用）
+          const defaultParticipant = participants[0];
           for (const keyword of searchKeywords) {
             const searchResponse = await fetch('/api/search', {
               method: 'POST',
@@ -769,6 +771,11 @@ export function useDiscussion(): UseDiscussionReturn {
                 engines: searchConfig.engines,
                 fetchFullContent: searchConfig.fetchFullContent,
                 fullContentLimit: searchConfig.fullContentMaxResults,
+                // 関連性フィルタ用パラメータ
+                topic: currentTopic,
+                relevanceFilter: searchConfig.relevanceFilter,
+                defaultAIProvider: defaultParticipant?.provider,
+                defaultAIModel: defaultParticipant?.model,
               }),
               signal: abortControllerRef.current.signal,
             });
