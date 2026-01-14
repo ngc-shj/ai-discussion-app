@@ -1,30 +1,22 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect } from 'react';
 
 interface FullContentModalProps {
   title: string;
   url: string;
-  content: string;  // AI要約済みの場合は要約内容、そうでなければ全文
-  originalFullContent?: string;  // AI要約前の元の全文
+  content: string;  // 表示するコンテンツ（全文またはAI要約）
   isExtracted?: boolean;  // AI要約済みかどうか
   onClose: () => void;
 }
-
-type TabType = 'summary' | 'fullContent';
 
 export function FullContentModal({
   title,
   url,
   content,
-  originalFullContent,
   isExtracted,
   onClose,
 }: FullContentModalProps) {
-  // タブ状態（AI要約済みで元の全文がある場合のみタブ表示）
-  const hasBothContents = isExtracted && originalFullContent;
-  const [activeTab, setActiveTab] = useState<TabType>('summary');
-
   // ESCキーで閉じる
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -36,17 +28,9 @@ export function FullContentModal({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  // 表示するコンテンツ
-  const displayContent = useMemo(() => {
-    if (hasBothContents && activeTab === 'fullContent') {
-      return originalFullContent;
-    }
-    return content;
-  }, [hasBothContents, activeTab, originalFullContent, content]);
-
-  const charCount = displayContent.length;
-  const lineCount = displayContent.split('\n').length;
-  const byteSize = new Blob([displayContent]).size;
+  const charCount = content.length;
+  const lineCount = content.split('\n').length;
+  const byteSize = new Blob([content]).size;
   const kbSize = (byteSize / 1024).toFixed(2);
 
   return (
@@ -75,6 +59,7 @@ export function FullContentModal({
             type="button"
             onClick={onClose}
             className="p-1 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-700 shrink-0"
+            title="閉じる"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -87,55 +72,24 @@ export function FullContentModal({
           </button>
         </div>
 
-        {/* タブ切り替え（両方ある場合のみ表示） */}
-        {hasBothContents ? (
-          <div className="px-4 py-2 border-b border-gray-700 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('summary')}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                activeTab === 'summary'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'
-              }`}
-            >
-              AI要約
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('fullContent')}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                activeTab === 'fullContent'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'
-              }`}
-            >
-              元の全文
-            </button>
-            <span className="text-xs text-gray-500 ml-2">
-              {kbSize} KB · {lineCount}行 · {charCount.toLocaleString()}文字
+        {/* メタ情報 */}
+        <div className="px-4 py-2 text-sm text-gray-400 border-b border-gray-700 flex items-center gap-2">
+          {isExtracted ? (
+            <span className="bg-purple-900/50 text-purple-400 px-1.5 py-0.5 rounded text-xs border border-purple-600/50">
+              AI要約済
             </span>
-          </div>
-        ) : (
-          /* メタ情報（タブがない場合） */
-          <div className="px-4 py-2 text-sm text-gray-400 border-b border-gray-700 flex items-center gap-2">
-            {isExtracted ? (
-              <span className="bg-purple-900/50 text-purple-400 px-1.5 py-0.5 rounded text-xs border border-purple-600/50">
-                AI要約済
-              </span>
-            ) : (
-              <span className="bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded text-xs">
-                全文取得済
-              </span>
-            )}
-            <span>{kbSize} KB · {lineCount}行 · {charCount.toLocaleString()}文字</span>
-          </div>
-        )}
+          ) : (
+            <span className="bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded text-xs">
+              全文取得済
+            </span>
+          )}
+          <span>{kbSize} KB · {lineCount}行 · {charCount.toLocaleString()}文字</span>
+        </div>
 
         {/* コンテンツ */}
         <div className="flex-1 overflow-y-auto p-4">
           <div className="text-sm text-gray-300 whitespace-pre-wrap break-words">
-            {displayContent}
+            {content}
           </div>
         </div>
       </div>

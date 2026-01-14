@@ -26,9 +26,12 @@ function getRelevanceColor(score: number, isFiltered: boolean): { bg: string; te
   }
 }
 
+// モーダル表示用の拡張型（どちらのコンテンツを表示するか）
+type ModalState = (SearchResult & { _showOriginal?: boolean }) | null;
+
 export function SearchResultsDisplay({ results }: SearchResultsDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [fullContentResult, setFullContentResult] = useState<SearchResult | null>(null);
+  const [fullContentResult, setFullContentResult] = useState<ModalState>(null);
 
   if (results.length === 0) return null;
 
@@ -160,22 +163,32 @@ export function SearchResultsDisplay({ results }: SearchResultsDisplayProps) {
                       除外
                     </span>
                   )}
-                  {/* 全文取得済バッジ（クリックで全文表示、AI要約済みでない場合） */}
+                  {/* 全文取得済バッジ（クリックで全文表示） */}
                   {result.fullContent && !isFiltered && !relevance?.isExtracted && (
                     <button
                       type="button"
-                      onClick={() => setFullContentResult(result)}
+                      onClick={() => setFullContentResult({ ...result, _showOriginal: false })}
                       className="bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded hover:bg-blue-800/60 hover:text-blue-300 transition-colors cursor-pointer"
                       title="クリックして全文を表示"
                     >
                       全文取得済
                     </button>
                   )}
-                  {/* AI要約済バッジ（クリックで要約を表示） */}
+                  {/* AI要約済みの場合: 全文取得済とAI要約済の2つのバッジを表示 */}
+                  {relevance?.isExtracted && !isFiltered && result.originalFullContent && (
+                    <button
+                      type="button"
+                      onClick={() => setFullContentResult({ ...result, _showOriginal: true })}
+                      className="bg-blue-900/50 text-blue-400 px-1.5 py-0.5 rounded hover:bg-blue-800/60 hover:text-blue-300 transition-colors cursor-pointer"
+                      title="クリックして元の全文を表示"
+                    >
+                      全文取得済
+                    </button>
+                  )}
                   {relevance?.isExtracted && !isFiltered && result.fullContent && (
                     <button
                       type="button"
-                      onClick={() => setFullContentResult(result)}
+                      onClick={() => setFullContentResult({ ...result, _showOriginal: false })}
                       className="bg-purple-900/30 text-purple-400 px-1.5 py-0.5 rounded border border-purple-600/50 hover:bg-purple-800/40 hover:text-purple-300 transition-colors cursor-pointer"
                       title="クリックしてAI要約を表示"
                     >
@@ -190,13 +203,16 @@ export function SearchResultsDisplay({ results }: SearchResultsDisplayProps) {
       )}
 
       {/* 全文/AI要約表示モーダル */}
-      {fullContentResult && fullContentResult.fullContent && (
+      {fullContentResult && (fullContentResult.fullContent || fullContentResult.originalFullContent) && (
         <FullContentModal
           title={fullContentResult.title}
           url={fullContentResult.url}
-          content={fullContentResult.fullContent}
-          originalFullContent={fullContentResult.originalFullContent}
-          isExtracted={fullContentResult.relevance?.isExtracted}
+          content={
+            fullContentResult._showOriginal && fullContentResult.originalFullContent
+              ? fullContentResult.originalFullContent
+              : fullContentResult.fullContent || ''
+          }
+          isExtracted={!fullContentResult._showOriginal && fullContentResult.relevance?.isExtracted}
           onClose={() => setFullContentResult(null)}
         />
       )}
