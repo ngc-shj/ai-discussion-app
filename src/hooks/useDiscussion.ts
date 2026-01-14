@@ -2114,9 +2114,9 @@ export function useDiscussion(): UseDiscussionReturn {
     ]
   );
 
-  // isSearchingはsearchProgressから派生
+  // isSearchingはsearchProgressから派生（検索完了 phase: 'done' は検索中ではない）
   // 注: 検索中は必ずisDiscussingもtrueなので、isProcessingには不要
-  const isSearching = searchProgress !== null;
+  const isSearching = searchProgress !== null && searchProgress.phase !== 'done';
 
   // 処理中フラグ（議論実行中、統合回答生成中、フォローアップ生成中）
   // 検索中はisDiscussingがtrueなのでisSearchingは不要
