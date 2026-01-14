@@ -143,7 +143,7 @@ export function DiscussionOptionsModal({
         {/* ヘッダー */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
           <h2 id="discussion-options-title" className="text-lg font-semibold text-white">
-            議論設定
+            議論進行の設定
           </h2>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500">
