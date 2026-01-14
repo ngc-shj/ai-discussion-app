@@ -57,7 +57,7 @@ export interface SearchUiProgress {
 export interface SearchTiming {
   onStart: boolean;        // 議論開始時に検索
   eachRound: boolean;      // ラウンドごとに検索
-  beforeSummary: boolean;  // 統合回答生成前に検索
+  beforeSummary: boolean;  // 統合前検索（統合回答生成前に検索）
   onDemand: boolean;       // AIが要求した時に検索（[[SEARCH:query]]パターン）
 }
 

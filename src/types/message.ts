@@ -102,6 +102,7 @@ export function formatTopicForDisplay(topic: string, maxLength: number = UI_TOPI
 export type SummaryPhase =
   | 'idle'           // 通常状態（議論中または議論前）
   | 'awaiting'       // 統合回答ボタン表示中（ユーザーのクリック待ち）
+  | 'searching'      // 統合前検索中
   | 'generating';    // 統合回答生成中
 
 // 議論メッセージ

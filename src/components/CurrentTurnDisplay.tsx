@@ -31,7 +31,7 @@ interface CurrentTurnDisplayProps {
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   suggestedFollowUps?: FollowUpQuestion[];
   isGeneratingFollowUps?: boolean;
-  onGenerateSummary?: () => void;
+  onFinalizeDiscussion?: () => void;
   onExtendDiscussion?: (config: ExtendDiscussionConfig) => void;
   currentRounds?: number;
   currentMode?: DiscussionMode;
@@ -60,7 +60,7 @@ export function CurrentTurnDisplay({
   onVote,
   suggestedFollowUps,
   isGeneratingFollowUps,
-  onGenerateSummary,
+  onFinalizeDiscussion,
   onExtendDiscussion,
   currentRounds = 0,
   currentMode,
@@ -232,6 +232,7 @@ export function CurrentTurnDisplay({
                 isDiscussing={isDiscussing}
                 bottomRef={bottomRef}
                 searchProgress={summaryPhase === 'generating' ? null : searchProgress}
+                summaryPhase={summaryPhase}
               />
             </div>
           )}
@@ -274,7 +275,7 @@ export function CurrentTurnDisplay({
                   )}
                   <button
                     type="button"
-                    onClick={onGenerateSummary}
+                    onClick={onFinalizeDiscussion}
                     className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg transition-all shadow-lg"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -302,7 +303,7 @@ export function CurrentTurnDisplay({
       )}
 
       {/* 統合回答または統合中表示 */}
-      {(finalAnswer || summaryPhase === 'generating') && (
+      {(finalAnswer || summaryPhase === 'generating' || summaryPhase === 'searching') && (
         <div className="flex gap-2 md:gap-3">
           <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shrink-0">
             <span className="text-white text-base md:text-lg">✨</span>
@@ -325,9 +326,9 @@ export function CurrentTurnDisplay({
                   )!} />
                 </div>
               )}
-              {summaryPhase === 'generating' && !finalAnswer ? (
+              {(summaryPhase === 'generating' || summaryPhase === 'searching') && !finalAnswer ? (
                 searchProgress ? (
-                  // 統合回答生成中の検索進捗表示
+                  // 統合前検索または統合回答生成中の検索進捗表示
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <svg className="w-4 h-4 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">

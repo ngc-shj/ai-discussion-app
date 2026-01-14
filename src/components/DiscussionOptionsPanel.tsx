@@ -533,7 +533,7 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
                     disabled={disabled}
                     className="w-3.5 h-3.5 rounded border-gray-500 bg-gray-600 text-green-500 focus:ring-green-500 focus:ring-offset-0 disabled:opacity-50"
                   />
-                  <span className="text-xs text-gray-300">統合回答前に検索</span>
+                  <span className="text-xs text-gray-300">統合前検索</span>
                 </label>
                 <label className={`flex items-center gap-2 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                   <input
