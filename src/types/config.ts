@@ -24,6 +24,7 @@ export interface SearchKeywordInfo {
   timestamp: Date;                         // 生成時刻
   prompt?: string;                         // AIに渡されたプロンプト（確認用）
   results?: SearchResult[];               // このタイミングで取得した検索結果
+  completedKeywordIndex?: number;         // 最後に完了したキーワードのインデックス（中断復元用）
 }
 
 // 検索進捗状態
