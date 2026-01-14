@@ -8,6 +8,7 @@ export { AISelector } from './AISelector';
 export { ParticipantsPanel } from './ParticipantsPanel';
 export { InputForm } from './InputForm';
 export { DiscussionOptionsPanel } from './DiscussionOptionsPanel';
+export { DiscussionOptionsModal } from './DiscussionOptionsModal';
 export { FinalAnswer } from './FinalAnswer';
 export { ProgressIndicator } from './ProgressIndicator';
 export { SessionSidebar } from './SessionSidebar';
