@@ -251,7 +251,6 @@ export function InputForm({
         discussionDepth={discussionDepth}
         onDiscussionDepthChange={onDiscussionDepthChange}
         directionGuide={directionGuide}
-        onDirectionGuideChange={onDirectionGuideChange}
         terminationConfig={terminationConfig}
         onTerminationConfigChange={onTerminationConfigChange}
         keywordInput={keywordInput}

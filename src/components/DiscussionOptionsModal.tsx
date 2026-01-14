@@ -25,7 +25,6 @@ interface DiscussionOptionsModalProps {
   onDiscussionDepthChange: (depth: DiscussionDepth) => void;
   // Direction Guide
   directionGuide: DirectionGuide;
-  onDirectionGuideChange: (guide: DirectionGuide) => void;
   // Termination
   terminationConfig: TerminationConfig;
   onTerminationConfigChange: (config: TerminationConfig) => void;
@@ -66,7 +65,6 @@ export function DiscussionOptionsModal({
   discussionDepth,
   onDiscussionDepthChange,
   directionGuide,
-  onDirectionGuideChange,
   terminationConfig,
   onTerminationConfigChange,
   keywordInput,
