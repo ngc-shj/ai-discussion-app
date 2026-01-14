@@ -782,15 +782,21 @@ export function useDiscussion(): UseDiscussionReturn {
             if (searchResponse.ok) {
               const searchData = await searchResponse.json();
               const newResults = searchData.results || [];
-              // 既存の検索結果と統合（重複除去）
-              const existingUrls = new Set(summarySearchResults.map(r => r.url));
-              const uniqueNewResults = newResults.filter((r: SearchResult) => !existingUrls.has(r.url));
-              summarySearchResults = [...summarySearchResults, ...uniqueNewResults];
               summaryKeywordResults.push(...newResults);
             }
           }
-          // 最大件数に制限
-          summarySearchResults = summarySearchResults.slice(0, searchConfig.maxResults);
+          // 統合前の検索結果を開始前の検索結果と統合
+          // 重複URLの場合は統合前の結果で上書き（より新しい情報を優先）
+          const resultsByUrl = new Map<string, SearchResult>();
+          // まず開始前の結果を追加
+          for (const result of summarySearchResults) {
+            resultsByUrl.set(result.url, result);
+          }
+          // 統合前の結果で上書き（重複URLの場合は新しいものに置き換え）
+          for (const result of summaryKeywordResults) {
+            resultsByUrl.set(result.url, result);
+          }
+          summarySearchResults = Array.from(resultsByUrl.values());
           setCurrentSearchResults(summarySearchResults);
 
           // 検索キーワード情報を追加（検索結果を含む、最大件数に制限）
