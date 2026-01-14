@@ -84,6 +84,7 @@ export interface SSESearchingEvent {
 export interface SSESearchResultsEvent {
   type: 'search_results';
   searchResults: SearchResult[];
+  searchResultsAccumulated?: SearchResult[]; // 累積検索結果（全タイミングの合計）
 }
 
 export interface SSESearchKeywordsEvent {
@@ -128,7 +129,7 @@ export interface SSEEventHandlers {
   onReadyForSummary?: () => void;
   onComplete?: () => void;
   onSearching?: (searchResults?: SearchResult[]) => void;
-  onSearchResults?: (searchResults: SearchResult[]) => void;
+  onSearchResults?: (searchResults: SearchResult[], searchResultsAccumulated?: SearchResult[]) => void;
   onSearchKeywords?: (searchKeywords: SearchKeywordInfo) => void;
   onSearchProgress?: (searchProgress: SSESearchProgressEvent['searchProgress']) => void;
 }
@@ -175,7 +176,7 @@ export function parseSSELine(line: string, handlers: SSEEventHandlers): void {
         handlers.onSearching?.(event.searchResults);
         break;
       case 'search_results':
-        handlers.onSearchResults?.(event.searchResults);
+        handlers.onSearchResults?.(event.searchResults, event.searchResultsAccumulated);
         break;
       case 'search_keywords':
         handlers.onSearchKeywords?.(event.searchKeywords);

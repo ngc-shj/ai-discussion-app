@@ -55,12 +55,8 @@ export async function POST(request: NextRequest) {
                 round,
               });
             },
-            onSearchResult: (results) => {
-              sendSSE({
-                type: 'search_results',
-                searchResults: results,
-              });
-            },
+            // onSearchResultは使用しない（yieldで返されるsearch_resultsイベントに
+            // searchResultsAccumulatedが含まれているため、そちらを使用する）
           })) {
             sendSSE(progress);
           }

@@ -27,6 +27,7 @@ export interface DiscussionSSEEvent {
   summaryPrompt?: string;
   error?: string;
   searchResults?: SearchResult[];
+  searchResultsAccumulated?: SearchResult[]; // 累積検索結果（全タイミングの合計）
   searchKeywords?: SearchKeywordInfo; // 検索キーワード情報
   searchProgress?: {
     currentKeywordIndex: number;

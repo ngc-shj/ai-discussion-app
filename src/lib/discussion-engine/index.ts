@@ -216,8 +216,6 @@ export async function* runDiscussion(
           const existingUrls = new Set(roundSearchResults.map(r => r.url));
           const uniqueNewResults = newResults.filter(r => !existingUrls.has(r.url));
           roundSearchResults = [...roundSearchResults, ...uniqueNewResults];
-          // 全体の検索結果にもマージ
-          currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
         }
 
         // 完了を通知
@@ -232,24 +230,23 @@ export async function* runDiscussion(
         };
       }
 
-      // maxResultsで検索結果を制限
-      if (searchConfig.maxResults && currentSearchResults.length > searchConfig.maxResults) {
-        currentSearchResults = currentSearchResults.slice(0, searchConfig.maxResults);
-      }
-      // このラウンドの結果も制限
-      if (searchConfig.maxResults && roundSearchResults.length > searchConfig.maxResults) {
-        roundSearchResults = roundSearchResults.slice(0, searchConfig.maxResults);
-      }
+      // このラウンドの検索結果をmaxResultsで制限
+      roundSearchResults = roundSearchResults.slice(0, searchConfig.maxResults);
+
+      // 制限後の結果を全体の累積結果にマージ
+      currentSearchResults = mergeSearchResults(currentSearchResults, roundSearchResults);
 
       // 検索結果をコールバックで通知（全体の累積結果）
       if (currentSearchResults.length > 0) {
         request.onSearchResult?.(currentSearchResults);
       }
 
-      // 検索完了を通知（このラウンドの結果のみ）
+      // 検索完了を通知（このラウンドの結果のみ、UI表示用）
+      // searchResultsAccumulatedは全体の累積結果（プロンプト生成用）
       yield {
         type: 'search_results',
         searchResults: roundSearchResults,
+        searchResultsAccumulated: currentSearchResults,
       };
     }
 
