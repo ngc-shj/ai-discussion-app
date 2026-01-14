@@ -328,16 +328,21 @@ export function CurrentTurnDisplay({
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
                       <span className="text-xs md:text-sm text-gray-300">
-                        統合前のWeb検索中... ({searchProgress.currentKeywordIndex + 1}/{searchProgress.totalKeywords})
+                        {searchProgress.phase === 'keywords'
+                          ? '検索キーワード生成中...'
+                          : `統合前のWeb検索中... (${searchProgress.currentKeywordIndex + 1}/${searchProgress.totalKeywords})`
+                        }
                       </span>
                     </div>
-                    {/* 進捗バー */}
-                    <div className="w-full bg-gray-700 rounded-full h-2">
-                      <div
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${((searchProgress.currentKeywordIndex + 1) / searchProgress.totalKeywords) * 100}%` }}
-                      />
-                    </div>
+                    {/* 進捗バー（キーワード生成中は非表示） */}
+                    {searchProgress.phase !== 'keywords' && searchProgress.totalKeywords > 0 && (
+                      <div className="w-full bg-gray-700 rounded-full h-2">
+                        <div
+                          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${((searchProgress.currentKeywordIndex + 1) / searchProgress.totalKeywords) * 100}%` }}
+                        />
+                      </div>
+                    )}
                     {/* 現在検索中のキーワード */}
                     {searchProgress.currentKeyword && (
                       <div className="text-xs text-gray-400">
