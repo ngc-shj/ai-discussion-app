@@ -128,44 +128,16 @@ export default function Home() {
   // プリセットモーダルの開閉状態
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
 
-  // 初期ロード完了フラグ
-  const initialRestoreDoneRef = useRef(false);
+
 
   // 初期ロード時に中断状態を復元
   useEffect(() => {
-    // 初期ロードが完了し、中断状態があり、まだ復元していない場合のみ実行
+    // 初期ロードが完了していない場合は何もしない
     if (!isInitialLoadComplete) return;
-    if (!interruptedState) return;
-    if (initialRestoreDoneRef.current) return;
 
-    initialRestoreDoneRef.current = true;
-
-    // 設定を復元
-    restoreFromSession({
-      participants: interruptedState.participants,
-      discussionMode: interruptedState.discussionMode,
-      discussionDepth: interruptedState.discussionDepth,
-      directionGuide: interruptedState.directionGuide,
-      terminationConfig: interruptedState.terminationConfig,
-      userProfile: interruptedState.userProfile,
-    });
-
-    // 議論の表示状態を復元
-    restoreDiscussionState({
-      topic: interruptedState.topic,
-      messages: interruptedState.messages,
-      searchResults: interruptedState.searchResults,
-      searchKeywords: interruptedState.searchKeywords,
-      // 統合回答生成中だった場合は'awaiting'として扱い、ボタンを表示
-      summaryPhase: interruptedState.summaryPhase === 'generating' ? 'awaiting' : interruptedState.summaryPhase,
-      startMarker: interruptedState.startMarker,
-      extensionMarkers: interruptedState.extensionMarkers,
-      discussionMode: interruptedState.discussionMode,
-      discussionDepth: interruptedState.discussionDepth,
-      directionGuide: interruptedState.directionGuide,
-      terminationConfig: interruptedState.terminationConfig,
-    });
-  }, [isInitialLoadComplete, interruptedState, restoreFromSession, restoreDiscussionState]);
+    // リロード時には常に中断状態をクリア（未選択状態にする）
+    discardInterrupted();
+  }, [isInitialLoadComplete, discardInterrupted]);
 
 
   // 新しいセッションを開始

@@ -84,53 +84,7 @@ export function useSessionManager(): UseSessionManagerState & UseSessionManagerA
   // 初期ロード
   useEffect(() => {
     const init = async () => {
-      const loadedSessions = await loadSessions();
-
-      // まず localStorage から中断状態をチェック（手動中断の場合）
-      const savedInterrupted = getInterruptedState();
-      if (savedInterrupted) {
-        setInterruptedStateInternal(savedInterrupted);
-        // 対応するセッションを選択
-        const session = loadedSessions.find(s => s.id === savedInterrupted.sessionId);
-        if (session) {
-          setCurrentSession(session);
-        }
-        setIsInitialLoadComplete(true);
-        return;
-      }
-
-      // IndexedDB から中断状態を持つ最新のセッションを探す（自動保存の場合）
-      const sessionWithInterrupted = loadedSessions.find(s => s.interruptedTurn);
-      if (sessionWithInterrupted) {
-        setCurrentSession(sessionWithInterrupted);
-        const turn = sessionWithInterrupted.interruptedTurn!;
-        // 注意: InterruptedTurnState/InterruptedDiscussionSnapshot にフィールドを追加した場合、
-        // ここと selectSession の両方で対応するフィールドを追加すること
-        const interrupted: InterruptedDiscussionSnapshot = {
-          sessionId: sessionWithInterrupted.id,
-          topic: turn.topic,
-          participants: turn.participants || sessionWithInterrupted.participants,
-          messages: turn.messages,
-          currentRound: turn.currentRound,
-          currentParticipantIndex: turn.currentParticipantIndex,
-          totalRounds: turn.totalRounds,
-          searchResults: turn.searchResults,
-          searchKeywords: turn.searchKeywords,
-          completedSearchKeywordIndex: turn.completedSearchKeywordIndex,
-          searchTiming: turn.searchTiming, // 検索タイミングを復元
-          searchConfig: turn.searchConfig,
-          userProfile: turn.userProfile,
-          discussionMode: turn.discussionMode,
-          discussionDepth: turn.discussionDepth,
-          directionGuide: turn.directionGuide,
-          terminationConfig: turn.terminationConfig,
-          interruptedAt: turn.interruptedAt,
-          summaryPhase: turn.summaryPhase,
-          startMarker: turn.startMarker,
-          extensionMarkers: turn.extensionMarkers,
-        };
-        setInterruptedStateInternal(interrupted);
-      }
+      await loadSessions();
       setIsInitialLoadComplete(true);
     };
     init();
