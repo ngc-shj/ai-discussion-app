@@ -47,8 +47,6 @@ async function judgeAndExtractWithAI(
 
   // fullContentがある場合はそれを使用、なければcontentを使用
   const contentToAnalyze = result.fullContent || result.content;
-  // 長すぎる場合は切り詰め（トークン制限対策）
-  const truncatedContent = contentToAnalyze.slice(0, 8000);
 
   const prompt = `あなたは検索結果の関連性を判定し、関連部分を抽出する専門家です。
 
@@ -59,7 +57,7 @@ ${topic}
 タイトル: ${result.title}
 URL: ${result.url}
 内容:
-${truncatedContent}
+${contentToAnalyze}
 
 【タスク】
 1. この検索結果がトピックに関連しているかを判定してください
@@ -67,7 +65,7 @@ ${truncatedContent}
    - トピックに含まれる人名・組織名と、検索結果に含まれる人名・組織名が一致しているか
    - 同姓同名の別人や、名前が似ている別の人物・組織ではないか
    - 検索結果の内容がトピックの文脈に適切か
-3. 関連している場合は、トピックに関係する重要な情報のみを抽出してください（最大1000文字程度）
+3. 関連している場合は、トピックに関係する重要な情報のみを抽出してください（最大3000文字程度）
    不要な情報（関係ない人物の話題、広告、ナビゲーション等）は除外してください
 
 【回答形式】
