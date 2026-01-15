@@ -1565,8 +1565,10 @@ export function useDiscussion(): UseDiscussionReturn {
             participants,
             messages: collectedMessagesRef.current,
             currentRound: interruptedRound,
-            // 参加者インデックスは実際の進捗を保存（検索再開はsearchTimingで判断）
-            currentParticipantIndex: currentDiscussionUiProgressRef.current.currentParticipantIndex,
+            // 検索中の中断時は参加者インデックスを0にリセット（検索は参加者発言の前に実行されるため）
+            currentParticipantIndex: lastSearchTimingRef.current
+              ? 0
+              : currentDiscussionUiProgressRef.current.currentParticipantIndex,
             totalRounds: terminationConfig.maxRounds,
             searchResults: searchResults.length > 0 ? searchResults : undefined,
             searchKeywords: searchKeywordsForInterrupted.length > 0 ? searchKeywordsForInterrupted : undefined,
@@ -1992,8 +1994,10 @@ export function useDiscussion(): UseDiscussionReturn {
             participants: interruptedState.participants,
             messages: collectedMessagesRef.current,
             currentRound: interruptedRound,
-            // 参加者インデックスは実際の進捗を保存（検索再開はsearchTimingで判断）
-            currentParticipantIndex: currentDiscussionUiProgressRef.current.currentParticipantIndex,
+            // 検索中の中断時は参加者インデックスを0にリセット（検索は参加者発言の前に実行されるため）
+            currentParticipantIndex: lastSearchTimingRef.current
+              ? 0
+              : currentDiscussionUiProgressRef.current.currentParticipantIndex,
             totalRounds: interruptedState.totalRounds,
             searchResults: interruptedState.searchResults,
             searchKeywords: collectedSearchKeywordsRef.current.length > 0 ? collectedSearchKeywordsRef.current : undefined,

@@ -93,6 +93,9 @@ export async function POST(request: NextRequest) {
       relevanceFilter,
       defaultAIProvider,
       defaultAIModel,
+      // 検索タイミング（クライアント側オーケストレーション用）
+      timing = 'start',
+      searchKeywords,
     } = body;
 
     if (!query) {
@@ -132,12 +135,13 @@ export async function POST(request: NextRequest) {
         ? { provider: defaultAIProvider, model: defaultAIModel }
         : undefined;
 
-      // 開始時検索用のコンテキスト
-      const startSearchContext: SearchContext = {
-        timing: 'start',
+      // 検索コンテキスト（タイミングとキーワードを設定）
+      const searchContext: SearchContext = {
+        timing: timing as 'start' | 'round' | 'summary',
+        searchKeywords: searchKeywords || undefined,
       };
 
-      const { results, warnings } = await performSearch(query, searchConfig, topic, defaultAI, startSearchContext);
+      const { results, warnings } = await performSearch(query, searchConfig, topic, defaultAI, searchContext);
 
       // filteredCountをwarningから抽出
       const lowRelevanceWarning = warnings?.find(w => w.type === 'low_relevance');
