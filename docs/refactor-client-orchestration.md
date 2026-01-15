@@ -192,3 +192,35 @@ data: { error: string }
 - IndexedDB の既存データ構造は維持
 - 検索キャッシュは共有（サーバーサイドで動作）
 - SSEのエラーハンドリングを適切に実装
+
+---
+
+## 進捗ログ
+
+### 2026-01-16: フェーズ1完了
+
+#### 完了した作業
+
+1. **`/api/ai-generate` 作成** - [src/app/api/ai-generate/route.ts](../src/app/api/ai-generate/route.ts)
+   - SSEストリーミングでAI発言を返す
+   - `message_chunk`, `message`, `error`, `complete` イベント対応
+
+2. **`/api/search` 拡張** - [src/app/api/search/route.ts](../src/app/api/search/route.ts)
+   - `timing` パラメータ追加 ('start' | 'round' | 'summary')
+   - `searchKeywords` パラメータ追加
+   - `SearchContext` を `performSearch` に渡すように修正
+
+3. **既存API確認**
+   - `/api/summarize` - そのまま使用可能
+   - `/api/followups` - そのまま使用可能
+
+4. **バグ修正: 検索中断時の `currentParticipantIndex`**
+   - 問題: ラウンド検索中に中断→再開すると順序が逆になる
+   - 原因: `currentParticipantIndex` が0以外の値で保存されていた
+   - 修正: `searchTiming` が設定されている場合（start/round/summary）は常に0を使用
+   - 理由: 検索は参加者発言の前に実行されるため
+
+#### 次のステップ: フェーズ2
+
+- `useDiscussion` をクライアント側ループに書き換え
+- 複数の `xxxRef` 変数の整理（クライアント側オーケストレーションで簡素化可能）
