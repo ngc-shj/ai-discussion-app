@@ -3,7 +3,7 @@ import { createProvider, createDiscussionPrompt, createFollowUpPrompt, parseFoll
 import { createSearchKeywordPrompt, SearchKeywordTiming } from '../ai-providers/prompt-formatters';
 import { DiscussionSSEEvent, DiscussionRequest, getProviderDisplayName } from './types';
 import { checkConsensus, checkTerminationKeywords } from './termination';
-import { performSearch, mergeSearchResults, DefaultAIConfig } from '../search';
+import { performSearch, mergeSearchResults, DefaultAIConfig, SearchContext } from '../search';
 import { logger } from '@/lib/logger';
 
 const log = logger.discussion;
@@ -224,7 +224,12 @@ export async function* runDiscussion(
           },
         };
 
-        const { results: newResults } = await performSearch(keyword, searchConfig, topic, defaultAI);
+        // ラウンド検索用のコンテキスト
+        const roundSearchContext: SearchContext = {
+          timing: 'round',
+          searchKeywords: searchKeywords,
+        };
+        const { results: newResults } = await performSearch(keyword, searchConfig, topic, defaultAI, roundSearchContext);
         if (newResults.length > 0) {
           // このラウンドの結果に追加（重複除去）
           const existingUrls = new Set(roundSearchResults.map(r => r.url));
@@ -378,8 +383,13 @@ export async function* runDiscussion(
             provider: participants[0].provider,
             model: participants[0].model,
           };
+          // オンデマンド検索用のコンテキスト（議論中の検索なのでroundとして扱う）
+          const onDemandSearchContext: SearchContext = {
+            timing: 'round',
+            searchKeywords: searchQueries,
+          };
           for (const query of searchQueries) {
-            const { results: newResults } = await performSearch(query, searchConfig, topic, onDemandDefaultAI);
+            const { results: newResults } = await performSearch(query, searchConfig, topic, onDemandDefaultAI, onDemandSearchContext);
             if (newResults.length > 0) {
               currentSearchResults = mergeSearchResults(currentSearchResults, newResults);
             }

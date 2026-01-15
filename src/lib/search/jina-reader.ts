@@ -177,7 +177,7 @@ export async function fetchPageContent(
   // キャッシュをチェック
   const cachedContent = getFromCache(url);
   if (cachedContent) {
-    log.info('Cache hit', { url, contentLength: cachedContent.length });
+    log.info('Cache hit (jina)', { url, contentLength: cachedContent.length });
     return {
       url,
       content: cachedContent,
