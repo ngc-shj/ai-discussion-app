@@ -8,7 +8,8 @@ import {
   SearchWarning,
 } from './types';
 import { createWarningFromError } from './warning-utils';
-import { filterByRelevance } from './relevance-filter';
+import { filterByRelevance, SearchContext } from './relevance-filter';
+import { getSearchResultsFromCache, setSearchResultsToCache } from './cache';
 import {
   SearXNGProvider,
   TavilyProvider,
@@ -22,6 +23,8 @@ const log = logger.search;
 
 // 型定義のエクスポート
 export * from './types';
+export type { SearchContext } from './relevance-filter';
+export { clearSearchCache, clearRelevanceCache, clearAllSearchCaches, getCacheStats } from './cache';
 
 // プロバイダーのエクスポート
 export * from './providers';
@@ -128,8 +131,23 @@ export async function fetchSearchResults(params: SearchParams): Promise<{
   totalResults: number;
   provider: SearchProvider;
   warnings?: SearchWarning[];
+  fromCache?: boolean;
 }> {
   const provider = params.provider || getDefaultSearchProvider();
+
+  // キャッシュをチェック
+  const cachedResults = getSearchResultsFromCache(params.query, provider, params.maxResults);
+  if (cachedResults) {
+    log.info('Cache hit (search)', { query: params.query, resultCount: cachedResults.length });
+    return {
+      results: cachedResults,
+      query: params.query,
+      totalResults: cachedResults.length,
+      provider,
+      fromCache: true,
+    };
+  }
+
   const searchProvider = getSearchProvider(provider, params.engines);
 
   const providerParams: SearchProviderParams = {
@@ -147,6 +165,11 @@ export async function fetchSearchResults(params: SearchParams): Promise<{
     content: result.content,
     publishedDate: result.publishedDate,
   }));
+
+  // キャッシュに保存
+  if (results.length > 0) {
+    setSearchResultsToCache(params.query, results, provider, params.maxResults);
+  }
 
   return {
     results,
@@ -177,12 +200,14 @@ export interface DefaultAIConfig {
  * @param config 検索設定
  * @param topic 関連性フィルタリング用のトピック
  * @param defaultAI 関連性フィルタリング用のデフォルトAI設定（最初の参加者のプロバイダー/モデルを使用）
+ * @param searchContext 検索コンテキスト（検索タイミングとキーワード）
  */
 export async function performSearch(
   query: string,
   config: SearchConfig,
   topic?: string,
-  defaultAI?: DefaultAIConfig
+  defaultAI?: DefaultAIConfig,
+  searchContext?: SearchContext
 ): Promise<{ results: SearchResult[]; warnings?: SearchWarning[] }> {
   try {
     const { results, warnings = [] } = await fetchSearchResults({
@@ -218,6 +243,7 @@ export async function performSearch(
         threshold: config.relevanceFilter.threshold,
         aiProvider,
         aiModel,
+        searchContext,
       });
       processedResults = filterResult.results;
       if (filterResult.warning) {

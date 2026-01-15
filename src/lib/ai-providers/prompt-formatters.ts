@@ -328,7 +328,7 @@ ${messagesXml}
 /**
  * XML属性値をエスケープ
  */
-function escapeXmlAttr(str: string): string {
+export function escapeXmlAttr(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;')
@@ -340,7 +340,7 @@ function escapeXmlAttr(str: string): string {
 /**
  * XMLコンテンツをエスケープ
  */
-function escapeXmlContent(str: string): string {
+export function escapeXmlContent(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

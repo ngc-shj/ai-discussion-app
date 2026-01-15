@@ -11,6 +11,7 @@ export { OpenAIProvider } from './openai';
 export { GeminiProvider } from './gemini';
 export { createDiscussionPrompt, createFollowUpPrompt, parseFollowUpResponse } from './types';
 export type { AIProvider, ModelInfo } from './types';
+export { escapeXmlAttr, escapeXmlContent } from './prompt-formatters';
 
 // プロバイダーのファクトリー関数
 export function createProvider(type: AIProviderType, model?: string): AIProvider {

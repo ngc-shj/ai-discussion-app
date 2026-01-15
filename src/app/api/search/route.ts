@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchSearchResults, performSearch, DefaultAIConfig } from '@/lib/search';
+import { fetchSearchResults, performSearch, DefaultAIConfig, SearchContext } from '@/lib/search';
 import { enrichSearchResultsWithContent } from '@/lib/search/jina-reader';
 import { SearchProviderType, SearchConfig } from '@/types';
 import { logger } from '@/lib/logger';
@@ -132,7 +132,12 @@ export async function POST(request: NextRequest) {
         ? { provider: defaultAIProvider, model: defaultAIModel }
         : undefined;
 
-      const { results, warnings } = await performSearch(query, searchConfig, topic, defaultAI);
+      // 開始時検索用のコンテキスト
+      const startSearchContext: SearchContext = {
+        timing: 'start',
+      };
+
+      const { results, warnings } = await performSearch(query, searchConfig, topic, defaultAI, startSearchContext);
 
       // filteredCountをwarningから抽出
       const lowRelevanceWarning = warnings?.find(w => w.type === 'low_relevance');
