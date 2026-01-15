@@ -224,3 +224,37 @@ data: { error: string }
 
 - `useDiscussion` をクライアント側ループに書き換え
 - 複数の `xxxRef` 変数の整理（クライアント側オーケストレーションで簡素化可能）
+
+### 2026-01-16: フェーズ2進行中
+
+#### 完了した作業
+
+1. **`src/lib/client-orchestration.ts` 作成**
+   - `runClientOrchestration`: メインオーケストレーション関数
+   - `generateSearchKeywords`: 検索キーワード生成
+   - `performSearch`: 検索実行
+   - `generateAIMessage`: AI発言生成（SSE）
+   - `generateSummary`: 統合回答生成（SSE）
+   - `generateFollowUps`: フォローアップ生成
+   - `processSSE`: SSEストリーム処理ユーティリティ
+
+#### 設計ポイント
+
+- **DiscussionState**: 議論の現在状態を表す型
+  - `phase`: 'idle' | 'searching' | 'generating' | 'summarizing' | 'followup' | 'complete' | 'error'
+  - `currentRound`, `currentParticipantIndex`: 再開時に使用
+  - `messages`, `searchResults`, `searchKeywords`: 累積データ
+
+- **中断ポイント**: `shouldInterrupt()` コールバックで制御
+  - 各検索の前
+  - 各AI発言の前
+  - 統合回答の前
+
+- **IndexedDB連携**: `useDiscussion` で `onStateChange` コールバックを実装し、状態変更時にIndexedDBに保存
+
+#### 残りの作業
+
+- [ ] `useDiscussion` に `startDiscussionNew` を追加（新オーケストレーション使用）
+- [ ] IndexedDB保存処理の実装
+- [ ] 既存の `startDiscussion` と並行稼働でテスト
+- [ ] 問題なければ旧コードを削除
