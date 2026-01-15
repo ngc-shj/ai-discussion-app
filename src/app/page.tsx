@@ -11,7 +11,7 @@ import {
 import {
   DiscussionPanel,
   ParticipantsPanel,
-  SettingsContent,
+  SettingsModal,
   InputForm,
   ProgressIndicator,
   SessionSidebar,
@@ -121,8 +121,8 @@ export default function Home() {
   // PC用サイドバー折りたたみ状態
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsCollapsed, setIsSettingsCollapsed] = useState(false);
-  // 設定モード（右パネルの表示切り替え）
-  const [isSettingsMode, setIsSettingsMode] = useState(false);
+  // 設定モーダルの開閉状態
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   // フォローアップ用のプリセットトピック
   const [presetTopic, setPresetTopic] = useState<string>('');
   // プリセットモーダルの開閉状態
@@ -543,100 +543,6 @@ export default function Home() {
   const isSettingsDisabled = isProcessing;
   const isSessionSelectionDisabled = isProcessing;
 
-  // 設定モード時は全画面設定画面を表示
-  if (isSettingsMode) {
-    return (
-      <div className="flex h-screen bg-gray-900 text-white">
-        {/* 左サイドバー - 設定モード時も表示 */}
-        {!isSidebarCollapsed && (
-          <div className="hidden md:block">
-            <SessionSidebar
-              sessions={sessions}
-              currentSessionId={currentSession?.id || null}
-              onSelectSession={(session) => {
-                handleSelectSession(session);
-                setIsSettingsMode(false);
-              }}
-              onNewSession={() => {
-                handleNewSession();
-                setIsSettingsMode(false);
-              }}
-              onDeleteSession={handleDeleteSession}
-              onBulkDeleteSessions={handleBulkDeleteSessions}
-              onRenameSession={handleRenameSession}
-              disabled={isSessionSelectionDisabled}
-              onCollapse={() => setIsSidebarCollapsed(true)}
-              onOpenSettings={() => setIsSettingsMode(true)}
-              onOpenPresets={() => setIsPresetModalOpen(true)}
-              presetCount={presets.length}
-            />
-          </div>
-        )}
-
-        {/* モバイル用サイドバー */}
-        <div className="md:hidden">
-          <SessionSidebar
-            sessions={sessions}
-            currentSessionId={currentSession?.id || null}
-            onSelectSession={(session) => {
-              handleSelectSession(session);
-              setIsSidebarOpen(false);
-              setIsSettingsMode(false);
-            }}
-            onNewSession={() => {
-              handleNewSession();
-              setIsSidebarOpen(false);
-              setIsSettingsMode(false);
-            }}
-            onDeleteSession={handleDeleteSession}
-            onBulkDeleteSessions={handleBulkDeleteSessions}
-            onRenameSession={handleRenameSession}
-            disabled={isSessionSelectionDisabled}
-            isOpen={isSidebarOpen}
-            onClose={() => setIsSidebarOpen(false)}
-            onOpenSettings={() => {
-              setIsSidebarOpen(false);
-              setIsSettingsMode(true);
-            }}
-            onOpenPresets={() => {
-              setIsSidebarOpen(false);
-              setIsPresetModalOpen(true);
-            }}
-            presetCount={presets.length}
-          />
-        </div>
-
-        {/* 設定画面（全画面） */}
-        <div className="flex-1 h-full">
-          <SettingsContent
-            apiKeys={apiKeys}
-            onApiKeyChange={setApiKey}
-            onSaveApiKeys={saveApiKeys}
-            hasUnsavedChanges={hasUnsavedApiKeyChanges}
-            isUrlValid={isUrlValid}
-            userProfile={userProfile}
-            onProfileChange={setUserProfile}
-            onBack={() => setIsSettingsMode(false)}
-            disabled={isSettingsDisabled}
-          />
-        </div>
-
-        {/* プリセット管理モーダル（設定モード時用） */}
-        <PresetManagerModal
-          isOpen={isPresetModalOpen}
-          onClose={() => setIsPresetModalOpen(false)}
-          presets={presets}
-          onLoadPreset={handleLoadPreset}
-          onSaveCurrentAsPreset={handleSaveAsPreset}
-          onRenamePreset={(id, name) => updatePreset(id, { name })}
-          onDeletePreset={deletePreset}
-          onDuplicatePreset={duplicatePreset}
-          validatePreset={handleValidatePreset}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-screen bg-gray-900 text-white">
       {/* 左サイドバー: セッション一覧 - デスクトップ */}
@@ -652,7 +558,7 @@ export default function Home() {
             onRenameSession={handleRenameSession}
             disabled={isSessionSelectionDisabled}
             onCollapse={() => setIsSidebarCollapsed(true)}
-            onOpenSettings={() => setIsSettingsMode(true)}
+              onOpenSettings={() => setIsSettingsModalOpen(true)}
             onOpenPresets={() => setIsPresetModalOpen(true)}
             presetCount={presets.length}
           />
@@ -680,7 +586,7 @@ export default function Home() {
           onClose={() => setIsSidebarOpen(false)}
           onOpenSettings={() => {
             setIsSidebarOpen(false);
-            setIsSettingsMode(true);
+            setIsSettingsModalOpen(true);
           }}
           onOpenPresets={() => {
             setIsSidebarOpen(false);
@@ -908,6 +814,20 @@ export default function Home() {
         onDeletePreset={deletePreset}
         onDuplicatePreset={duplicatePreset}
         validatePreset={handleValidatePreset}
+      />
+
+      {/* 設定モーダル */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        apiKeys={apiKeys}
+        onApiKeyChange={setApiKey}
+        onSaveApiKeys={saveApiKeys}
+        hasUnsavedChanges={hasUnsavedApiKeyChanges}
+        isUrlValid={isUrlValid}
+        userProfile={userProfile}
+        onProfileChange={setUserProfile}
+        disabled={isSettingsDisabled}
       />
     </div>
   );

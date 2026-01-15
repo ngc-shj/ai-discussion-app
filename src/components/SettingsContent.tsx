@@ -256,26 +256,6 @@ export function SettingsContent({
 
   return (
     <div className="flex flex-col h-full bg-gray-900">
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700 shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-            title="戻る"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h2 className="text-lg font-semibold text-white">設定</h2>
-        </div>
-        {/* 全タブ自動保存 */}
-        <span className="text-sm text-gray-500">
-          自動保存
-        </span>
-      </div>
 
       {/* コンテンツエリア */}
       <div className="flex flex-1 min-h-0">
