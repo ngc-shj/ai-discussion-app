@@ -2593,14 +2593,21 @@ export function useDiscussion(): UseDiscussionReturn {
             }
           }
 
-          // 中断時の状態保存（awaiting/complete/errorは正常終了なので除外）
-          if (localShouldInterruptRef.current && state.phase !== 'awaiting' && state.phase !== 'complete' && state.phase !== 'error') {
-            // フェーズに応じたsearchTimingを決定
-            // - generating_keywords/searching: 最新のsearchKeywordsのtimingを使用
-            // - summarizing: 'summary'を設定（統合回答フェーズから再開するため）
+          // 状態保存のロジック
+          // シンプルな原則: フェーズ変化時に保存（中断ボタン押下時の特別な保存は不要）
+          // - フェーズ変化時: 現在の状態を保存
+          // - complete/error/idle: 正常終了または開始前なので保存不要
+          // 中断時は直前の保存済み状態から再開すればよい
+          if (phaseChanged && state.phase !== 'complete' && state.phase !== 'error' && state.phase !== 'idle') {
+            // フェーズに応じたsearchTimingとsummaryPhaseを決定
             let searchTiming: 'start' | 'round' | 'summary' | undefined;
-            if (state.phase === 'summarizing') {
+            let summaryPhase: 'awaiting' | 'searching' | 'generating' | 'idle' | undefined;
+
+            if (state.phase === 'awaiting') {
+              summaryPhase = 'awaiting';
+            } else if (state.phase === 'summarizing') {
               searchTiming = 'summary';
+              summaryPhase = 'generating';
             } else if (state.phase === 'generating_keywords' || state.phase === 'searching') {
               const latestKeywordInfo = state.searchKeywords[state.searchKeywords.length - 1];
               searchTiming = latestKeywordInfo?.timing;
@@ -2624,6 +2631,7 @@ export function useDiscussion(): UseDiscussionReturn {
               directionGuide,
               terminationConfig,
               startMarker: turnStartMarker,
+              summaryPhase,
             });
             saveInterruptedState(interrupted);
             setInterruptedState(interrupted);
@@ -2950,11 +2958,21 @@ export function useDiscussion(): UseDiscussionReturn {
             }
           }
 
-          // 中断時の状態保存
-          if (localShouldInterruptRef.current && state.phase !== 'awaiting' && state.phase !== 'complete' && state.phase !== 'error') {
+          // 状態保存のロジック
+          // シンプルな原則: フェーズ変化時に保存（中断ボタン押下時の特別な保存は不要）
+          // - フェーズ変化時: 現在の状態を保存
+          // - complete/error/idle: 正常終了または開始前なので保存不要
+          // 中断時は直前の保存済み状態から再開すればよい
+          if (phaseChanged && state.phase !== 'complete' && state.phase !== 'error' && state.phase !== 'idle') {
+            // フェーズに応じたsearchTimingとsummaryPhaseを決定
             let searchTiming: 'start' | 'round' | 'summary' | undefined;
-            if (state.phase === 'summarizing') {
+            let summaryPhase: 'awaiting' | 'searching' | 'generating' | 'idle' | undefined;
+
+            if (state.phase === 'awaiting') {
+              summaryPhase = 'awaiting';
+            } else if (state.phase === 'summarizing') {
               searchTiming = 'summary';
+              summaryPhase = 'generating';
             } else if (state.phase === 'generating_keywords' || state.phase === 'searching') {
               const latestKeywordInfo = state.searchKeywords[state.searchKeywords.length - 1];
               searchTiming = latestKeywordInfo?.timing;
@@ -2978,6 +2996,7 @@ export function useDiscussion(): UseDiscussionReturn {
               directionGuide: interruptedState.directionGuide,
               terminationConfig: interruptedState.terminationConfig,
               startMarker: turnStartMarker,
+              summaryPhase,
             });
             saveInterruptedState(interrupted);
             setInterruptedState(interrupted);
