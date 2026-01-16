@@ -22,6 +22,22 @@ import { logger } from '@/lib/logger';
 
 const log = logger.api.child({ route: '/api/ai-generate' });
 
+/**
+ * AI応答から{{SEARCH:query}}パターンを抽出
+ */
+function extractSearchQueries(content: string): string[] {
+  const pattern = /\{\{SEARCH:([^}]+)\}\}/g;
+  const queries: string[] = [];
+  let match;
+  while ((match = pattern.exec(content)) !== null) {
+    const query = match[1].trim();
+    if (query) {
+      queries.push(query);
+    }
+  }
+  return queries;
+}
+
 interface AIGenerateRequest {
   // 発言する参加者
   participant: DiscussionParticipant;
@@ -192,12 +208,13 @@ export async function POST(request: NextRequest) {
                 })}\n\n`));
               } else {
                 // 完成したメッセージを送信
+                const finalContent = response.content || accumulatedContent;
                 const message: DiscussionMessage = {
                   id: messageId,
                   participantId: participant.id,
                   provider: participant.provider,
                   model: participant.model,
-                  content: response.content || accumulatedContent,
+                  content: finalContent,
                   round,
                   timestamp: new Date(),
                   prompt,
@@ -206,9 +223,13 @@ export async function POST(request: NextRequest) {
                   color: participant.color,
                 };
 
+                // onDemand検索が有効な場合、検索クエリを抽出
+                const searchQueries = enableOnDemandSearch ? extractSearchQueries(finalContent) : [];
+
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                   type: 'message',
                   message,
+                  ...(searchQueries.length > 0 && { searchQueries }),
                 })}\n\n`));
               }
             } catch (streamError) {
@@ -236,9 +257,13 @@ export async function POST(request: NextRequest) {
                   color: participant.color,
                 };
 
+                // onDemand検索が有効な場合、検索クエリを抽出
+                const searchQueries = enableOnDemandSearch ? extractSearchQueries(response.content) : [];
+
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                   type: 'message',
                   message,
+                  ...(searchQueries.length > 0 && { searchQueries }),
                 })}\n\n`));
               }
             }
@@ -266,9 +291,13 @@ export async function POST(request: NextRequest) {
                 color: participant.color,
               };
 
+              // onDemand検索が有効な場合、検索クエリを抽出
+              const searchQueries = enableOnDemandSearch ? extractSearchQueries(response.content) : [];
+
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                 type: 'message',
                 message,
+                ...(searchQueries.length > 0 && { searchQueries }),
               })}\n\n`));
             }
           }

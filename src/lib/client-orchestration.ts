@@ -18,8 +18,10 @@ import {
   DiscussionDepth,
   DirectionGuide,
   PreviousTurnSummary,
+  TerminationConfig,
   formatParticipantDisplayName,
 } from '@/types';
+import { checkConsensus, checkTerminationKeywords } from '@/lib/termination';
 
 // ============================================================================
 // 型定義
@@ -37,6 +39,9 @@ export interface DiscussionState {
   summaryPrompt: string;
   suggestedFollowUps: string[];
   error: string | null;
+  // 早期終了情報
+  terminatedEarly?: boolean;
+  terminationReason?: 'consensus' | 'keyword';
 }
 
 /** 議論設定 */
@@ -51,6 +56,7 @@ export interface DiscussionConfig {
   directionGuide?: DirectionGuide;
   previousTurns?: PreviousTurnSummary[];
   initialSearchResults?: SearchResult[];
+  terminationConfig?: TerminationConfig;
   // 再開用パラメータ
   resumeFrom?: {
     currentRound: number;
@@ -219,8 +225,9 @@ export async function generateAIMessage(
   callbacks: {
     onChunk: (messageId: string, chunk: string, accumulated: string) => void;
     shouldInterrupt: () => boolean;
-  }
-): Promise<{ message: DiscussionMessage | null; interrupted: boolean; error?: string }> {
+  },
+  enableOnDemandSearch?: boolean
+): Promise<{ message: DiscussionMessage | null; interrupted: boolean; error?: string; searchQueries?: string[] }> {
   const response = await fetch('/api/ai-generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -236,6 +243,7 @@ export async function generateAIMessage(
       discussionMode: config.discussionMode,
       discussionDepth: config.discussionDepth,
       directionGuide: config.directionGuide,
+      enableOnDemandSearch,
     }),
   });
 
@@ -245,6 +253,7 @@ export async function generateAIMessage(
 
   let message: DiscussionMessage | null = null;
   let error: string | undefined;
+  let searchQueries: string[] | undefined;
 
   const { interrupted } = await processSSE(
     response,
@@ -259,6 +268,7 @@ export async function generateAIMessage(
           break;
         case 'message':
           message = event.message as DiscussionMessage;
+          searchQueries = event.searchQueries as string[] | undefined;
           break;
         case 'error':
           error = event.error as string;
@@ -268,7 +278,7 @@ export async function generateAIMessage(
     callbacks.shouldInterrupt
   );
 
-  return { message, interrupted, error };
+  return { message, interrupted, error, searchQueries };
 }
 
 /**
@@ -647,7 +657,10 @@ export async function runClientOrchestration(
           currentParticipantIndex: pIndex,
         });
 
-        const { message, interrupted, error } = await generateAIMessage(
+        // onDemand検索が有効かチェック
+        const enableOnDemandSearch = config.searchConfig?.enabled && config.searchConfig?.timing?.onDemand;
+
+        const { message, interrupted, error, searchQueries } = await generateAIMessage(
           config,
           participant,
           round,
@@ -656,7 +669,8 @@ export async function runClientOrchestration(
           {
             onChunk: callbacks.onMessageChunk,
             shouldInterrupt: callbacks.shouldInterrupt,
-          }
+          },
+          enableOnDemandSearch
         );
 
         if (interrupted) {
@@ -679,6 +693,77 @@ export async function runClientOrchestration(
         if (message) {
           state.messages.push(message);
           updateState({ messages: [...state.messages] });
+
+          // ============================================================================
+          // onDemand検索の実行（AIが{{SEARCH:query}}パターンで要求した場合）
+          // ============================================================================
+          if (searchQueries && searchQueries.length > 0 && config.searchConfig) {
+            updateState({ phase: 'searching' });
+
+            const defaultAI = {
+              provider: config.participants[0].provider,
+              model: config.participants[0].model,
+            };
+
+            for (let i = 0; i < searchQueries.length; i++) {
+              if (callbacks.shouldInterrupt()) {
+                return state;
+              }
+
+              callbacks.onSearchProgress(searchQueries[i], i, searchQueries.length);
+
+              try {
+                const { results } = await performSearch(
+                  searchQueries[i],
+                  config.searchConfig,
+                  config.topic,
+                  'round', // onDemandはラウンド中の検索として扱う
+                  searchQueries,
+                  defaultAI
+                );
+
+                // 重複除去してマージ
+                const existingUrls = new Set(state.searchResults.map(r => r.url));
+                const newResults = results.filter(r => !existingUrls.has(r.url));
+                state.searchResults = [...state.searchResults, ...newResults];
+              } catch (searchErr) {
+                // 検索エラーは警告としてログに出すが、議論は継続
+                console.warn('onDemand search failed:', searchErr);
+              }
+            }
+
+            updateState({ searchResults: state.searchResults });
+          }
+
+          // ============================================================================
+          // 終了条件チェック（各発言後）
+          // ============================================================================
+          const termConfig = config.terminationConfig;
+          if (termConfig) {
+            // 合意形成チェック
+            if (termConfig.condition === 'consensus' && termConfig.consensusThreshold) {
+              if (checkConsensus(state.messages, termConfig.consensusThreshold)) {
+                updateState({
+                  phase: 'awaiting',
+                  terminatedEarly: true,
+                  terminationReason: 'consensus',
+                });
+                return state;
+              }
+            }
+
+            // 終了キーワードチェック
+            if (termConfig.condition === 'keyword' && termConfig.terminationKeywords?.length) {
+              if (checkTerminationKeywords(message.content, termConfig.terminationKeywords)) {
+                updateState({
+                  phase: 'awaiting',
+                  terminatedEarly: true,
+                  terminationReason: 'keyword',
+                });
+                return state;
+              }
+            }
+          }
         }
       }
 
