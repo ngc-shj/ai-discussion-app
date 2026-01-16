@@ -19,7 +19,6 @@ import {
   DirectionGuide,
   PreviousTurnSummary,
   TerminationConfig,
-  formatParticipantDisplayName,
 } from '@/types';
 import { checkConsensus, checkTerminationKeywords } from '@/lib/termination';
 
@@ -377,6 +376,150 @@ export async function generateFollowUps(
 }
 
 // ============================================================================
+// 検索処理ヘルパー関数
+// ============================================================================
+
+interface ExecuteSearchParams {
+  timing: 'start' | 'round';
+  round?: number;
+  topic: string;
+  messages: DiscussionMessage[];
+  participants: DiscussionParticipant[];
+  searchConfig: SearchConfig;
+  state: DiscussionState;
+  callbacks: DiscussionCallbacks;
+  updateState: (updates: Partial<DiscussionState>) => void;
+}
+
+interface ExecuteSearchResult {
+  interrupted: boolean;
+  searchKeywordInfo: SearchKeywordInfo | null;
+}
+
+/**
+ * 検索キーワード生成と検索実行を行う共通関数
+ * start/roundタイミングで使用
+ */
+async function executeSearchWithKeywords(
+  params: ExecuteSearchParams
+): Promise<ExecuteSearchResult> {
+  const {
+    timing,
+    round,
+    topic,
+    messages,
+    participants,
+    searchConfig,
+    state,
+    callbacks,
+    updateState,
+  } = params;
+
+  // 中断チェック
+  if (callbacks.shouldInterrupt()) {
+    return { interrupted: true, searchKeywordInfo: null };
+  }
+
+  // キーワード生成中
+  const phaseUpdate: Partial<DiscussionState> = { phase: 'generating_keywords' };
+  if (round !== undefined) {
+    phaseUpdate.currentRound = round;
+  }
+  updateState(phaseUpdate);
+
+  // 検索キーワードを生成
+  const { keywords, prompt } = await generateSearchKeywords(
+    topic,
+    messages,
+    timing,
+    participants[0]
+  );
+
+  // 既存のエントリを探す
+  const existingIndex = timing === 'start'
+    ? state.searchKeywords.findIndex(kw => kw.timing === 'start')
+    : state.searchKeywords.findIndex(kw => kw.timing === 'round' && kw.round === round);
+
+  const keywordInfo: SearchKeywordInfo = {
+    timing,
+    ...(round !== undefined && { round }),
+    keywords,
+    prompt,
+    timestamp: new Date(),
+    // resultsは検索完了後に設定
+  };
+
+  if (existingIndex >= 0) {
+    state.searchKeywords[existingIndex] = keywordInfo;
+  } else {
+    state.searchKeywords.push(keywordInfo);
+  }
+
+  // キーワード生成完了後にphase: 'searching'とキーワード情報を一緒に更新
+  const searchingUpdate: Partial<DiscussionState> = {
+    phase: 'searching',
+    searchKeywords: [...state.searchKeywords],
+  };
+  if (round !== undefined) {
+    searchingUpdate.currentRound = round;
+  }
+  updateState(searchingUpdate);
+
+  const defaultAI = {
+    provider: participants[0].provider,
+    model: participants[0].model,
+  };
+
+  // 各キーワードで検索
+  const collectedResults: SearchResult[] = [];
+  for (let i = 0; i < keywords.length; i++) {
+    if (callbacks.shouldInterrupt()) {
+      // 中断時は完了したキーワードインデックスのみ記録
+      keywordInfo.completedKeywordIndex = i - 1;
+      const interruptUpdate: Partial<DiscussionState> = {
+        searchResults: state.searchResults,
+        searchKeywords: [...state.searchKeywords],
+      };
+      if (round !== undefined) {
+        interruptUpdate.currentRound = round;
+        interruptUpdate.messages = [...state.messages];
+      }
+      updateState(interruptUpdate);
+      return { interrupted: true, searchKeywordInfo: keywordInfo };
+    }
+
+    callbacks.onSearchProgress(keywords[i], i, keywords.length);
+
+    const { results } = await performSearch(
+      keywords[i],
+      searchConfig,
+      topic,
+      timing,
+      keywords,
+      defaultAI
+    );
+
+    // 重複除去してマージ
+    const existingUrls = new Set(state.searchResults.map(r => r.url));
+    const newResults = results.filter(r => !existingUrls.has(r.url));
+    state.searchResults = [...state.searchResults, ...newResults];
+    collectedResults.push(...newResults);
+  }
+
+  // 検索完了後にのみresultsを設定
+  keywordInfo.results = collectedResults;
+  keywordInfo.completedKeywordIndex = keywords.length - 1;
+
+  // searchKeywordsの状態を更新（resultsを含む）
+  updateState({
+    searchResults: state.searchResults,
+    searchKeywords: [...state.searchKeywords],
+  });
+
+  return { interrupted: false, searchKeywordInfo: keywordInfo };
+}
+
+// ============================================================================
 // メインオーケストレーション関数
 // ============================================================================
 
@@ -442,84 +585,20 @@ export async function runClientOrchestration(
       (!existingStartKeyword || existingStartKeyword.results === undefined);
 
     if (shouldRunStartSearch) {
-      if (callbacks.shouldInterrupt()) {
+      const { interrupted } = await executeSearchWithKeywords({
+        timing: 'start',
+        topic: config.topic,
+        messages: [], // 開始時はメッセージなし
+        participants: config.participants,
+        searchConfig: config.searchConfig!,
+        state,
+        callbacks,
+        updateState,
+      });
+
+      if (interrupted) {
         return state;
       }
-
-      // キーワード生成中
-      updateState({ phase: 'generating_keywords' });
-
-      // 開始時検索キーワードを生成
-      const { keywords, prompt } = await generateSearchKeywords(
-        config.topic,
-        [], // 開始時はメッセージなし
-        'start',
-        config.participants[0]
-      );
-
-      // 既存のエントリを探す（再開時に開始時検索のキーワードが既にある場合）
-      const existingStartIndex = state.searchKeywords.findIndex(kw => kw.timing === 'start');
-
-      const startKeywordInfo: SearchKeywordInfo = {
-        timing: 'start',
-        keywords,
-        prompt,
-        timestamp: new Date(),
-        // resultsは検索完了後に設定
-      };
-
-      if (existingStartIndex >= 0) {
-        // 既存のエントリを更新
-        state.searchKeywords[existingStartIndex] = startKeywordInfo;
-      } else {
-        // 新規追加
-        state.searchKeywords.push(startKeywordInfo);
-      }
-      // キーワード生成完了後にphase: 'searching'とキーワード情報を一緒に更新
-      updateState({ phase: 'searching', searchKeywords: [...state.searchKeywords] });
-
-      const defaultAI = {
-        provider: config.participants[0].provider,
-        model: config.participants[0].model,
-      };
-
-      // 各キーワードで検索（ローカル変数に結果を集める）
-      const collectedResults: SearchResult[] = [];
-      for (let i = 0; i < keywords.length; i++) {
-        if (callbacks.shouldInterrupt()) {
-          // 中断時は完了したキーワードインデックスのみ記録（resultsは設定しない - undefinedのまま）
-          startKeywordInfo.completedKeywordIndex = i - 1;
-          updateState({
-            searchResults: state.searchResults,
-            searchKeywords: [...state.searchKeywords],
-          });
-          return state;
-        }
-
-        callbacks.onSearchProgress(keywords[i], i, keywords.length);
-
-        const { results } = await performSearch(
-          keywords[i],
-          config.searchConfig!, // shouldRunStartSearchがtrueの場合、searchConfigは必ず存在
-          config.topic,
-          'start',
-          keywords,
-          defaultAI
-        );
-
-        // 重複除去してマージ
-        const existingUrls = new Set(state.searchResults.map(r => r.url));
-        const newResults = results.filter(r => !existingUrls.has(r.url));
-        state.searchResults = [...state.searchResults, ...newResults];
-        collectedResults.push(...newResults);
-      }
-
-      // 検索完了後にのみresultsを設定
-      startKeywordInfo.results = collectedResults;
-      startKeywordInfo.completedKeywordIndex = keywords.length - 1;
-
-      // searchKeywordsの状態を更新（resultsを含む）
-      updateState({ searchResults: state.searchResults, searchKeywords: [...state.searchKeywords] });
     }
 
     // ============================================================================
@@ -542,97 +621,24 @@ export async function runClientOrchestration(
 
       // ラウンド検索（2ラウンド目以降、または再開時）
       if (shouldRunRoundSearch) {
-        if (callbacks.shouldInterrupt()) {
-          // 中断時は現在の状態を全て更新
-          updateState({
-            currentRound: round,
-            searchResults: state.searchResults,
-            searchKeywords: [...state.searchKeywords],
-            messages: [...state.messages],
-          });
-          return state;
-        }
-
-        // キーワード生成中
-        updateState({ phase: 'generating_keywords', currentRound: round });
-
         // 前ラウンドのメッセージからキーワード生成
         const previousRoundMessages = state.messages.filter(m => m.round === round - 1);
-        const { keywords, prompt } = await generateSearchKeywords(
-          config.topic,
-          previousRoundMessages.length > 0 ? previousRoundMessages : state.messages,
-          'round',
-          config.participants[0]
-        );
 
-        // 既存のエントリを探す（再開時に同じラウンドのキーワードが既にある場合）
-        const existingIndex = state.searchKeywords.findIndex(
-          kw => kw.timing === 'round' && kw.round === round
-        );
-
-        const keywordInfo: SearchKeywordInfo = {
+        const { interrupted } = await executeSearchWithKeywords({
           timing: 'round',
           round,
-          keywords,
-          prompt,
-          timestamp: new Date(),
-          // resultsは検索完了後に設定
-        };
+          topic: config.topic,
+          messages: previousRoundMessages.length > 0 ? previousRoundMessages : state.messages,
+          participants: config.participants,
+          searchConfig: config.searchConfig!,
+          state,
+          callbacks,
+          updateState,
+        });
 
-        if (existingIndex >= 0) {
-          // 既存のエントリを更新
-          state.searchKeywords[existingIndex] = keywordInfo;
-        } else {
-          // 新規追加
-          state.searchKeywords.push(keywordInfo);
+        if (interrupted) {
+          return state;
         }
-        // キーワード生成完了後にphase: 'searching'とキーワード情報を一緒に更新
-        updateState({ phase: 'searching', currentRound: round, searchKeywords: [...state.searchKeywords] });
-
-        // 各キーワードで検索（ローカル変数に結果を集める）
-        const defaultAI = {
-          provider: config.participants[0].provider,
-          model: config.participants[0].model,
-        };
-
-        const collectedResults: SearchResult[] = [];
-        for (let i = 0; i < keywords.length; i++) {
-          if (callbacks.shouldInterrupt()) {
-            // 中断時は完了したキーワードインデックスのみ記録（resultsは設定しない - undefinedのまま）
-            keywordInfo.completedKeywordIndex = i - 1;
-            updateState({
-              currentRound: round,
-              searchResults: state.searchResults,
-              searchKeywords: [...state.searchKeywords],
-              messages: [...state.messages],
-            });
-            return state;
-          }
-
-          callbacks.onSearchProgress(keywords[i], i, keywords.length);
-
-          const { results } = await performSearch(
-            keywords[i],
-            config.searchConfig!, // shouldRunRoundSearchがtrueの場合、searchConfigは必ず存在
-            config.topic,
-            'round',
-            keywords,
-            defaultAI
-          );
-
-          // 重複除去してマージ
-          const existingUrls = new Set(state.searchResults.map(r => r.url));
-          const newResults = results.filter(r => !existingUrls.has(r.url));
-          state.searchResults = [...state.searchResults, ...newResults];
-          collectedResults.push(...newResults);
-        }
-
-        // 検索完了後にのみresultsを設定
-        keywordInfo.results = collectedResults;
-        keywordInfo.completedKeywordIndex = keywords.length - 1;
-
-        // searchKeywordsの状態を更新（resultsを含む）
-        updateState({ searchResults: state.searchResults, searchKeywords: [...state.searchKeywords] });
       }
 
       // 各参加者の発言
