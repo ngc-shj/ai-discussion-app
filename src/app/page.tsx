@@ -51,6 +51,7 @@ export default function Home() {
     currentSearchResults,
     currentSearchKeywords,
     isDiscussing,
+    isInterrupting,
     isSearching,
     searchProgress,
     isGeneratingFollowUps,
@@ -669,6 +670,7 @@ export default function Home() {
           currentFinalAnswer={currentFinalAnswer}
           currentSummaryPrompt={currentSummaryPrompt}
           isDiscussing={isDiscussing}
+          isInterrupting={isInterrupting}
           summaryPhase={summaryPhase}
           searchResults={currentSearchResults}
           searchKeywords={currentSearchKeywords}

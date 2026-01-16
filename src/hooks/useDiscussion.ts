@@ -71,6 +71,8 @@ export interface UseDiscussionState {
   currentSearchResults: SearchResult[];
   currentSearchKeywords: SearchKeywordInfo[];
   isDiscussing: boolean;
+  /** 中断処理中かどうか */
+  isInterrupting: boolean;
   /** 検索中かどうか（searchProgress !== null から派生） */
   isSearching: boolean;
   isGeneratingFollowUps: boolean;
@@ -291,6 +293,7 @@ export function useDiscussion(): UseDiscussionReturn {
   // 現在の議論で使用中の設定（延長時に参照するため）- 統合
   const [currentSettings, setCurrentSettings] = useState<CurrentSettings>(INITIAL_SETTINGS);
 
+  const [isInterrupting, setIsInterrupting] = useState(false);
   const interruptRequestedRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -355,6 +358,7 @@ export function useDiscussion(): UseDiscussionReturn {
     setSearchData(INITIAL_SEARCH_DATA);
     // ローディング・進行状況
     setIsDiscussing(false);
+    setIsInterrupting(false);
     setIsGeneratingFollowUps(false);
     setSummaryPhase('idle');
     setDiscussionUiProgress(INITIAL_PROGRESS);
@@ -407,6 +411,7 @@ export function useDiscussion(): UseDiscussionReturn {
 
   const handleInterrupt = useCallback(() => {
     interruptRequestedRef.current = true;
+    setIsInterrupting(true);
     // AbortControllerがあればキャンセル
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -682,6 +687,7 @@ export function useDiscussion(): UseDiscussionReturn {
       setStreamingMessage(null);
       setSearchUiProgress(null);
       setIsGeneratingFollowUps(false);
+      setIsInterrupting(false);
       setError(null);
 
       // ===== ステージ0: 統合前検索 =====
@@ -736,6 +742,7 @@ export function useDiscussion(): UseDiscussionReturn {
                 setInterruptedState(interruptedSnapshot);
               }
               setSummaryPhase('awaiting');
+              setIsInterrupting(false);
               return;
             }
             console.error('Summary search failed:', err);
@@ -843,6 +850,7 @@ export function useDiscussion(): UseDiscussionReturn {
             setInterruptedState(interruptedSnapshot);
           }
           setSummaryPhase('awaiting');
+          setIsInterrupting(false);
           return;
         }
 
@@ -968,6 +976,7 @@ export function useDiscussion(): UseDiscussionReturn {
             setInterruptedState(interruptedSnapshot);
           }
           setSummaryPhase('awaiting');
+          setIsInterrupting(false);
           return;
         }
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -1327,6 +1336,7 @@ export function useDiscussion(): UseDiscussionReturn {
         if (localShouldInterruptRef.current) {
           // 中断状態の保存は onStateChange 内で既に行われている
           setIsDiscussing(false);
+          setIsInterrupting(false);
           setStreamingMessage(null);
           setSearchUiProgress(null);
           return;
@@ -1444,6 +1454,7 @@ export function useDiscussion(): UseDiscussionReturn {
       setSearchUiProgress(null);
       setStreamingMessage(null);
       setIsGeneratingFollowUps(false);
+      setIsInterrupting(false);
 
       // 設定を復元
       setCurrentSettings({
@@ -1690,6 +1701,7 @@ export function useDiscussion(): UseDiscussionReturn {
         // 中断された場合
         if (localShouldInterruptRef.current) {
           setIsDiscussing(false);
+          setIsInterrupting(false);
           setStreamingMessage(null);
           setSearchUiProgress(null);
           return;
@@ -1901,6 +1913,7 @@ export function useDiscussion(): UseDiscussionReturn {
     currentSearchResults,
     currentSearchKeywords,
     isDiscussing,
+    isInterrupting,
     isSearching,
     isGeneratingFollowUps,
     isProcessing,

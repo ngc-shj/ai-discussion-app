@@ -20,6 +20,7 @@ interface CurrentTurnDisplayProps {
   finalAnswer?: string;
   summaryPrompt?: string;
   isDiscussing: boolean;
+  isInterrupting?: boolean;
   summaryPhase?: SummaryPhase;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
@@ -49,6 +50,7 @@ export function CurrentTurnDisplay({
   finalAnswer,
   summaryPrompt,
   isDiscussing,
+  isInterrupting,
   summaryPhase,
   searchResults: _searchResults, // 後方互換のため保持、searchKeywordsに統合済み
   searchKeywords,
@@ -230,6 +232,7 @@ export function CurrentTurnDisplay({
                 onVote={onVote}
                 streamingMessage={streamingMessage}
                 isDiscussing={isDiscussing}
+                isInterrupting={isInterrupting}
                 bottomRef={bottomRef}
                 searchProgress={summaryPhase === 'generating' ? null : searchProgress}
                 summaryPhase={summaryPhase}

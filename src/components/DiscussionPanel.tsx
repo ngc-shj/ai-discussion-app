@@ -14,6 +14,7 @@ interface DiscussionPanelProps {
   currentFinalAnswer?: string;
   currentSummaryPrompt?: string;
   isDiscussing: boolean;
+  isInterrupting?: boolean;
   searchResults?: SearchResult[];
   searchKeywords?: SearchKeywordInfo[];
   searchProgress?: SearchUiProgress | null; // 検索進捗状態
@@ -46,6 +47,7 @@ export function DiscussionPanel({
   currentFinalAnswer,
   currentSummaryPrompt,
   isDiscussing,
+  isInterrupting,
   searchResults,
   searchKeywords,
   searchProgress,
@@ -118,6 +120,7 @@ export function DiscussionPanel({
           finalAnswer={currentFinalAnswer}
           summaryPrompt={currentSummaryPrompt}
           isDiscussing={isDiscussing}
+          isInterrupting={isInterrupting}
           summaryPhase={summaryPhase}
           searchResults={searchResults}
           searchKeywords={searchKeywords}
