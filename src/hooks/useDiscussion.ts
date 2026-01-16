@@ -38,6 +38,12 @@ import {
   createInterruptedState,
   getPreviousTurns,
 } from '@/lib/sse-utils';
+import {
+  runClientOrchestration,
+  DiscussionState as OrchestrationState,
+  DiscussionConfig as OrchestrationConfig,
+  DiscussionCallbacks as OrchestrationCallbacks,
+} from '@/lib/client-orchestration';
 
 export interface DiscussionUiProgress {
   currentRound: number;
@@ -120,6 +126,10 @@ export interface UseDiscussionActions {
   performTimedSearch: (params: TimedSearchParams) => Promise<TimedSearchResult>;
   finalizeDiscussion: (params: FinalizeDiscussionParams) => Promise<void>;
   generateFollowUps: (params: GenerateFollowUpsParams) => Promise<void>;
+  /** 新オーケストレーションを使用した議論開始（実験的） */
+  startDiscussionNew: (params: StartDiscussionParams) => Promise<void>;
+  /** 新オーケストレーションを使用した議論再開（実験的） */
+  resumeDiscussionNew: (params: ResumeDiscussionParams) => Promise<void>;
 }
 
 /** useDiscussion フックの戻り値 */
@@ -624,10 +634,26 @@ function createDiscussionSSEHandlers(params: CreateSSEHandlersParams): SSEEventH
       }
     },
     onSearchKeywords: (searchKeywords) => {
-      setCurrentSearchKeywords?.(prev => [...prev, searchKeywords]);
+      // 既存のエントリがあれば更新、なければ追加（再開時の重複防止）
+      setCurrentSearchKeywords?.(prev => {
+        const existingIndex = prev.findIndex(kw => kw.timing === searchKeywords.timing && kw.round === searchKeywords.round);
+        if (existingIndex >= 0) {
+          return prev.map((kw, i) => i === existingIndex ? searchKeywords : kw);
+        }
+        return [...prev, searchKeywords];
+      });
       // refにも追加して、クロージャ内でも最新の値を参照できるようにする
       if (collectedSearchKeywordsRef) {
-        collectedSearchKeywordsRef.current = [...collectedSearchKeywordsRef.current, searchKeywords];
+        const existingRefIndex = collectedSearchKeywordsRef.current.findIndex(
+          kw => kw.timing === searchKeywords.timing && kw.round === searchKeywords.round
+        );
+        if (existingRefIndex >= 0) {
+          collectedSearchKeywordsRef.current = collectedSearchKeywordsRef.current.map(
+            (kw, i) => i === existingRefIndex ? searchKeywords : kw
+          );
+        } else {
+          collectedSearchKeywordsRef.current = [...collectedSearchKeywordsRef.current, searchKeywords];
+        }
       }
       // 最後に受信した検索タイミングを記録（中断時の状態保存用）
       if (lastSearchTimingRef) {
@@ -807,8 +833,10 @@ export function useDiscussion(): UseDiscussionReturn {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    // ストリーミングメッセージをクリア（中断時の残留を防ぐ）
+    // 中断時のUI状態をクリア（残留を防ぐ）
     setStreamingMessage(null);
+    setSearchUiProgress(null);
+    setIsGeneratingFollowUps(false);
   }, []);
 
   /**
@@ -836,16 +864,17 @@ export function useDiscussion(): UseDiscussionReturn {
       let keywordPrompt: string | undefined;
       let wasInterrupted = false;
 
-      // 復元時: 既存のキーワードを使用
-      const isResuming = existingKeywords && existingKeywords.length > 0 &&
-        completedKeywordIndex >= 0 &&
-        completedKeywordIndex < existingKeywords[0].keywords.length - 1;
+      // シンプルな原則:
+      // - 既存のキーワードがある → キーワード生成をスキップ、検索から開始
+      // - 既存のキーワードがない → キーワード生成から開始
+      const hasExistingKeywords = existingKeywords && existingKeywords.length > 0 && existingKeywords[0].keywords.length > 0;
 
-      if (isResuming && existingKeywords) {
+      if (hasExistingKeywords && existingKeywords) {
+        // 既存のキーワードを使用（キーワード生成済み、検索から再開）
         searchKeywords = existingKeywords[0].keywords;
         keywordPrompt = existingKeywords[0].prompt;
-        // 復元時の進捗表示
-        const resumeFromIndex = completedKeywordIndex + 1;
+        // 検索開始位置を決定
+        const resumeFromIndex = completedKeywordIndex >= 0 ? completedKeywordIndex + 1 : 0;
         setSearchUiProgress({
           phase: 'searching',
           currentKeywordIndex: resumeFromIndex,
@@ -913,14 +942,21 @@ export function useDiscussion(): UseDiscussionReturn {
           prompt: keywordPrompt,
           // results は undefined のまま（検索中は結果部分を表示しない）
         };
-        setCurrentSearchKeywords(prev => [...prev, earlyKeywordInfo]);
+        // 既存のエントリがあれば更新、なければ追加（再開時の重複防止）
+        setCurrentSearchKeywords(prev => {
+          const existingIndex = prev.findIndex(kw => kw.timing === timing && kw.round === round);
+          if (existingIndex >= 0) {
+            return prev.map((kw, i) => i === existingIndex ? earlyKeywordInfo : kw);
+          }
+          return [...prev, earlyKeywordInfo];
+        });
       }
 
       // 警告を収集
       const collectedWarnings: SearchWarning[] = [];
 
-      // 開始インデックス（復元時は途中から）
-      const startIndex = isResuming ? completedKeywordIndex + 1 : 0;
+      // 開始インデックス（既存キーワードがあれば途中から）
+      const startIndex = hasExistingKeywords && completedKeywordIndex >= 0 ? completedKeywordIndex + 1 : 0;
 
       // 生成されたキーワードで検索
       for (let i = startIndex; i < searchKeywords.length; i++) {
@@ -1060,27 +1096,72 @@ export function useDiscussion(): UseDiscussionReturn {
         updateAndSaveSession,
       } = params;
 
+      // AbortControllerを初期化（統合前検索で使用するため、最初に初期化）
+      abortControllerRef.current = new AbortController();
+      interruptRequestedRef.current = false;
+
+      // UI状態を初期化（前の状態が残らないように）
+      setStreamingMessage(null);
+      setSearchUiProgress(null);
+      setIsGeneratingFollowUps(false);
+      setError(null);
+
       // ===== ステージ0: 統合前検索 =====
       // 検索結果のkeywordInfoを保持（状態更新は非同期なので、createNewTurnに直接渡す必要がある）
       let summarySearchKeywordInfo: SearchKeywordInfo | undefined;
       if (searchConfig?.enabled && searchConfig?.timing?.beforeSummary) {
-        setSummaryPhase('searching');
-        setInterruptedState(null);
-        try {
-          const searchResult = await performTimedSearch({
-            timing: 'summary',
-            topic: currentTopic,
-            searchConfig,
-            participants,
-            messages: currentMessages,
-          });
-          summarySearchKeywordInfo = searchResult.keywordInfo;
-        } catch (err) {
-          if (err instanceof Error && err.name === 'AbortError') {
-            setSummaryPhase('awaiting');
-            return;
+        // シンプルな原則:
+        // - 統合前検索キーワードがあり、検索結果がある → 検索スキップ
+        // - 統合前検索キーワードがあり、検索結果がない（undefined）→ 検索から再開
+        // - 統合前検索キーワードがない → 新規検索
+        const existingSummaryKeyword = currentSearchKeywords.find(kw => kw.timing === 'summary');
+
+        if (existingSummaryKeyword?.results !== undefined) {
+          // 既に検索完了している → スキップ
+          summarySearchKeywordInfo = existingSummaryKeyword;
+        } else {
+          // 検索が必要
+          setSummaryPhase('searching');
+          setInterruptedState(null);
+          try {
+            const searchResult = await performTimedSearch({
+              timing: 'summary',
+              topic: currentTopic,
+              searchConfig,
+              participants,
+              messages: currentMessages,
+              abortSignal: abortControllerRef.current.signal,
+              // 既存のキーワードがあれば渡す（resultsはundefinedだが、キーワードは生成済み）
+              existingKeywords: existingSummaryKeyword ? [existingSummaryKeyword] : undefined,
+            });
+            summarySearchKeywordInfo = searchResult.keywordInfo;
+          } catch (err) {
+            if (err instanceof Error && err.name === 'AbortError') {
+              // 中断された場合、中断状態を保存
+              // handleInterruptでもクリアされるが、念のため明示的にクリア
+              setSearchUiProgress(null);
+              const session = currentSessionRef.current;
+              if (session?.interruptedTurn) {
+                const updatedInterruptedTurn: InterruptedTurnSnapshot = {
+                  ...session.interruptedTurn,
+                  searchTiming: 'summary',
+                  summaryPhase: 'awaiting',
+                  interruptedAt: new Date(),
+                };
+                await updateAndSaveSession({
+                  interruptedTurn: updatedInterruptedTurn,
+                });
+                const interruptedSnapshot: InterruptedDiscussionSnapshot = {
+                  ...updatedInterruptedTurn,
+                  sessionId: session.id,
+                };
+                setInterruptedState(interruptedSnapshot);
+              }
+              setSummaryPhase('awaiting');
+              return;
+            }
+            console.error('Summary search failed:', err);
           }
-          console.error('Summary search failed:', err);
         }
       }
 
@@ -1088,10 +1169,6 @@ export function useDiscussion(): UseDiscussionReturn {
       setError(null);
       // 復元・破棄ボタンをすぐに非表示にする
       setInterruptedState(null);
-
-      // AbortControllerを初期化
-      abortControllerRef.current = new AbortController();
-      interruptRequestedRef.current = false;
 
       // セッションのinterruptedTurnを統合回答生成中状態に更新
       // クリアするのではなく、summaryPhase: 'generating'で更新することでリロード時に復元可能にする
@@ -1166,8 +1243,28 @@ export function useDiscussion(): UseDiscussionReturn {
         );
 
         if (wasInterrupted) {
-          // 中断された場合は状態をリセットして終了
-          setSummaryPhase('idle');
+          // 中断された場合、searchTiming: 'summary'を設定して再開時に正しく処理できるようにする
+          const session = currentSessionRef.current;
+          if (session?.interruptedTurn) {
+            // interruptedTurnにsearchTimingを設定
+            const updatedInterruptedTurn: InterruptedTurnSnapshot = {
+              ...session.interruptedTurn,
+              searchTiming: 'summary',
+              summaryPhase: 'awaiting',
+              interruptedAt: new Date(),
+            };
+            await updateAndSaveSession({
+              interruptedTurn: updatedInterruptedTurn,
+            });
+            // Reactの状態も更新（resumeDiscussionNewが正しく処理できるように）
+            // InterruptedTurnSnapshotにsessionIdを追加してInterruptedDiscussionSnapshotに変換
+            const interruptedSnapshot: InterruptedDiscussionSnapshot = {
+              ...updatedInterruptedTurn,
+              sessionId: session.id,
+            };
+            setInterruptedState(interruptedSnapshot);
+          }
+          setSummaryPhase('awaiting');
           return;
         }
 
@@ -1271,16 +1368,34 @@ export function useDiscussion(): UseDiscussionReturn {
         }
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') {
-          // 中断された場合は正常終了
+          // 中断された場合、中断状態を保存してから終了
+          // handleInterruptでもクリアされるが、念のため明示的にクリア
+          setSearchUiProgress(null);
+          setStreamingMessage(null);
+          const session = currentSessionRef.current;
+          if (session?.interruptedTurn) {
+            const updatedInterruptedTurn: InterruptedTurnSnapshot = {
+              ...session.interruptedTurn,
+              searchTiming: 'summary',
+              summaryPhase: 'awaiting',
+              interruptedAt: new Date(),
+            };
+            await updateAndSaveSession({
+              interruptedTurn: updatedInterruptedTurn,
+            });
+            const interruptedSnapshot: InterruptedDiscussionSnapshot = {
+              ...updatedInterruptedTurn,
+              sessionId: session.id,
+            };
+            setInterruptedState(interruptedSnapshot);
+          }
+          setSummaryPhase('awaiting');
           return;
         }
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         // AbortControllerをクリア
         abortControllerRef.current = null;
-        // エラー時のフォールバック: summaryPhaseを確実にidleに戻す
-        // 成功時はonSummaryで既にidleに設定されているので二重設定になるが問題ない
-        setSummaryPhase('idle');
       }
     },
     [currentMessages, currentTopic, currentSearchResults, currentSearchKeywords, messageVotes, clearCurrentTurnState, startMarker, extensionMarkers]
@@ -2291,6 +2406,673 @@ export function useDiscussion(): UseDiscussionReturn {
     ]
   );
 
+  /**
+   * 新オーケストレーションを使用した議論開始（実験的）
+   * クライアント側でループを制御し、各APIを順番に呼び出す方式
+   */
+  const startDiscussionNew = useCallback(
+    async (params: StartDiscussionParams) => {
+      const {
+        topic,
+        participants,
+        terminationConfig,
+        searchConfig,
+        userProfile,
+        discussionMode,
+        discussionDepth,
+        directionGuide,
+        currentSessionRef,
+        setCurrentSession,
+        setSessions,
+        setInterruptedState,
+        updateAndSaveSession,
+      } = params;
+
+      // 中断フラグ用のローカルref
+      const localShouldInterruptRef = { current: false };
+
+      // 状態をリセット
+      resetAllState();
+      setCurrentTopic(topic);
+      setDiscussionParticipants(participants);
+      setIsDiscussing(true);
+      setSummaryPhase('idle');
+      setError(null);
+
+      // 設定を保存
+      setCurrentSettings({
+        discussionMode,
+        discussionDepth,
+        directionGuide,
+        terminationConfig,
+      });
+
+      // 中断フラグをリセット
+      abortControllerRef.current = new AbortController();
+
+      // セッションを取得または作成
+      // 追加質問の場合: 既存のセッション（currentSessionRef.current）を引き継ぐ
+      // 新規の場合: トピック名で検索、なければ作成
+      let session: DiscussionSession | null = currentSessionRef.current;
+      if (!session) {
+        const sessions = await getAllSessions();
+        session = sessions.find((s) => s.title === topic) || null;
+      }
+      if (!session) {
+        session = createNewSession(topic, participants, terminationConfig.maxRounds);
+        await saveSession(session);
+        setSessions((prev) => [session!, ...prev]);
+      }
+      setCurrentSession(session);
+      currentSessionRef.current = session;
+
+      // 開始マーカーを作成
+      const turnStartMarker: StartMarker = {
+        totalRounds: terminationConfig.maxRounds,
+        mode: discussionMode,
+        depth: discussionDepth,
+        keywords: directionGuide.keywords?.length ? directionGuide.keywords : undefined,
+        timestamp: new Date(),
+      };
+      setStartMarker(turnStartMarker);
+
+      // オーケストレーション設定
+      const orchestrationConfig: OrchestrationConfig = {
+        topic,
+        participants,
+        totalRounds: terminationConfig.maxRounds,
+        searchConfig,
+        userProfile,
+        discussionMode,
+        discussionDepth,
+        directionGuide,
+        previousTurns: getPreviousTurns(session),
+      };
+
+      // 前回のフェーズを記録（フェーズ変化時のみUI状態を更新するため）
+      let lastPhase: OrchestrationState['phase'] | null = null;
+
+      // コールバック
+      const callbacks: OrchestrationCallbacks = {
+        onStateChange: (state: OrchestrationState) => {
+          // 状態更新
+          setCurrentMessages(state.messages);
+          setCurrentSearchResults(state.searchResults);
+          setCurrentSearchKeywords(state.searchKeywords);
+          setCurrentFinalAnswer(state.finalAnswer);
+          setCurrentSummaryPrompt(state.summaryPrompt);
+          setSuggestedFollowUps(state.suggestedFollowUps.map((q, i) => ({
+            id: `followup-${i}`,
+            question: q,
+            category: 'expansion' as const,
+          })));
+
+          if (state.error) {
+            setError(state.error);
+          }
+
+          // 進捗更新
+          setDiscussionUiProgress({
+            currentRound: state.currentRound,
+            totalRounds: terminationConfig.maxRounds,
+            currentParticipantIndex: state.currentParticipantIndex,
+            totalParticipants: participants.length,
+            currentParticipant: participants[state.currentParticipantIndex] || null,
+          });
+
+          // フェーズが変わった場合のみUI状態を更新
+          const phaseChanged = lastPhase !== state.phase;
+          lastPhase = state.phase;
+
+          // フェーズに応じたUI状態更新（フェーズ変化時のみ）
+          if (phaseChanged) {
+            switch (state.phase) {
+            case 'generating_keywords':
+              // 検索キーワード生成中
+              setStreamingMessage(null); // 前のラウンドのストリーミングメッセージをクリア
+              setSearchUiProgress({
+                phase: 'keywords',
+                currentKeywordIndex: 0,
+                totalKeywords: 0,
+                completedKeywords: [],
+              });
+              break;
+            case 'searching': {
+              // 最新のキーワード情報からtotalKeywordsを取得
+              const latestKeywordInfo = state.searchKeywords[state.searchKeywords.length - 1];
+              const totalKeywords = latestKeywordInfo?.keywords?.length || 1;
+              setStreamingMessage(null); // 前のラウンドのストリーミングメッセージをクリア
+              setSearchUiProgress({
+                phase: 'searching',
+                currentKeywordIndex: 0,
+                totalKeywords,
+                completedKeywords: [],
+              });
+              break;
+            }
+            case 'generating': {
+              // 検索進捗をクリア
+              setSearchUiProgress(null);
+              // ストリーミングメッセージの初期化（ラウンド情報を設定）
+              const currentParticipant = participants[state.currentParticipantIndex];
+              setStreamingMessage({
+                messageId: '',
+                participantId: currentParticipant?.id || '',
+                content: '',
+                provider: currentParticipant?.provider || '',
+                round: state.currentRound,
+              });
+              break;
+            }
+            case 'awaiting':
+              // 全ラウンド完了、統合回答待ち
+              setSearchUiProgress(null); // 検索進捗をクリア
+              setStreamingMessage(null); // ストリーミングメッセージをクリア
+              setSummaryPhase('awaiting');
+              setIsDiscussing(false); // 議論中フラグをオフ
+              break;
+            case 'summarizing':
+              setSearchUiProgress(null); // 検索進捗をクリア
+              setStreamingMessage(null); // ストリーミングメッセージをクリア
+              setSummaryPhase('generating');
+              break;
+            case 'followup':
+              // フォローアップ生成中（特に状態変更なし、summaryPhaseはgeneratingのまま）
+              break;
+            case 'complete':
+              setSearchUiProgress(null); // 検索進捗をクリア
+              setStreamingMessage(null); // ストリーミングメッセージをクリア
+              setSummaryPhase('idle');
+              setIsDiscussing(false);
+              break;
+            case 'error':
+              setSearchUiProgress(null); // 検索進捗をクリア
+              setStreamingMessage(null); // ストリーミングメッセージをクリア
+              setIsDiscussing(false);
+              break;
+            }
+          }
+
+          // 中断時の状態保存（awaiting/complete/errorは正常終了なので除外）
+          if (localShouldInterruptRef.current && state.phase !== 'awaiting' && state.phase !== 'complete' && state.phase !== 'error') {
+            // フェーズに応じたsearchTimingを決定
+            // - generating_keywords/searching: 最新のsearchKeywordsのtimingを使用
+            // - summarizing: 'summary'を設定（統合回答フェーズから再開するため）
+            let searchTiming: 'start' | 'round' | 'summary' | undefined;
+            if (state.phase === 'summarizing') {
+              searchTiming = 'summary';
+            } else if (state.phase === 'generating_keywords' || state.phase === 'searching') {
+              const latestKeywordInfo = state.searchKeywords[state.searchKeywords.length - 1];
+              searchTiming = latestKeywordInfo?.timing;
+            }
+
+            const interrupted = createInterruptedState({
+              sessionId: session?.id || '',
+              topic,
+              participants,
+              messages: state.messages,
+              currentRound: state.currentRound,
+              currentParticipantIndex: state.currentParticipantIndex,
+              totalRounds: terminationConfig.maxRounds,
+              searchResults: state.searchResults,
+              searchKeywords: state.searchKeywords,
+              searchTiming,
+              searchConfig,
+              userProfile,
+              discussionMode,
+              discussionDepth,
+              directionGuide,
+              terminationConfig,
+              startMarker: turnStartMarker,
+            });
+            saveInterruptedState(interrupted);
+            setInterruptedState(interrupted);
+          }
+        },
+        onMessageChunk: (messageId, _chunk, accumulatedContent) => {
+          // stateから現在のラウンドと参加者を取得
+          setStreamingMessage((prev) => ({
+            messageId,
+            participantId: prev?.participantId || '',
+            content: accumulatedContent,
+            provider: prev?.provider || '',
+            round: prev?.round || 1,
+          }));
+        },
+        onSummaryChunk: (_chunk, accumulatedContent) => {
+          setCurrentFinalAnswer(accumulatedContent);
+        },
+        onSearchProgress: (keyword, index, total) => {
+          setSearchUiProgress({
+            phase: 'searching',
+            currentKeywordIndex: index,
+            totalKeywords: total,
+            currentKeyword: keyword,
+            completedKeywords: [],
+          });
+        },
+        shouldInterrupt: () => localShouldInterruptRef.current,
+      };
+
+      // 中断ハンドラを設定（abortControllerのabortイベントで中断フラグを立てる）
+      abortControllerRef.current.signal.addEventListener('abort', () => {
+        localShouldInterruptRef.current = true;
+      });
+
+      try {
+        // オーケストレーション実行
+        const finalState = await runClientOrchestration(orchestrationConfig, callbacks);
+
+        // 中断された場合
+        if (localShouldInterruptRef.current) {
+          // 中断状態の保存は onStateChange 内で既に行われている
+          setIsDiscussing(false);
+          setStreamingMessage(null);
+          setSearchUiProgress(null);
+          return;
+        }
+
+        // 完了時の処理（awaitingで停止した場合も含む）
+        if (finalState.phase === 'complete' && finalState.finalAnswer) {
+          // ターンを保存
+          const newTurn = createNewTurn(
+            topic,
+            finalState.messages,
+            finalState.finalAnswer,
+            finalState.searchResults,
+            finalState.summaryPrompt,
+            undefined, // suggestedFollowUps
+            turnStartMarker,
+            undefined, // extensionMarkers
+            finalState.searchKeywords
+          );
+
+          await updateAndSaveSession({
+            turns: [...(session?.turns || []), newTurn],
+            interruptedTurn: undefined,
+          });
+
+          // 中断状態をクリア
+          clearInterruptedState();
+          setInterruptedState(null);
+        }
+
+        setStreamingMessage(null);
+        setSearchUiProgress(null);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMessage);
+        setIsDiscussing(false);
+      }
+    },
+    [
+      resetAllState,
+      setCurrentTopic,
+      setDiscussionParticipants,
+      setIsDiscussing,
+      setSummaryPhase,
+      setError,
+      setCurrentSettings,
+      setCurrentMessages,
+      setCurrentSearchResults,
+      setCurrentSearchKeywords,
+      setCurrentFinalAnswer,
+      setCurrentSummaryPrompt,
+      setSuggestedFollowUps,
+      setDiscussionUiProgress,
+      setSearchUiProgress,
+      setStreamingMessage,
+      setStartMarker,
+    ]
+  );
+
+  // 新オーケストレーションを使用した議論再開
+  const resumeDiscussionNew = useCallback(
+    async (params: ResumeDiscussionParams) => {
+      const {
+        interruptedState,
+        restoreFromSession,
+        currentSessionRef,
+        setCurrentSession,
+        setSessions,
+        setInterruptedState,
+        updateAndSaveSession,
+      } = params;
+
+      // 中断フラグ用のローカルref
+      const localShouldInterruptRef = { current: false };
+
+      // 再開開始時に中断状態をクリア（再度中断した場合は新しい状態が保存される）
+      clearInterruptedState();
+      setInterruptedState(null);
+
+      // 状態を復元
+      restoreFromSession({
+        participants: interruptedState.participants,
+        discussionMode: interruptedState.discussionMode,
+        discussionDepth: interruptedState.discussionDepth,
+        directionGuide: interruptedState.directionGuide,
+        terminationConfig: interruptedState.terminationConfig,
+        userProfile: interruptedState.userProfile,
+      });
+      setCurrentMessages(interruptedState.messages);
+      setCurrentSearchResults(interruptedState.searchResults || []);
+      // 検索キーワードを復元（未完了の検索結果はundefinedにリセット）
+      const cleanedSearchKeywords = (interruptedState.searchKeywords || []).map(kw => {
+        // searchTiming === 'round' で再開する場合、該当ラウンドの検索キーワードのresultsをundefinedに
+        // （検索が再実行されるため、古い結果を表示しない）
+        if (interruptedState.searchTiming === 'round' && kw.timing === 'round' && kw.round === interruptedState.currentRound) {
+          return { ...kw, results: undefined };
+        }
+        // searchTiming === 'start' で再開する場合、開始時検索のresultsをundefinedに
+        if (interruptedState.searchTiming === 'start' && kw.timing === 'start') {
+          return { ...kw, results: undefined };
+        }
+        // completedKeywordIndexがキーワード数未満の場合、検索が未完了なのでresultsをundefinedに
+        if (kw.completedKeywordIndex !== undefined && kw.completedKeywordIndex < kw.keywords.length - 1) {
+          return { ...kw, results: undefined };
+        }
+        return kw;
+      });
+      setCurrentSearchKeywords(cleanedSearchKeywords);
+      setCurrentTopic(interruptedState.topic);
+      setDiscussionParticipants(interruptedState.participants);
+      setIsDiscussing(true);
+      setSummaryPhase('idle');
+      setError(null);
+      // UI状態を初期化（前の状態が残らないように）
+      setSearchUiProgress(null);
+      setStreamingMessage(null);
+      setIsGeneratingFollowUps(false);
+
+      // 設定を復元
+      setCurrentSettings({
+        discussionMode: interruptedState.discussionMode || null,
+        discussionDepth: interruptedState.discussionDepth || null,
+        directionGuide: interruptedState.directionGuide || null,
+        terminationConfig: interruptedState.terminationConfig || null,
+      });
+
+      // 開始マーカーを復元
+      if (interruptedState.startMarker) {
+        setStartMarker(interruptedState.startMarker);
+      }
+
+      // 中断フラグをリセット
+      abortControllerRef.current = new AbortController();
+
+      // セッションを取得または作成
+      const sessions = await getAllSessions();
+      let session = sessions.find((s) => s.id === interruptedState.sessionId);
+      if (!session) {
+        session = createNewSession(
+          interruptedState.topic,
+          interruptedState.participants,
+          interruptedState.totalRounds
+        );
+        await saveSession(session);
+        setSessions((prev) => [session!, ...prev]);
+      }
+      setCurrentSession(session);
+      currentSessionRef.current = session;
+
+      // 開始マーカー（再開時は中断状態から復元）
+      const turnStartMarker: StartMarker | undefined = interruptedState.startMarker || (
+        interruptedState.discussionMode && interruptedState.discussionDepth
+          ? {
+            totalRounds: interruptedState.totalRounds,
+            mode: interruptedState.discussionMode,
+            depth: interruptedState.discussionDepth,
+            keywords: interruptedState.directionGuide?.keywords?.length
+              ? interruptedState.directionGuide.keywords
+              : undefined,
+            timestamp: new Date(),
+          }
+          : undefined
+      );
+
+      // オーケストレーション設定（再開用）
+      const orchestrationConfig: OrchestrationConfig = {
+        topic: interruptedState.topic,
+        participants: interruptedState.participants,
+        totalRounds: interruptedState.totalRounds,
+        searchConfig: interruptedState.searchConfig,
+        userProfile: interruptedState.userProfile,
+        discussionMode: interruptedState.discussionMode,
+        discussionDepth: interruptedState.discussionDepth,
+        directionGuide: interruptedState.directionGuide,
+        previousTurns: getPreviousTurns(session),
+        // 再開用パラメータ
+        resumeFrom: {
+          currentRound: interruptedState.currentRound,
+          currentParticipantIndex: interruptedState.currentParticipantIndex,
+          messages: interruptedState.messages,
+          searchResults: interruptedState.searchResults || [],
+          searchKeywords: interruptedState.searchKeywords,
+          searchTiming: interruptedState.searchTiming,
+        },
+      };
+
+      // 前回のフェーズを記録
+      let lastPhase: OrchestrationState['phase'] | null = null;
+
+      // コールバック（startDiscussionNewと同様）
+      const callbacks: OrchestrationCallbacks = {
+        onStateChange: (state: OrchestrationState) => {
+          // 状態更新
+          setCurrentMessages(state.messages);
+          setCurrentSearchResults(state.searchResults);
+          setCurrentSearchKeywords(state.searchKeywords);
+          setCurrentFinalAnswer(state.finalAnswer);
+          setCurrentSummaryPrompt(state.summaryPrompt);
+          setSuggestedFollowUps(state.suggestedFollowUps.map((q, i) => ({
+            id: `followup-${i}`,
+            question: q,
+            category: 'expansion' as const,
+          })));
+
+          if (state.error) {
+            setError(state.error);
+          }
+
+          // 進捗更新
+          setDiscussionUiProgress({
+            currentRound: state.currentRound,
+            totalRounds: interruptedState.totalRounds,
+            currentParticipantIndex: state.currentParticipantIndex,
+            totalParticipants: interruptedState.participants.length,
+            currentParticipant: interruptedState.participants[state.currentParticipantIndex] || null,
+          });
+
+          // フェーズが変わった場合のみUI状態を更新
+          const phaseChanged = lastPhase !== state.phase;
+          lastPhase = state.phase;
+
+          if (phaseChanged) {
+            switch (state.phase) {
+            case 'generating_keywords':
+              setStreamingMessage(null);
+              setSearchUiProgress({
+                phase: 'keywords',
+                currentKeywordIndex: 0,
+                totalKeywords: 0,
+                completedKeywords: [],
+              });
+              break;
+            case 'searching': {
+              const latestKeywordInfo = state.searchKeywords[state.searchKeywords.length - 1];
+              const totalKeywords = latestKeywordInfo?.keywords?.length || 1;
+              setStreamingMessage(null);
+              setSearchUiProgress({
+                phase: 'searching',
+                currentKeywordIndex: 0,
+                totalKeywords,
+                completedKeywords: [],
+              });
+              break;
+            }
+            case 'generating': {
+              setSearchUiProgress(null);
+              const currentParticipant = interruptedState.participants[state.currentParticipantIndex];
+              setStreamingMessage({
+                messageId: '',
+                participantId: currentParticipant?.id || '',
+                content: '',
+                provider: currentParticipant?.provider || '',
+                round: state.currentRound,
+              });
+              break;
+            }
+            case 'awaiting':
+              setSearchUiProgress(null);
+              setStreamingMessage(null);
+              setSummaryPhase('awaiting');
+              setIsDiscussing(false);
+              break;
+            case 'summarizing':
+              setSearchUiProgress(null);
+              setStreamingMessage(null);
+              setSummaryPhase('generating');
+              break;
+            case 'followup':
+              break;
+            case 'complete':
+              setSearchUiProgress(null);
+              setStreamingMessage(null);
+              setSummaryPhase('idle');
+              setIsDiscussing(false);
+              break;
+            case 'error':
+              setSearchUiProgress(null);
+              setStreamingMessage(null);
+              setIsDiscussing(false);
+              break;
+            }
+          }
+
+          // 中断時の状態保存
+          if (localShouldInterruptRef.current && state.phase !== 'awaiting' && state.phase !== 'complete' && state.phase !== 'error') {
+            let searchTiming: 'start' | 'round' | 'summary' | undefined;
+            if (state.phase === 'summarizing') {
+              searchTiming = 'summary';
+            } else if (state.phase === 'generating_keywords' || state.phase === 'searching') {
+              const latestKeywordInfo = state.searchKeywords[state.searchKeywords.length - 1];
+              searchTiming = latestKeywordInfo?.timing;
+            }
+
+            const interrupted = createInterruptedState({
+              sessionId: session?.id || '',
+              topic: interruptedState.topic,
+              participants: interruptedState.participants,
+              messages: state.messages,
+              currentRound: state.currentRound,
+              currentParticipantIndex: state.currentParticipantIndex,
+              totalRounds: interruptedState.totalRounds,
+              searchResults: state.searchResults,
+              searchKeywords: state.searchKeywords,
+              searchTiming,
+              searchConfig: interruptedState.searchConfig,
+              userProfile: interruptedState.userProfile,
+              discussionMode: interruptedState.discussionMode,
+              discussionDepth: interruptedState.discussionDepth,
+              directionGuide: interruptedState.directionGuide,
+              terminationConfig: interruptedState.terminationConfig,
+              startMarker: turnStartMarker,
+            });
+            saveInterruptedState(interrupted);
+            setInterruptedState(interrupted);
+          }
+        },
+        onMessageChunk: (messageId, _chunk, accumulatedContent) => {
+          setStreamingMessage((prev) => ({
+            messageId,
+            participantId: prev?.participantId || '',
+            content: accumulatedContent,
+            provider: prev?.provider || '',
+            round: prev?.round || 1,
+          }));
+        },
+        onSummaryChunk: (_chunk, accumulatedContent) => {
+          setCurrentFinalAnswer(accumulatedContent);
+        },
+        onSearchProgress: (keyword, index, total) => {
+          setSearchUiProgress({
+            phase: 'searching',
+            currentKeywordIndex: index,
+            totalKeywords: total,
+            currentKeyword: keyword,
+            completedKeywords: [],
+          });
+        },
+        shouldInterrupt: () => localShouldInterruptRef.current,
+      };
+
+      // 中断ハンドラを設定
+      abortControllerRef.current.signal.addEventListener('abort', () => {
+        localShouldInterruptRef.current = true;
+      });
+
+      try {
+        // オーケストレーション実行
+        const finalState = await runClientOrchestration(orchestrationConfig, callbacks);
+
+        // 中断された場合
+        if (localShouldInterruptRef.current) {
+          setIsDiscussing(false);
+          setStreamingMessage(null);
+          setSearchUiProgress(null);
+          return;
+        }
+
+        // 完了時の処理（completeフェーズでターン保存）
+        if (finalState.phase === 'complete' && finalState.finalAnswer) {
+          const newTurn = createNewTurn(
+            interruptedState.topic,
+            finalState.messages,
+            finalState.finalAnswer,
+            finalState.searchResults,
+            finalState.summaryPrompt,
+            undefined,
+            turnStartMarker,
+            undefined,
+            finalState.searchKeywords
+          );
+
+          await updateAndSaveSession({
+            turns: [...(session?.turns || []), newTurn],
+            interruptedTurn: undefined,
+          });
+        }
+        // 注: 中断状態は再開開始時にクリア済み
+
+        setStreamingMessage(null);
+        setSearchUiProgress(null);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMessage);
+        setIsDiscussing(false);
+      }
+    },
+    [
+      setCurrentTopic,
+      setDiscussionParticipants,
+      setIsDiscussing,
+      setSummaryPhase,
+      setError,
+      setCurrentSettings,
+      setCurrentMessages,
+      setCurrentSearchResults,
+      setCurrentSearchKeywords,
+      setCurrentFinalAnswer,
+      setCurrentSummaryPrompt,
+      setSuggestedFollowUps,
+      setDiscussionUiProgress,
+      setSearchUiProgress,
+      setStreamingMessage,
+      setStartMarker,
+    ]
+  );
+
   // isSearchingはsearchProgressから派生（検索完了 phase: 'done' は検索中ではない）
   // 注: 検索中は必ずisDiscussingもtrueなので、isProcessingには不要
   const isSearching = searchProgress !== null && searchProgress.phase !== 'done';
@@ -2337,7 +3119,9 @@ export function useDiscussion(): UseDiscussionReturn {
     restoreDiscussionState,
     handleInterrupt,
     startDiscussion,
+    startDiscussionNew,
     resumeDiscussion,
+    resumeDiscussionNew,
     extendDiscussion,
     performTimedSearch,
     finalizeDiscussion,

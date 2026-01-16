@@ -314,16 +314,10 @@ export function CurrentTurnDisplay({
             </div>
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-purple-700/50 rounded-lg p-2 md:p-3 text-gray-200 text-sm md:text-base">
               {/* 統合前検索（統合回答ブロック内に表示） */}
-              {/* 検索進捗中は非表示、検索が完了（phase: 'done' または null）しているもののみ表示 */}
-              {(!searchProgress || searchProgress.phase === 'done') && searchKeywords?.find(kw =>
-                kw.timing === 'summary' &&
-                (kw.completedKeywordIndex === undefined || kw.completedKeywordIndex >= kw.keywords.length - 1)
-              ) && (
+              {/* キーワード生成中は非表示、キーワード生成完了後は検索中も表示 */}
+              {searchKeywords?.find(kw => kw.timing === 'summary') && (
                 <div className="mb-3">
-                  <SearchKeywordItem keyword={searchKeywords.find(kw =>
-                    kw.timing === 'summary' &&
-                    (kw.completedKeywordIndex === undefined || kw.completedKeywordIndex >= kw.keywords.length - 1)
-                  )!} />
+                  <SearchKeywordItem keyword={searchKeywords.find(kw => kw.timing === 'summary')!} />
                 </div>
               )}
               {(summaryPhase === 'generating' || summaryPhase === 'searching') && !finalAnswer ? (

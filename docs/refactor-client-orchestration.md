@@ -254,7 +254,33 @@ data: { error: string }
 
 #### 残りの作業
 
-- [ ] `useDiscussion` に `startDiscussionNew` を追加（新オーケストレーション使用）
-- [ ] IndexedDB保存処理の実装
+- [x] `useDiscussion` に `startDiscussionNew` を追加（新オーケストレーション使用）
+- [x] IndexedDB保存処理の実装
 - [ ] 既存の `startDiscussion` と並行稼働でテスト
 - [ ] 問題なければ旧コードを削除
+
+### 2026-01-16: フェーズ2完了 - `startDiscussionNew` 実装
+
+#### 完了した作業
+
+1. **`useDiscussion.ts` に `startDiscussionNew` 追加**
+   - `runClientOrchestration` を呼び出す新しい関数
+   - コールバック実装：
+     - `onStateChange`: UI状態更新、中断時のIndexedDB保存
+     - `onMessageChunk`: ストリーミングメッセージ表示
+     - `onSummaryChunk`: 統合回答のストリーミング表示
+     - `onSearchProgress`: 検索進捗表示
+     - `shouldInterrupt`: 中断判定
+   - 完了時の処理：
+     - `createNewTurn` でターン作成
+     - `updateAndSaveSession` でセッション保存
+     - `clearInterruptedState` で中断状態クリア
+
+2. **エラー修正**
+   - `category: 'deeper'` → `category: 'expansion'` (FollowUpCategory型に合わせて修正)
+
+#### 次のステップ
+
+- UIから `startDiscussionNew` を呼び出せるようにする（フラグ切り替え）
+- 動作テスト
+- 問題なければ旧コードを削除

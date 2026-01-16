@@ -67,7 +67,9 @@ export default function Home() {
     restoreDiscussionState,
     handleInterrupt,
     startDiscussion,
+    startDiscussionNew,
     resumeDiscussion,
+    resumeDiscussionNew,
     extendDiscussion,
     finalizeDiscussion,
     generateFollowUps,
@@ -127,6 +129,8 @@ export default function Home() {
   const [presetTopic, setPresetTopic] = useState<string>('');
   // プリセットモーダルの開閉状態
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+  // 新オーケストレーションを使用するかどうか（実験的）
+  const [useNewOrchestration, setUseNewOrchestration] = useState(true);
 
 
 
@@ -466,7 +470,7 @@ export default function Home() {
   // 中断した議論を再開
   const handleResumeDiscussion = useCallback(async () => {
     if (!interruptedState) return;
-    await resumeDiscussion({
+    const resumeParams = {
       interruptedState,
       restoreFromSession,
       currentSessionRef,
@@ -474,8 +478,13 @@ export default function Home() {
       setSessions,
       setInterruptedState,
       updateAndSaveSession,
-    });
-  }, [interruptedState, restoreFromSession, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, resumeDiscussion]);
+    };
+    if (useNewOrchestration) {
+      await resumeDiscussionNew(resumeParams);
+    } else {
+      await resumeDiscussion(resumeParams);
+    }
+  }, [interruptedState, restoreFromSession, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, resumeDiscussion, resumeDiscussionNew, useNewOrchestration]);
 
   // 議論を延長
   const handleExtendDiscussion = useCallback(async (config: ExtendDiscussionConfig) => {
@@ -494,7 +503,7 @@ export default function Home() {
 
   // 議論を開始
   const handleStartDiscussion = useCallback(async (topic: string) => {
-    await startDiscussion({
+    const discussionParams = {
       topic,
       participants,
       terminationConfig,
@@ -508,8 +517,14 @@ export default function Home() {
       setSessions,
       setInterruptedState,
       updateAndSaveSession,
-    });
-  }, [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, startDiscussion]);
+    };
+
+    if (useNewOrchestration) {
+      await startDiscussionNew(discussionParams);
+    } else {
+      await startDiscussion(discussionParams);
+    }
+  }, [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, startDiscussion, startDiscussionNew, useNewOrchestration]);
 
   // 無効化条件（useDiscussionから取得）
   const isSettingsDisabled = isProcessing;
