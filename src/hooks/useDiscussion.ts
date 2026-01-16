@@ -834,7 +834,7 @@ export function useDiscussion(): UseDiscussionReturn {
             await updateAndSaveSession({
               interruptedTurn: updatedInterruptedTurn,
             });
-            // Reactの状態も更新（resumeDiscussionNewが正しく処理できるように）
+            // Reactの状態も更新（resumeDiscussionが正しく処理できるように）
             // InterruptedTurnSnapshotにsessionIdを追加してInterruptedDiscussionSnapshotに変換
             const interruptedSnapshot: InterruptedDiscussionSnapshot = {
               ...updatedInterruptedTurn,
@@ -1516,7 +1516,7 @@ export function useDiscussion(): UseDiscussionReturn {
       // 前回のフェーズを記録
       let lastPhase: OrchestrationState['phase'] | null = null;
 
-      // コールバック（startDiscussionNewと同様）
+      // コールバック（startDiscussionと同様）
       const callbacks: OrchestrationCallbacks = {
         onStateChange: (state: OrchestrationState) => {
           // 状態更新
