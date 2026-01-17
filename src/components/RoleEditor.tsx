@@ -260,51 +260,44 @@ export function RoleEditor({
               </div>
             </div>
 
-            {/* プリセットロールセクション */}
+            {/* プリセットロールセクション（タブ形式） */}
             <div className="pt-3 border-t border-gray-700">
-              <div className="text-xs text-gray-500 flex items-center justify-between mb-2">
-                <span>プリセットロール</span>
-                <span>{ROLE_PRESETS.length}件</span>
-              </div>
-              <div className="space-y-2">
+              <div className="text-xs text-gray-500 mb-2">プリセットロール</div>
+
+              {/* タブボタン（横並び・折り返し） */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
                 {ROLE_PRESETS.map((preset) => (
-                  <div
+                  <button
                     key={preset.id}
-                    className={`group relative p-3 rounded-lg border transition-colors cursor-pointer ${
-                      selectedPresetId === preset.id
-                        ? 'bg-gray-700/50 border-gray-500'
-                        : 'bg-gray-900/30 border-gray-700 hover:border-gray-600'
-                    }`}
+                    type="button"
                     onClick={() => setSelectedPresetId(selectedPresetId === preset.id ? null : preset.id)}
+                    className={`px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
+                      selectedPresetId === preset.id
+                        ? 'bg-gray-600 border-gray-500 text-white'
+                        : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-300'
+                    }`}
+                    title={preset.description}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-300">{preset.name}</span>
-                          <span className="text-xs text-gray-500 bg-gray-600/50 px-1.5 py-0.5 rounded">
-                            プリセット
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-500 mt-0.5">{preset.description}</div>
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
 
-                        {/* 選択時に詳細表示 */}
-                        {selectedPresetId === preset.id && (
-                          <div className="mt-2 pt-2 border-t border-gray-600/50">
-                            <div className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded max-h-24 overflow-y-auto">
-                              {preset.prompt}
-                            </div>
-                          </div>
-                        )}
+              {/* 選択されたプリセットの詳細表示エリア */}
+              {selectedPresetId && (() => {
+                const selectedPreset = ROLE_PRESETS.find(p => p.id === selectedPresetId);
+                if (!selectedPreset) return null;
+                return (
+                  <div className="p-3 bg-gray-900/50 border border-gray-700 rounded-lg">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <div className="text-sm font-medium text-white">{selectedPreset.name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{selectedPreset.description}</div>
                       </div>
-
-                      {/* 常に複製ボタンを表示 */}
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDuplicatePreset(preset);
-                        }}
-                        className="shrink-0 ml-2 p-1.5 text-gray-400 hover:text-green-400 hover:bg-gray-700 rounded transition-colors"
+                        onClick={() => handleDuplicatePreset(selectedPreset)}
+                        className="shrink-0 p-1.5 text-gray-400 hover:text-green-400 hover:bg-gray-700 rounded transition-colors"
                         title="カスタムとして複製"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -312,9 +305,19 @@ export function RoleEditor({
                         </svg>
                       </button>
                     </div>
+                    <div className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded max-h-24 overflow-y-auto">
+                      {selectedPreset.prompt}
+                    </div>
                   </div>
-                ))}
-              </div>
+                );
+              })()}
+
+              {/* 未選択時のプレースホルダー */}
+              {!selectedPresetId && (
+                <div className="p-3 bg-gray-900/30 border border-dashed border-gray-700 rounded-lg text-center">
+                  <p className="text-xs text-gray-500">プリセットを選択すると詳細が表示されます</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
