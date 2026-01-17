@@ -8,6 +8,8 @@ import { FollowUpSuggestions } from './FollowUpSuggestions';
 import { DeepDiveModal } from './DeepDiveModal';
 import { ExtendDiscussionModal } from './ExtendDiscussionModal';
 import { CounterargumentButton } from './CounterargumentButton';
+import { ForkButton } from './ForkButton';
+import { ForkModal } from './ForkModal';
 import { MessageList } from './MessageList';
 import { SearchKeywordItem } from './SearchKeywordItem';
 import { SearchResultsAccordion } from './SearchResultsAccordion';
@@ -28,6 +30,7 @@ interface CurrentTurnDisplayProps {
   onFollowUp?: (topic: string, previousAnswer: string) => void;
   onDeepDive?: (topic: string, previousAnswer: string, type: DeepDiveType, customPrompt?: string) => void;
   onCounterargument?: (topic: string, previousAnswer: string) => void;
+  onFork?: (turnId: string, topic: string, previousAnswer: string, label: string, perspective: string) => void;
   messageVotes?: MessageVote[];
   onVote?: (messageId: string, vote: 'agree' | 'disagree' | 'neutral') => void;
   suggestedFollowUps?: FollowUpQuestion[];
@@ -58,6 +61,7 @@ export function CurrentTurnDisplay({
   onFollowUp,
   onDeepDive,
   onCounterargument,
+  onFork,
   messageVotes,
   onVote,
   suggestedFollowUps,
@@ -77,6 +81,7 @@ export function CurrentTurnDisplay({
   const [copied, setCopied] = useState(false);
   const [discussionCopied, setDiscussionCopied] = useState(false);
   const [isDeepDiveModalOpen, setIsDeepDiveModalOpen] = useState(false);
+  const [isForkModalOpen, setIsForkModalOpen] = useState(false);
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [showSummaryPrompt, setShowSummaryPrompt] = useState(false);
 
@@ -441,7 +446,7 @@ export function CurrentTurnDisplay({
               </div>
             )}
             {/* アクションボタン（統合完了後のみ表示） */}
-            {finalAnswer && summaryPhase !== 'generating' && !isDiscussing && (onDeepDive || onCounterargument) && (
+            {finalAnswer && summaryPhase !== 'generating' && !isDiscussing && (onDeepDive || onCounterargument || onFork) && (
               <div className="mt-2 flex justify-end gap-2 flex-wrap">
                 {onDeepDive && (
                   <button
@@ -461,6 +466,11 @@ export function CurrentTurnDisplay({
                     onClick={() => onCounterargument(topic, finalAnswer)}
                   />
                 )}
+                {onFork && (
+                  <ForkButton
+                    onClick={() => setIsForkModalOpen(true)}
+                  />
+                )}
               </div>
             )}
             {/* DeepDiveModal */}
@@ -469,6 +479,15 @@ export function CurrentTurnDisplay({
                 isOpen={isDeepDiveModalOpen}
                 onClose={() => setIsDeepDiveModalOpen(false)}
                 onStartDeepDive={(type, customPrompt) => onDeepDive(topic, finalAnswer, type, customPrompt)}
+                topic={topic}
+              />
+            )}
+            {/* ForkModal */}
+            {finalAnswer && onFork && (
+              <ForkModal
+                isOpen={isForkModalOpen}
+                onClose={() => setIsForkModalOpen(false)}
+                onCreateFork={(label, perspective) => onFork('current', topic, finalAnswer, label, perspective)}
                 topic={topic}
               />
             )}

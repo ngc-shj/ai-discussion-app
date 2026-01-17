@@ -128,6 +128,7 @@ export function DiscussionPanel({
           onFollowUp={onFollowUp}
           onDeepDive={onDeepDive}
           onCounterargument={onCounterargument}
+          onFork={onFork}
           messageVotes={messageVotes}
           onVote={onVote}
           suggestedFollowUps={suggestedFollowUps}
