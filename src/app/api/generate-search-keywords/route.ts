@@ -11,7 +11,7 @@ interface GenerateKeywordsRequest {
   messages?: Array<{ provider: string; content: string }>;
   timing: SearchKeywordTiming;
   participant?: DiscussionParticipant;
-  maxKeywords?: number; // キーワードの最大数（デフォルト3）
+  maxKeywords?: number; // キーワードの最大数（デフォルト1）
 }
 
 /**
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: GenerateKeywordsRequest = await request.json();
-    const { topic, messages, timing, participant, maxKeywords = 3 } = body;
+    const { topic, messages, timing, participant, maxKeywords = 1 } = body;
 
     if (!topic) {
       log.warn('Missing topic parameter');
@@ -57,10 +57,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    log.info('Generate keywords request received', { topic, timing });
+    log.info('Generate keywords request received', { topic, timing, maxKeywords });
 
-    // プロンプトを生成
-    const prompt = createSearchKeywordPrompt(topic, messages, timing);
+    // プロンプトを生成（maxKeywordsを渡す）
+    const prompt = createSearchKeywordPrompt(topic, messages, timing, maxKeywords);
 
     // 参加者が指定されていればそのプロバイダーを使用、なければデフォルト
     let provider;

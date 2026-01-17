@@ -30,8 +30,11 @@ export function SearchResultsAccordion({ searchKeywords }: SearchResultsAccordio
   const roundKeywords = searchKeywords.filter(kw => kw.timing === 'round');
   const summaryKeywords = searchKeywords.filter(kw => kw.timing === 'summary');
 
-  // 検索結果の総数を計算
-  const totalResults = searchKeywords.reduce((sum, kw) => sum + (kw.results?.length || 0), 0);
+  // 有効な検索結果の総数を計算（filtered=trueを除外）
+  const totalRelevantResults = searchKeywords.reduce((sum, kw) => {
+    const relevantCount = kw.results?.filter(r => !r.filtered).length || 0;
+    return sum + relevantCount;
+  }, 0);
 
   return (
     <div className="mt-3">
@@ -54,7 +57,7 @@ export function SearchResultsAccordion({ searchKeywords }: SearchResultsAccordio
         </svg>
         <span>検索結果を{isExpanded ? '折りたたむ' : '見る'}</span>
         <span className="text-gray-500">
-          ({searchKeywords.length}回検索、{totalResults}件)
+          ({searchKeywords.length}回検索、有効{totalRelevantResults}件)
         </span>
       </button>
 
@@ -107,7 +110,11 @@ function SearchSection({
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
-  const totalResults = keywords.reduce((sum, kw) => sum + (kw.results?.length || 0), 0);
+  // 有効な検索結果の総数を計算（filtered=trueを除外）
+  const totalRelevantResults = keywords.reduce((sum, kw) => {
+    const relevantCount = kw.results?.filter(r => !r.filtered).length || 0;
+    return sum + relevantCount;
+  }, 0);
 
   return (
     <div className="bg-gray-800/30 rounded-lg p-2">
@@ -127,7 +134,7 @@ function SearchSection({
         </svg>
         <span className="font-medium">{label}</span>
         <span className="text-xs text-gray-500">
-          ({keywords.length}回、{totalResults}件)
+          ({keywords.length}回、有効{totalRelevantResults}件)
         </span>
       </button>
 

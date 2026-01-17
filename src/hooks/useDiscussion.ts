@@ -442,7 +442,8 @@ export function useDiscussion(): UseDiscussionReturn {
       } = params;
 
       let searchKeywords: string[] = [];
-      let searchResults: SearchResult[] = [...existingResults];
+      let accumulatedResults: SearchResult[] = [...existingResults];  // 累積結果（重複除外済み）
+      let totalFetchedCount = 0;  // APIから取得した総件数（重複含む）
       let lastCompletedKeywordIndex = completedKeywordIndex;
       let keywordPrompt: string | undefined;
       let wasInterrupted = false;
@@ -480,7 +481,7 @@ export function useDiscussion(): UseDiscussionReturn {
           topic,
           timing,
           participant: participants[0],
-          maxKeywords: searchConfig.maxKeywords || 3,
+          maxKeywords: searchConfig.maxKeywords || 1,
         };
         // summary時は議論内容も渡す
         if (timing === 'summary' && messages) {
@@ -574,17 +575,18 @@ export function useDiscussion(): UseDiscussionReturn {
 
         if (searchResponse.ok) {
           const searchData = await searchResponse.json();
-          const newResults = searchData.results || [];
+          const fetchedResults = searchData.results || [];  // APIから取得した結果（重複含む可能性あり）
 
-          // 重複除去して追加
+          // 重複除去して累積結果に追加
           const resultsByUrl = new Map<string, SearchResult>();
-          for (const r of searchResults) {
+          for (const r of accumulatedResults) {
             resultsByUrl.set(r.url, r);
           }
-          for (const r of newResults) {
+          for (const r of fetchedResults) {
             resultsByUrl.set(r.url, r);
           }
-          searchResults = Array.from(resultsByUrl.values());
+          accumulatedResults = Array.from(resultsByUrl.values());
+          totalFetchedCount += fetchedResults.length;  // 取得件数をカウント
 
           // 警告を収集
           if (searchData.warnings && searchData.warnings.length > 0) {
@@ -616,27 +618,26 @@ export function useDiscussion(): UseDiscussionReturn {
       });
 
       // 検索結果をmaxResultsで制限
-      searchResults = searchResults.slice(0, searchConfig.maxResults);
+      accumulatedResults = accumulatedResults.slice(0, searchConfig.maxResults);
 
-      // キーワード情報を作成
+      // 既存の結果と重複しない新規結果のみを抽出
+      const existingUrls = new Set(currentSearchResults.map((r: SearchResult) => r.url));
+      const uniqueNewResults = accumulatedResults.filter((r: SearchResult) => !existingUrls.has(r.url));
+
+      // キーワード情報を作成（新規結果のみを保存、取得件数も記録）
       const keywordInfo: SearchKeywordInfo = {
         timing,
         round,
         keywords: searchKeywords,
         timestamp: new Date(),
         prompt: keywordPrompt,
-        results: searchResults,
+        results: uniqueNewResults,
+        fetchedCount: totalFetchedCount,  // APIから取得した総件数（重複含む）
       };
 
       // 状態を更新（既存の結果とマージ）
-      const resultsByUrl = new Map<string, SearchResult>();
-      for (const r of currentSearchResults) {
-        resultsByUrl.set(r.url, r);
-      }
-      for (const r of searchResults) {
-        resultsByUrl.set(r.url, r);
-      }
-      setCurrentSearchResults(Array.from(resultsByUrl.values()));
+      const mergedResults = [...currentSearchResults, ...uniqueNewResults];
+      setCurrentSearchResults(mergedResults);
       // キーワード情報の結果を更新（早期追加時は空だった）
       // 復元時は既に結果がある場合もあるため、更新または追加
       setCurrentSearchKeywords(prev => {
@@ -644,7 +645,7 @@ export function useDiscussion(): UseDiscussionReturn {
         if (existingIndex >= 0) {
           // 既存のキーワード情報を更新
           return prev.map((kw, i) =>
-            i === existingIndex ? { ...kw, results: searchResults } : kw
+            i === existingIndex ? { ...kw, results: uniqueNewResults } : kw
           );
         } else {
           // 新規追加（復元時などで早期追加されていなかった場合）
@@ -653,7 +654,7 @@ export function useDiscussion(): UseDiscussionReturn {
       });
 
       return {
-        results: searchResults,
+        results: uniqueNewResults,
         keywordInfo,
         lastCompletedKeywordIndex,
         wasInterrupted,
@@ -773,6 +774,11 @@ export function useDiscussion(): UseDiscussionReturn {
 
       try {
         // ===== ステージ1: 統合回答の生成 =====
+        // 統合前検索の結果を含めた全検索結果を構築
+        const allSearchResults = summarySearchKeywordInfo?.results
+          ? [...currentSearchResults, ...summarySearchKeywordInfo.results]
+          : currentSearchResults;
+
         const response = await fetch('/api/summarize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -781,7 +787,7 @@ export function useDiscussion(): UseDiscussionReturn {
             participants,
             messages: currentMessages,
             previousTurns,
-            searchResults: currentSearchResults,
+            searchResults: allSearchResults,
             userProfile,
             discussionMode,
             discussionDepth,
@@ -861,11 +867,15 @@ export function useDiscussion(): UseDiscussionReturn {
           const allSearchKeywords = summarySearchKeywordInfo
             ? [...currentSearchKeywords, summarySearchKeywordInfo]
             : currentSearchKeywords;
+          // 統合前検索の結果を含めた全検索結果を構築（ターン保存用）
+          const allSearchResultsForTurn = summarySearchKeywordInfo?.results
+            ? [...currentSearchResults, ...summarySearchKeywordInfo.results]
+            : currentSearchResults;
           const newTurn = createNewTurn(
             currentTopic,
             currentMessages,
             collectedFinalAnswer,
-            currentSearchResults.length > 0 ? currentSearchResults : undefined,
+            allSearchResultsForTurn.length > 0 ? allSearchResultsForTurn : undefined,
             collectedSummaryPrompt || undefined,
             undefined, // フォローアップはまだない
             startMarker || undefined,
@@ -1113,12 +1123,8 @@ export function useDiscussion(): UseDiscussionReturn {
 
       // セッションを取得または作成
       // 追加質問の場合: 既存のセッション（currentSessionRef.current）を引き継ぐ
-      // 新規の場合: トピック名で検索、なければ作成
+      // 新規の場合: 常に新しいセッションを作成（同じトピック名でも別セッション）
       let session: DiscussionSession | null = currentSessionRef.current;
-      if (!session) {
-        const sessions = await getAllSessions();
-        session = sessions.find((s) => s.title === topic) || null;
-      }
       if (!session) {
         session = createNewSession(topic, participants, terminationConfig.maxRounds);
         await saveSession(session);

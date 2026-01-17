@@ -150,7 +150,8 @@ export async function generateSearchKeywords(
   topic: string,
   messages: DiscussionMessage[],
   timing: 'start' | 'round' | 'summary',
-  participant: DiscussionParticipant
+  participant: DiscussionParticipant,
+  maxKeywords?: number
 ): Promise<{ keywords: string[]; prompt?: string }> {
   const response = await fetch('/api/generate-search-keywords', {
     method: 'POST',
@@ -164,6 +165,7 @@ export async function generateSearchKeywords(
       timing,
       provider: participant.provider,
       model: participant.model,
+      maxKeywords: maxKeywords ?? 1,
     }),
   });
 
@@ -432,7 +434,8 @@ async function executeSearchWithKeywords(
     topic,
     messages,
     timing,
-    participants[0]
+    participants[0],
+    searchConfig.maxKeywords
   );
 
   // 既存のエントリを探す
@@ -471,7 +474,8 @@ async function executeSearchWithKeywords(
   };
 
   // 各キーワードで検索
-  const collectedResults: SearchResult[] = [];
+  const uniqueNewResults: SearchResult[] = [];  // 新規結果（重複除外済み）
+  let totalFetchedCount = 0;  // APIから取得した総件数（重複含む）
   for (let i = 0; i < keywords.length; i++) {
     if (callbacks.shouldInterrupt()) {
       // 中断時は完了したキーワードインデックスのみ記録
@@ -490,7 +494,7 @@ async function executeSearchWithKeywords(
 
     callbacks.onSearchProgress(keywords[i], i, keywords.length);
 
-    const { results } = await performSearch(
+    const { results: fetchedResults } = await performSearch(
       keywords[i],
       searchConfig,
       topic,
@@ -499,15 +503,18 @@ async function executeSearchWithKeywords(
       defaultAI
     );
 
+    totalFetchedCount += fetchedResults.length;  // 取得件数をカウント
+
     // 重複除去してマージ
     const existingUrls = new Set(state.searchResults.map(r => r.url));
-    const newResults = results.filter(r => !existingUrls.has(r.url));
-    state.searchResults = [...state.searchResults, ...newResults];
-    collectedResults.push(...newResults);
+    const filteredResults = fetchedResults.filter(r => !existingUrls.has(r.url));
+    state.searchResults = [...state.searchResults, ...filteredResults];
+    uniqueNewResults.push(...filteredResults);
   }
 
-  // 検索完了後にのみresultsを設定
-  keywordInfo.results = collectedResults;
+  // 検索完了後にのみresultsとfetchedCountを設定
+  keywordInfo.results = uniqueNewResults;
+  keywordInfo.fetchedCount = totalFetchedCount;
   keywordInfo.completedKeywordIndex = keywords.length - 1;
 
   // searchKeywordsの状態を更新（resultsを含む）
@@ -621,14 +628,14 @@ export async function runClientOrchestration(
 
       // ラウンド検索（2ラウンド目以降、または再開時）
       if (shouldRunRoundSearch) {
-        // 前ラウンドのメッセージからキーワード生成
-        const previousRoundMessages = state.messages.filter(m => m.round === round - 1);
+        // 現在のラウンドより前の全メッセージを渡す（議論の全体像を把握してキーワード生成）
+        const messagesBeforeCurrentRound = state.messages.filter(m => m.round < round);
 
         const { interrupted } = await executeSearchWithKeywords({
           timing: 'round',
           round,
           topic: config.topic,
-          messages: previousRoundMessages.length > 0 ? previousRoundMessages : state.messages,
+          messages: messagesBeforeCurrentRound.length > 0 ? messagesBeforeCurrentRound : state.messages,
           participants: config.participants,
           searchConfig: config.searchConfig!,
           state,

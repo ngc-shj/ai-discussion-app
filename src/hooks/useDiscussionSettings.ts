@@ -40,7 +40,7 @@ const DEFAULT_TERMINATION_CONFIG: TerminationConfig = {
 const DEFAULT_SEARCH_CONFIG: SearchConfig = {
   enabled: false,
   maxResults: 5,
-  maxKeywords: 3,
+  maxKeywords: 1,
   searchType: 'web',
   language: 'ja',
   timing: {

@@ -23,7 +23,8 @@ export interface SearchKeywordInfo {
   keywords: string[];                      // 生成されたキーワード
   timestamp: Date;                         // 生成時刻
   prompt?: string;                         // AIに渡されたプロンプト（確認用）
-  results?: SearchResult[];               // このタイミングで取得した検索結果
+  results?: SearchResult[];               // このタイミングで取得した新規検索結果（重複除外済み）
+  fetchedCount?: number;                  // 検索で取得した総件数（重複含む）
   completedKeywordIndex?: number;         // 最後に完了したキーワードのインデックス（中断復元用）
 }
 
@@ -78,7 +79,7 @@ export interface SearchConfig {
   provider?: SearchProviderType; // 検索プロバイダー（未指定時は自動選択）
   query?: string; // カスタム検索クエリ（空の場合はトピックを使用）
   maxResults: number;
-  maxKeywords?: number; // AI生成キーワードの最大数（デフォルト3）
+  maxKeywords?: number; // AI生成キーワードの最大数（デフォルト1）
   searchType: 'web' | 'news' | 'images';
   language?: string;
   engines?: string[]; // SearXNG用: 使用する検索エンジン
