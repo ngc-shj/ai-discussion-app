@@ -27,19 +27,38 @@ interface InlineSearchResultsProps {
   results: SearchResult[];
   /** 初期状態で展開するか（trueの場合、展開ボタンを非表示にして常に展開状態） */
   defaultExpanded?: boolean;
+  /** APIから取得した総件数（重複含む） */
+  fetchedCount?: number;
 }
 
 /**
  * 検索結果をインライン表示するコンポーネント
  */
-export function InlineSearchResults({ results, defaultExpanded = false }: InlineSearchResultsProps) {
+export function InlineSearchResults({ results, defaultExpanded = false, fetchedCount }: InlineSearchResultsProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [fullContentResult, setFullContentResult] = useState<ModalState>(null);
 
   // defaultExpandedがtrueの場合は展開ボタンを表示しない
   const showToggleButton = !defaultExpanded;
 
+  // 重複件数を計算（fetchedCountがある場合のみ）
+  const uniqueCount = results.length;
+  const duplicateCount = fetchedCount !== undefined ? fetchedCount - uniqueCount : 0;
+
   if (results.length === 0) {
+    // 取得はしたが全て重複だった場合
+    if (fetchedCount !== undefined && fetchedCount > 0) {
+      return (
+        <div className="mt-2 bg-gray-800/50 border border-gray-700/30 rounded-lg p-2">
+          <div className="flex items-center gap-2 text-gray-400 text-xs">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            <span>取得{fetchedCount}件 → 全て重複のため0件追加</span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="mt-2 bg-yellow-900/20 border border-yellow-700/30 rounded-lg p-2">
         <div className="flex items-center gap-2 text-yellow-400/70 text-xs">
@@ -77,9 +96,18 @@ export function InlineSearchResults({ results, defaultExpanded = false }: Inline
           </svg>
           <span>検索結果を{isExpanded ? '折りたたむ' : '展開'}</span>
           <span className="text-gray-500">
-            ({relevantCount}件
+            ({fetchedCount !== undefined ? (
+              <>
+                <span className="text-cyan-400">{uniqueCount}件</span>
+                {duplicateCount > 0 && (
+                  <span className="text-gray-500">/{fetchedCount}取得</span>
+                )}
+              </>
+            ) : (
+              <>{relevantCount}件</>
+            )}
             {filteredCount > 0 && (
-              <span className="text-orange-400">+{filteredCount}件除外</span>
+              <span className="text-orange-400"> +{filteredCount}件除外</span>
             )}
             )
           </span>

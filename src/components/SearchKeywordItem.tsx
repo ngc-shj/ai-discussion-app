@@ -75,7 +75,7 @@ export function SearchKeywordItem({ keyword }: SearchKeywordItemProps) {
 
         {/* 検索結果（このタイミングで取得した結果） */}
         {keyword.results !== undefined && (
-          <InlineSearchResults results={keyword.results} />
+          <InlineSearchResults results={keyword.results} fetchedCount={keyword.fetchedCount} />
         )}
       </div>
     </div>
