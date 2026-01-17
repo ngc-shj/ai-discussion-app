@@ -628,14 +628,14 @@ export async function runClientOrchestration(
 
       // ラウンド検索（2ラウンド目以降、または再開時）
       if (shouldRunRoundSearch) {
-        // 前ラウンドのメッセージからキーワード生成
-        const previousRoundMessages = state.messages.filter(m => m.round === round - 1);
+        // 現在のラウンドより前の全メッセージを渡す（議論の全体像を把握してキーワード生成）
+        const messagesBeforeCurrentRound = state.messages.filter(m => m.round < round);
 
         const { interrupted } = await executeSearchWithKeywords({
           timing: 'round',
           round,
           topic: config.topic,
-          messages: previousRoundMessages.length > 0 ? previousRoundMessages : state.messages,
+          messages: messagesBeforeCurrentRound.length > 0 ? messagesBeforeCurrentRound : state.messages,
           participants: config.participants,
           searchConfig: config.searchConfig!,
           state,

@@ -1114,12 +1114,8 @@ export function useDiscussion(): UseDiscussionReturn {
 
       // セッションを取得または作成
       // 追加質問の場合: 既存のセッション（currentSessionRef.current）を引き継ぐ
-      // 新規の場合: トピック名で検索、なければ作成
+      // 新規の場合: 常に新しいセッションを作成（同じトピック名でも別セッション）
       let session: DiscussionSession | null = currentSessionRef.current;
-      if (!session) {
-        const sessions = await getAllSessions();
-        session = sessions.find((s) => s.title === topic) || null;
-      }
       if (!session) {
         session = createNewSession(topic, participants, terminationConfig.maxRounds);
         await saveSession(session);
