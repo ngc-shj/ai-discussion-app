@@ -1217,20 +1217,11 @@ export function useDiscussion(): UseDiscussionReturn {
               });
               break;
             }
-            case 'generating': {
+            case 'generating':
               // 検索進捗をクリア
               setSearchUiProgress(null);
-              // ストリーミングメッセージの初期化（ラウンド情報を設定）
-              const currentParticipant = participants[state.currentParticipantIndex];
-              setStreamingMessage({
-                messageId: '',
-                participantId: currentParticipant?.id || '',
-                content: '',
-                provider: currentParticipant?.provider || '',
-                round: state.currentRound,
-              });
+              // 注: 参加者情報は下のgenerating専用処理で更新
               break;
-            }
             case 'awaiting':
               // 全ラウンド完了、統合回答待ち
               setSearchUiProgress(null); // 検索進捗をクリア
@@ -1258,6 +1249,26 @@ export function useDiscussion(): UseDiscussionReturn {
               setIsDiscussing(false);
               break;
             }
+          }
+
+          // generatingフェーズでは参加者が切り替わるたびにstreamingMessageを更新
+          // （フェーズ変化時だけでなく、同一フェーズ内での参加者切り替え時も対応）
+          if (state.phase === 'generating') {
+            const currentParticipant = participants[state.currentParticipantIndex];
+            setStreamingMessage((prev) => {
+              // 参加者が同じ場合は更新不要（contentを維持）
+              if (prev?.participantId === currentParticipant?.id) {
+                return prev;
+              }
+              // 参加者が変わった場合は新しいstreamingMessageを作成
+              return {
+                messageId: '',
+                participantId: currentParticipant?.id || '',
+                content: '',
+                provider: currentParticipant?.provider || '',
+                round: state.currentRound,
+              };
+            });
           }
 
           // 状態保存のロジック
@@ -1588,18 +1599,11 @@ export function useDiscussion(): UseDiscussionReturn {
               });
               break;
             }
-            case 'generating': {
+            case 'generating':
+              // 検索進捗をクリア
               setSearchUiProgress(null);
-              const currentParticipant = interruptedState.participants[state.currentParticipantIndex];
-              setStreamingMessage({
-                messageId: '',
-                participantId: currentParticipant?.id || '',
-                content: '',
-                provider: currentParticipant?.provider || '',
-                round: state.currentRound,
-              });
+              // 注: 参加者情報は下のgenerating専用処理で更新
               break;
-            }
             case 'awaiting':
               setSearchUiProgress(null);
               setStreamingMessage(null);
@@ -1625,6 +1629,26 @@ export function useDiscussion(): UseDiscussionReturn {
               setIsDiscussing(false);
               break;
             }
+          }
+
+          // generatingフェーズでは参加者が切り替わるたびにstreamingMessageを更新
+          // （フェーズ変化時だけでなく、同一フェーズ内での参加者切り替え時も対応）
+          if (state.phase === 'generating') {
+            const currentParticipant = interruptedState.participants[state.currentParticipantIndex];
+            setStreamingMessage((prev) => {
+              // 参加者が同じ場合は更新不要（contentを維持）
+              if (prev?.participantId === currentParticipant?.id) {
+                return prev;
+              }
+              // 参加者が変わった場合は新しいstreamingMessageを作成
+              return {
+                messageId: '',
+                participantId: currentParticipant?.id || '',
+                content: '',
+                provider: currentParticipant?.provider || '',
+                round: state.currentRound,
+              };
+            });
           }
 
           // 状態保存のロジック
