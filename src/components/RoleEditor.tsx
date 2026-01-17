@@ -289,35 +289,28 @@ export function RoleEditor({
 
                         {/* 選択時に詳細表示 */}
                         {selectedPresetId === preset.id && (
-                          <div className="mt-2 pt-2 border-t border-gray-600/50 space-y-2">
+                          <div className="mt-2 pt-2 border-t border-gray-600/50">
                             <div className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded max-h-24 overflow-y-auto">
                               {preset.prompt}
-                            </div>
-                            <div className="flex gap-2 pt-1">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDuplicatePreset(preset);
-                                }}
-                                className="flex-1 px-3 py-1.5 text-xs bg-green-600 hover:bg-green-500 text-white rounded transition-colors flex items-center justify-center gap-1"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                                カスタムとして複製
-                              </button>
                             </div>
                           </div>
                         )}
                       </div>
 
-                      {/* Expand indicator (when not selected) */}
-                      {selectedPresetId !== preset.id && (
-                        <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      {/* 常に複製ボタンを表示 */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDuplicatePreset(preset);
+                        }}
+                        className="shrink-0 ml-2 p-1.5 text-gray-400 hover:text-green-400 hover:bg-gray-700 rounded transition-colors"
+                        title="カスタムとして複製"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
-                      )}
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -445,52 +438,56 @@ function RoleListItem({
 
           {/* 選択時に詳細表示 */}
           {isSelected && (
-            <div className="mt-2 pt-2 border-t border-purple-500/30 space-y-2">
+            <div className="mt-2 pt-2 border-t border-purple-500/30">
               <div className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded max-h-24 overflow-y-auto">
                 {role.prompt}
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onStartEdit();
-                  }}
-                  className="flex-1 px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded transition-colors"
-                >
-                  編集
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDuplicate();
-                  }}
-                  className="px-3 py-1.5 text-xs text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
-                >
-                  複製
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete();
-                  }}
-                  className="px-3 py-1.5 text-xs text-red-400 hover:text-red-300 hover:bg-gray-700 rounded transition-colors"
-                >
-                  削除
-                </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Expand indicator (when not selected) */}
-        {!isSelected && (
-          <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        )}
+        {/* 常にアイコンボタンを表示 */}
+        <div className="flex items-center gap-1 shrink-0 ml-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartEdit();
+            }}
+            className="p-1.5 text-gray-400 hover:text-purple-400 hover:bg-gray-700 rounded transition-colors"
+            title="編集"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate();
+            }}
+            className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-gray-700 rounded transition-colors"
+            title="複製"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
+            title="削除"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );
