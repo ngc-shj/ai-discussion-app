@@ -179,16 +179,15 @@ export function AISelector({
       </p>
 
       {/* ロール編集モーダル */}
-      {showRoleEditor && (
-        <RoleEditor
-          customRoles={customRoles}
-          onAdd={addCustomRole}
-          onUpdate={updateCustomRole}
-          onDelete={deleteCustomRole}
-          onDuplicate={duplicateCustomRole}
-          onClose={() => setShowRoleEditor(false)}
-        />
-      )}
+      <RoleEditor
+        isOpen={showRoleEditor}
+        customRoles={customRoles}
+        onAdd={addCustomRole}
+        onUpdate={updateCustomRole}
+        onDelete={deleteCustomRole}
+        onDuplicate={duplicateCustomRole}
+        onClose={() => setShowRoleEditor(false)}
+      />
     </div>
   );
 }
