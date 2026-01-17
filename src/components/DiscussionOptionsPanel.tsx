@@ -233,6 +233,13 @@ export function DiscussionOptionsPanel({
               onDiscussionDepthChange={onDiscussionDepthChange}
               currentDepthPreset={currentDepthPreset}
             />
+
+            {/* ラウンド数（基本設定に配置） */}
+            <RoundsSection
+              disabled={disabled}
+              terminationConfig={terminationConfig}
+              onTerminationConfigChange={onTerminationConfigChange}
+            />
           </div>
 
           {/* 詳細設定 */}
@@ -969,6 +976,44 @@ function KeywordSection({
   );
 }
 
+interface RoundsSectionProps {
+  disabled?: boolean;
+  terminationConfig: TerminationConfig;
+  onTerminationConfigChange: (config: TerminationConfig) => void;
+}
+
+function RoundsSection({ disabled, terminationConfig, onTerminationConfigChange }: RoundsSectionProps) {
+  // 終了条件が「ラウンド数」以外の場合は「最大ラウンド数」として表示
+  const isMaxRounds = terminationConfig.condition !== 'rounds';
+  const label = isMaxRounds ? '最大ラウンド数' : 'ラウンド数';
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-xs text-gray-400">{label}</label>
+        <span className="text-xs text-blue-400 font-medium">
+          {terminationConfig.maxRounds}ラウンド
+        </span>
+      </div>
+      <input
+        type="range"
+        min="1"
+        max="10"
+        value={terminationConfig.maxRounds}
+        onChange={(e) => onTerminationConfigChange({ ...terminationConfig, maxRounds: Number(e.target.value) })}
+        disabled={disabled}
+        title={`${label}: ${terminationConfig.maxRounds}`}
+        className={`w-full h-2 bg-gray-600 rounded-lg appearance-none accent-blue-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+      />
+      <p className="text-xs text-gray-500">
+        {isMaxRounds
+          ? '終了条件が満たされない場合の上限'
+          : '各参加者が発言するラウンドの回数'}
+      </p>
+    </div>
+  );
+}
+
 interface TerminationSectionProps {
   disabled?: boolean;
   terminationConfig: TerminationConfig;
@@ -1082,24 +1127,6 @@ function TerminationSection({
           )}
         </div>
       )}
-
-      {/* 最大ラウンド数 */}
-      <div className="mt-2 space-y-1">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-400">最大ラウンド数</span>
-          <span className="text-xs text-gray-300">{terminationConfig.maxRounds}ラウンド</span>
-        </div>
-        <input
-          type="range"
-          min="1"
-          max="10"
-          value={terminationConfig.maxRounds}
-          onChange={(e) => onTerminationConfigChange({ ...terminationConfig, maxRounds: Number(e.target.value) })}
-          disabled={disabled}
-          title={`最大ラウンド数: ${terminationConfig.maxRounds}`}
-          className={`w-full h-2 bg-gray-600 rounded-lg appearance-none accent-gray-400 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-        />
-      </div>
     </div>
   );
 }
