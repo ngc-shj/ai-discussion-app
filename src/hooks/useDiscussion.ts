@@ -480,7 +480,7 @@ export function useDiscussion(): UseDiscussionReturn {
           topic,
           timing,
           participant: participants[0],
-          maxKeywords: searchConfig.maxKeywords || 3,
+          maxKeywords: searchConfig.maxKeywords || 1,
         };
         // summary時は議論内容も渡す
         if (timing === 'summary' && messages) {

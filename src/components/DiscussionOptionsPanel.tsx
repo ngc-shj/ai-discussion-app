@@ -493,6 +493,32 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
                 className={`w-full h-1.5 bg-gray-600 rounded-lg appearance-none accent-green-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
               />
             </div>
+
+            {/* 検索キーワード数 */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-gray-400">検索キーワード数</label>
+                <span className="text-xs text-green-400">{searchConfig.maxKeywords || 1}個</span>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="3"
+                value={searchConfig.maxKeywords || 1}
+                onChange={(e) => {
+                  onSearchConfigChange({
+                    ...searchConfig,
+                    maxKeywords: Number(e.target.value)
+                  });
+                }}
+                disabled={disabled}
+                title={`AIが生成する検索キーワード数: ${searchConfig.maxKeywords || 1}`}
+                className={`w-full h-1.5 bg-gray-600 rounded-lg appearance-none accent-green-500 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+              />
+              <p className="text-xs text-gray-500">
+                AIが生成する検索キーワードの数（各キーワードで{searchConfig.maxResults}件検索）
+              </p>
+            </div>
           </div>
 
           {/* 詳細設定 */}

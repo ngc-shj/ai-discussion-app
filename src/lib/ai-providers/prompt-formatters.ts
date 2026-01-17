@@ -354,28 +354,33 @@ export type SearchKeywordTiming = 'start' | 'round' | 'summary';
 
 /**
  * 検索キーワード生成用プロンプトを作成
+ * @param maxKeywords 生成するキーワード数（デフォルト1）
  */
 export function createSearchKeywordPrompt(
   topic: string,
   messages?: Array<{ provider: string; content: string }>,
-  timing: SearchKeywordTiming = 'start'
+  timing: SearchKeywordTiming = 'start',
+  maxKeywords: number = 1
 ): string {
   const currentYear = new Date().getFullYear();
+  const keywordCountText = maxKeywords === 1 ? '1つだけ' : `${maxKeywords}つ`;
+  const keywordExampleText = maxKeywords === 1 ? '["キーワード"]' : `["キーワード1"${maxKeywords >= 2 ? ', "キーワード2"' : ''}${maxKeywords >= 3 ? ', "キーワード3"' : ''}]`;
 
   if (timing === 'start') {
     return `以下のトピックについてWeb検索を行います。
-効果的な検索のためのキーワードを3つ生成してください。
+最も効果的な検索キーワードを${keywordCountText}生成してください。
 
 トピック: ${topic}
 
 要件:
-- 各キーワードは検索エンジンに最適化された形式（短く、具体的に）
+- 検索エンジンに最適化された形式（短く、具体的に）
 - 最新の情報を得られるよう必要に応じて「${currentYear}」などの年号を含める
 - 専門用語や固有名詞を適切に使用
 - 日本語と英語を適切に使い分ける
+- トピックの本質を捉えた最も重要なキーワードを選ぶ
 
 出力形式（JSONのみ、他の文章は不要）:
-["キーワード1", "キーワード2", "キーワード3"]`;
+${keywordExampleText}`;
   }
 
   // 各ラウンド・統合回答前：メッセージ部分のみXML形式
@@ -389,7 +394,7 @@ export function createSearchKeywordPrompt(
 
   const timingLabel = timing === 'round' ? '追加調査' : 'ファクトチェック';
 
-  return `以下の議論を踏まえて、${timingLabel}のための検索キーワードを3つ生成してください。
+  return `以下の議論を踏まえて、${timingLabel}のための検索キーワードを${keywordCountText}生成してください。
 
 トピック: ${topic}
 
@@ -398,10 +403,11 @@ ${formattedMessages}
 
 要件:
 - 議論で言及された具体的な事実・統計・人名などを確認できるキーワード
-- まだ議論で十分に扱われていない関連トピック
-- 異なる視点や反論を見つけられるキーワード
+- または、まだ議論で十分に扱われていない重要な関連トピック
+- または、異なる視点や反論を見つけられるキーワード
 - 最新の情報を得られるよう必要に応じて「${currentYear}」などの年号を含める
+- 上記の中から最も重要なものを選ぶ
 
 出力形式（JSONのみ、他の文章は不要）:
-["キーワード1", "キーワード2", "キーワード3"]`;
+${keywordExampleText}`;
 }
