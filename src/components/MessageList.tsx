@@ -82,6 +82,7 @@ interface MessageListProps {
   // リアルタイム表示用（CurrentTurnDisplay で使用）
   streamingMessage?: StreamingMessage | null;
   isDiscussing?: boolean;
+  isInterrupting?: boolean;
   bottomRef?: RefObject<HTMLDivElement | null>;
   // 検索中状態の表示用
   searchProgress?: SearchUiProgress | null;
@@ -99,6 +100,7 @@ export function MessageList({
   onVote,
   streamingMessage,
   isDiscussing,
+  isInterrupting,
   bottomRef,
   searchProgress,
   summaryPhase,
@@ -225,8 +227,16 @@ export function MessageList({
         />
       )}
 
+      {/* 中断処理中のローディング */}
+      {isInterrupting && (
+        <div className="flex items-center gap-2 py-3 md:py-4">
+          <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-yellow-400 rounded-full" />
+          <span className="text-yellow-400 text-xs md:text-sm">中断処理中...</span>
+        </div>
+      )}
+
       {/* 議論開始中のローディング */}
-      {isDiscussing && messages.length === 0 && !streamingMessage && !searchProgress && (
+      {isDiscussing && messages.length === 0 && !streamingMessage && !searchProgress && !isInterrupting && (
         <div className="flex items-center gap-2 py-3 md:py-4">
           <div className="animate-spin w-4 h-4 md:w-5 md:h-5 border-2 border-gray-500 border-t-blue-400 rounded-full" />
           <span className="text-gray-400 text-xs md:text-sm">議論を開始中...</span>

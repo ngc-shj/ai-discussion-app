@@ -243,6 +243,13 @@ export async function processSSEStream(
         parseSSELine(line, handlers);
       }
     }
+  } catch (err) {
+    // AbortErrorの場合は中断として扱う
+    if (err instanceof Error && err.name === 'AbortError') {
+      wasInterrupted = true;
+    } else {
+      throw err;
+    }
   } finally {
     // リーダーを確実にクリーンアップ
     try {
