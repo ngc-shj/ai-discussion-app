@@ -27,6 +27,7 @@ export function RoleEditor({
   const [newDescription, setNewDescription] = useState('');
   const [newPrompt, setNewPrompt] = useState('');
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState({ name: '', description: '', prompt: '' });
 
@@ -50,6 +51,7 @@ export function RoleEditor({
       setNewDescription('');
       setNewPrompt('');
       setSelectedRoleId(null);
+      setSelectedPresetId(null);
       setEditingId(null);
     }
   }, [isOpen]);
@@ -268,7 +270,12 @@ export function RoleEditor({
                 {ROLE_PRESETS.map((preset) => (
                   <div
                     key={preset.id}
-                    className="group relative p-3 rounded-lg border bg-gray-900/30 border-gray-700 hover:border-gray-600 transition-colors"
+                    className={`group relative p-3 rounded-lg border transition-colors cursor-pointer ${
+                      selectedPresetId === preset.id
+                        ? 'bg-gray-700/50 border-gray-500'
+                        : 'bg-gray-900/30 border-gray-700 hover:border-gray-600'
+                    }`}
+                    onClick={() => setSelectedPresetId(selectedPresetId === preset.id ? null : preset.id)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
@@ -279,18 +286,38 @@ export function RoleEditor({
                           </span>
                         </div>
                         <div className="text-xs text-gray-500 mt-0.5">{preset.description}</div>
+
+                        {/* 選択時に詳細表示 */}
+                        {selectedPresetId === preset.id && (
+                          <div className="mt-2 pt-2 border-t border-gray-600/50 space-y-2">
+                            <div className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded max-h-24 overflow-y-auto">
+                              {preset.prompt}
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDuplicatePreset(preset);
+                                }}
+                                className="flex-1 px-3 py-1.5 text-xs bg-green-600 hover:bg-green-500 text-white rounded transition-colors flex items-center justify-center gap-1"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                カスタムとして複製
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDuplicatePreset(preset)}
-                        className="shrink-0 px-2 py-1 text-xs text-gray-400 hover:text-green-400 hover:bg-gray-700 rounded transition-colors flex items-center gap-1"
-                        title="カスタムロールとして複製"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+
+                      {/* Expand indicator (when not selected) */}
+                      {selectedPresetId !== preset.id && (
+                        <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
-                        複製
-                      </button>
+                      )}
                     </div>
                   </div>
                 ))}
