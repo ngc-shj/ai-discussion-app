@@ -774,6 +774,11 @@ export function useDiscussion(): UseDiscussionReturn {
 
       try {
         // ===== ステージ1: 統合回答の生成 =====
+        // 統合前検索の結果を含めた全検索結果を構築
+        const allSearchResults = summarySearchKeywordInfo?.results
+          ? [...currentSearchResults, ...summarySearchKeywordInfo.results]
+          : currentSearchResults;
+
         const response = await fetch('/api/summarize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -782,7 +787,7 @@ export function useDiscussion(): UseDiscussionReturn {
             participants,
             messages: currentMessages,
             previousTurns,
-            searchResults: currentSearchResults,
+            searchResults: allSearchResults,
             userProfile,
             discussionMode,
             discussionDepth,
@@ -862,11 +867,15 @@ export function useDiscussion(): UseDiscussionReturn {
           const allSearchKeywords = summarySearchKeywordInfo
             ? [...currentSearchKeywords, summarySearchKeywordInfo]
             : currentSearchKeywords;
+          // 統合前検索の結果を含めた全検索結果を構築（ターン保存用）
+          const allSearchResultsForTurn = summarySearchKeywordInfo?.results
+            ? [...currentSearchResults, ...summarySearchKeywordInfo.results]
+            : currentSearchResults;
           const newTurn = createNewTurn(
             currentTopic,
             currentMessages,
             collectedFinalAnswer,
-            currentSearchResults.length > 0 ? currentSearchResults : undefined,
+            allSearchResultsForTurn.length > 0 ? allSearchResultsForTurn : undefined,
             collectedSummaryPrompt || undefined,
             undefined, // フォローアップはまだない
             startMarker || undefined,

@@ -96,18 +96,15 @@ export function InlineSearchResults({ results, defaultExpanded = false, fetchedC
           </svg>
           <span>検索結果を{isExpanded ? '折りたたむ' : '展開'}</span>
           <span className="text-gray-500">
-            ({fetchedCount !== undefined ? (
-              <>
-                <span className="text-cyan-400">{uniqueCount}件</span>
-                {duplicateCount > 0 && (
-                  <span className="text-gray-500">/{fetchedCount}取得</span>
-                )}
-              </>
-            ) : (
-              <>{relevantCount}件</>
+            (有効<span className="text-cyan-400">{relevantCount}件</span>
+            {fetchedCount !== undefined && (
+              <span className="text-gray-500">: 取得{fetchedCount}</span>
+            )}
+            {duplicateCount > 0 && (
+              <span className="text-gray-500">、重複{duplicateCount}</span>
             )}
             {filteredCount > 0 && (
-              <span className="text-orange-400"> +{filteredCount}件除外</span>
+              <span className="text-orange-400">、除外{filteredCount}</span>
             )}
             )
           </span>
