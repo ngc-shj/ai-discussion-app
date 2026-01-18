@@ -11,8 +11,6 @@ import {
   DiscussionDepth,
   DirectionGuide,
   TerminationConfig,
-  DEFAULT_PROVIDERS,
-  getLocalModelColor,
   generateParticipantId,
 } from '@/types';
 
@@ -154,27 +152,7 @@ export function useDiscussionSettings(): UseDiscussionSettingsState & UseDiscuss
             }
           }
 
-          // デフォルトの参加者を設定
-          const initialParticipants: DiscussionParticipant[] = [];
-          for (const providerId of ['ollama', 'gemini'] as AIProviderType[]) {
-            const models = data[providerId] || [];
-            if (models.length > 0) {
-              const provider = DEFAULT_PROVIDERS.find((p) => p.id === providerId);
-              if (provider) {
-                const model = models[0];
-                initialParticipants.push({
-                  id: generateParticipantId(),
-                  provider: providerId,
-                  model: model.id,
-                  displayName: model.name,
-                  color: provider.isLocal ? getLocalModelColor(model.id) : provider.color,
-                });
-              }
-            }
-          }
-          if (initialParticipants.length > 0) {
-            setParticipantsState(initialParticipants);
-          }
+          // デフォルトの参加者は空（ユーザーが明示的に追加する）
         }
       } catch (err) {
         console.error('Failed to fetch models:', err);

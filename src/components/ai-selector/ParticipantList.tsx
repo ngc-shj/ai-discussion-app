@@ -184,7 +184,18 @@ export function ParticipantList({
   );
 
   if (participants.length === 0) {
-    return null;
+    return (
+      <div className="p-3 bg-gray-700/30 rounded-lg">
+        <div className="flex flex-col items-center justify-center py-2 text-gray-500">
+          <svg className="w-6 h-6 mb-1.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+          <p className="text-xs text-center">
+            下のモデル一覧から追加
+          </p>
+        </div>
+      </div>
+    );
   }
 
   // ロールの情報を取得
@@ -208,8 +219,7 @@ export function ParticipantList({
   };
 
   return (
-    <div className="space-y-1 p-2 bg-gray-700/30 rounded-lg">
-      <div className="text-xs text-gray-400 mb-1">参加者一覧（ドラッグで順番変更）</div>
+    <div className="space-y-1.5 p-2 bg-gray-700/30 rounded-lg">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

@@ -86,9 +86,9 @@ export function ParticipantsPanel({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto flex flex-col space-y-4">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* AI選択 */}
-          <div className="bg-indigo-900/20 rounded-lg p-3 border border-indigo-800/30">
+          <div className="flex-1 min-h-0 bg-indigo-900/20 rounded-lg p-3 border border-indigo-800/30 overflow-hidden">
             <AISelector
               participants={participants}
               onParticipantsChange={onParticipantsChange}
@@ -98,7 +98,7 @@ export function ParticipantsPanel({
             />
           </div>
 
-          <div className="text-sm text-gray-400 pt-2 border-t border-gray-700">
+          <div className="shrink-0 text-sm text-gray-400 pt-2 mt-4 border-t border-gray-700">
             <p className="mb-2">
               <strong>ラウンドロビン形式</strong>
             </p>

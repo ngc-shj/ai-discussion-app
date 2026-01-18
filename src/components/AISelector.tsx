@@ -72,111 +72,119 @@ export function AISelector({
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => setShowRoleEditor(true)}
-          className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
-          title="カスタムロールを管理"
-        >
-          ロール管理
-        </button>
-        <span className="text-xs text-gray-500">{participants.length}人参加</span>
-      </div>
+    <div className="flex flex-col h-full">
+      {/* 参加者セクション - 固定 */}
+      <section className="shrink-0 pb-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-medium text-gray-300">参加者</h3>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowRoleEditor(true)}
+              className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+              title="カスタムロールを管理"
+            >
+              ロール管理
+            </button>
+            <span className="text-xs text-gray-500">{participants.length}人</span>
+          </div>
+        </div>
+        <ParticipantList
+          participants={participants}
+          customRoles={customRoles}
+          disabled={disabled}
+          onUpdateRole={handleUpdateRole}
+          onRemove={removeParticipant}
+          onReorder={onParticipantsChange}
+        />
+      </section>
 
-      {/* 選択された参加者一覧 */}
-      <ParticipantList
-        participants={participants}
-        customRoles={customRoles}
-        disabled={disabled}
-        onUpdateRole={handleUpdateRole}
-        onRemove={removeParticipant}
-        onReorder={onParticipantsChange}
-      />
+      {/* モデル一覧セクション - スクロール */}
+      <section className="flex-1 min-h-0 flex flex-col">
+        <div className="flex items-center justify-between mb-2 shrink-0">
+          <h3 className="text-sm font-medium text-gray-300">モデル一覧</h3>
+          <p className="text-xs text-gray-500">クリックで参加者に追加</p>
+        </div>
 
-      {/* モデル表示切替 */}
-      <div className={`flex flex-wrap items-center gap-2 p-2 bg-gray-700/50 rounded-lg ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
-        <span className="text-xs text-gray-400">表示:</span>
-        <label className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-          <input
-            type="radio"
-            name="modelFilter"
-            checked={modelFilter === 'latest-generation'}
-            onChange={() => setModelFilter('latest-generation')}
-            disabled={disabled}
-            className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600"
-          />
-          <span className="text-xs text-gray-300">最新世代</span>
-        </label>
-        <label className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-          <input
-            type="radio"
-            name="modelFilter"
-            checked={modelFilter === 'latest-5'}
-            onChange={() => setModelFilter('latest-5')}
-            disabled={disabled}
-            className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600"
-          />
-          <span className="text-xs text-gray-300">最新{LATEST_MODEL_COUNT}件</span>
-        </label>
-        <label className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-          <input
-            type="radio"
-            name="modelFilter"
-            checked={modelFilter === 'all'}
-            onChange={() => setModelFilter('all')}
-            disabled={disabled}
-            className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600"
-          />
-          <span className="text-xs text-gray-300">すべて</span>
-        </label>
-        <span className="text-gray-600">|</span>
-        <label
-          className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed opacity-50' : modelFilter === 'latest-generation' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
-          title={modelFilter === 'latest-generation' ? 'ローカルモデルの全サイズを表示' : '「最新世代」選択時のみ有効'}
-        >
-          <input
-            type="checkbox"
-            checked={showAllLocalSizes}
-            onChange={(e) => setShowAllLocalSizes(e.target.checked)}
-            disabled={disabled || modelFilter !== 'latest-generation'}
-            className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600 rounded disabled:opacity-50"
-          />
-          <span className="text-xs text-gray-300">ローカル全サイズ</span>
-        </label>
-      </div>
-
-      <div className="space-y-2">
-        {DEFAULT_PROVIDERS.map((provider) => {
-          const isAvailable = availability[provider.id];
-          const allModels = availableModels[provider.id] || [];
-          const filteredModels = getFilteredModels(allModels, provider.id);
-
-          return (
-            <ProviderSection
-              key={provider.id}
-              provider={provider}
-              isAvailable={isAvailable}
-              isExpanded={expandedProviders[provider.id]}
-              allModels={allModels}
-              filteredModels={filteredModels}
-              selectedCount={getSelectedCountForProvider(provider.id)}
-              modelFilter={modelFilter}
+        {/* モデル表示切替 */}
+        <div className={`shrink-0 flex flex-wrap items-center gap-2 p-2 mb-2 bg-gray-700/50 rounded-lg ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+          <span className="text-xs text-gray-400">表示:</span>
+          <label className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            <input
+              type="radio"
+              name="modelFilter"
+              checked={modelFilter === 'latest-generation'}
+              onChange={() => setModelFilter('latest-generation')}
               disabled={disabled}
-              onToggleExpanded={() => toggleExpanded(provider.id)}
-              onAddParticipant={(modelId, displayName, color) =>
-                addParticipant(provider.id, modelId, displayName, color)
-              }
-              getParticipantCount={(modelId) => getParticipantCountForModel(provider.id, modelId)}
+              className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600"
             />
-          );
-        })}
-      </div>
+            <span className="text-xs text-gray-300">最新世代</span>
+          </label>
+          <label className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            <input
+              type="radio"
+              name="modelFilter"
+              checked={modelFilter === 'latest-5'}
+              onChange={() => setModelFilter('latest-5')}
+              disabled={disabled}
+              className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600"
+            />
+            <span className="text-xs text-gray-300">最新{LATEST_MODEL_COUNT}件</span>
+          </label>
+          <label className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            <input
+              type="radio"
+              name="modelFilter"
+              checked={modelFilter === 'all'}
+              onChange={() => setModelFilter('all')}
+              disabled={disabled}
+              className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600"
+            />
+            <span className="text-xs text-gray-300">すべて</span>
+          </label>
+          <span className="text-gray-600">|</span>
+          <label
+            className={`flex items-center gap-1 ${disabled ? 'cursor-not-allowed opacity-50' : modelFilter === 'latest-generation' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+            title={modelFilter === 'latest-generation' ? 'ローカルモデルの全サイズを表示' : '「最新世代」選択時のみ有効'}
+          >
+            <input
+              type="checkbox"
+              checked={showAllLocalSizes}
+              onChange={(e) => setShowAllLocalSizes(e.target.checked)}
+              disabled={disabled || modelFilter !== 'latest-generation'}
+              className="w-3 h-3 text-blue-500 bg-gray-700 border-gray-600 rounded disabled:opacity-50"
+            />
+            <span className="text-xs text-gray-300">ローカル全サイズ</span>
+          </label>
+        </div>
 
-      <p className="text-xs text-gray-500">
-        同じモデルを異なる役割で複数追加できます
-      </p>
+        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+          {DEFAULT_PROVIDERS.map((provider) => {
+            const isAvailable = availability[provider.id];
+            const allModels = availableModels[provider.id] || [];
+            const filteredModels = getFilteredModels(allModels, provider.id);
+
+            return (
+              <ProviderSection
+                key={provider.id}
+                provider={provider}
+                isAvailable={isAvailable}
+                isExpanded={expandedProviders[provider.id]}
+                allModels={allModels}
+                filteredModels={filteredModels}
+                selectedCount={getSelectedCountForProvider(provider.id)}
+                modelFilter={modelFilter}
+                disabled={disabled}
+                onToggleExpanded={() => toggleExpanded(provider.id)}
+                onAddParticipant={(modelId, displayName, color) =>
+                  addParticipant(provider.id, modelId, displayName, color)
+                }
+                getParticipantCount={(modelId) => getParticipantCountForModel(provider.id, modelId)}
+              />
+            );
+          })}
+        </div>
+      </section>
 
       {/* ロール編集モーダル */}
       <RoleEditor
