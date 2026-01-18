@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   DiscussionMessage,
   DiscussionParticipant,
@@ -44,6 +44,7 @@ import {
   DiscussionConfig as OrchestrationConfig,
   DiscussionCallbacks as OrchestrationCallbacks,
 } from '@/lib/client-orchestration';
+import sessionEvent from '@/lib/session-event';
 
 export interface DiscussionUiProgress {
   currentRound: number;
@@ -386,6 +387,19 @@ export function useDiscussion(): UseDiscussionReturn {
     // 注: interruptRequestedRefはここでリセットしない
     // SSEストリーム処理が中断を検出して状態を保存するまで維持する必要がある
   }, [resetAllState]);
+
+  // sessionReset/discussionClearイベントを購読して議論状態をクリア
+  useEffect(() => {
+    const handler = () => {
+      clearCurrentTurnState();
+    };
+    sessionEvent.on('sessionReset', handler);
+    sessionEvent.on('discussionClear', handler);
+    return () => {
+      sessionEvent.off('sessionReset', handler);
+      sessionEvent.off('discussionClear', handler);
+    };
+  }, [clearCurrentTurnState]);
 
   const restoreDiscussionState = useCallback((params: RestoreDiscussionStateParams) => {
     // 全状態を初期化してからパラメータで上書き

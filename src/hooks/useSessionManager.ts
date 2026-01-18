@@ -16,6 +16,7 @@ import {
   clearInterruptedState,
   saveInterruptedState,
 } from '@/lib/session-storage';
+import sessionEvent from '@/lib/session-event';
 
 export interface UseSessionManagerState {
   sessions: DiscussionSession[];
@@ -90,9 +91,30 @@ export function useSessionManager(): UseSessionManagerState & UseSessionManagerA
     init();
   }, [loadSessions]);
 
-  // 新しいセッションを開始
+  // 新しいセッションを開始（セッションと中断状態をクリア）
   const newSession = useCallback(() => {
     setCurrentSession(null);
+    setInterruptedStateInternal(null);
+    clearInterruptedState();
+  }, []);
+
+  // sessionResetイベントを購読してセッション状態をクリア
+  useEffect(() => {
+    const handler = () => {
+      newSession();
+    };
+    sessionEvent.on('sessionReset', handler);
+    return () => sessionEvent.off('sessionReset', handler);
+  }, [newSession]);
+
+  // discussionClearイベントを購読して中断状態のみクリア（セッションはそのまま）
+  useEffect(() => {
+    const handler = () => {
+      setInterruptedStateInternal(null);
+      clearInterruptedState();
+    };
+    sessionEvent.on('discussionClear', handler);
+    return () => sessionEvent.off('discussionClear', handler);
   }, []);
 
   // セッションを選択

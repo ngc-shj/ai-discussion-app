@@ -19,6 +19,7 @@ import {
   PresetManagerModal,
 } from '@/components';
 import { useDiscussionSettings, useSessionManager, useDiscussion, usePresetManager, useApiKeys } from '@/hooks';
+import sessionEvent from '@/lib/session-event';
 
 export default function Home() {
   // 設定関連（カスタムフックを使用）
@@ -64,7 +65,6 @@ export default function Home() {
     messageVotes,
     discussionParticipants,
     handleVote,
-    clearCurrentTurnState,
     restoreDiscussionState,
     handleInterrupt,
     startDiscussion,
@@ -174,8 +174,8 @@ export default function Home() {
       };
       updateAndSaveSession({ interruptedTurn });
     }
-    setCurrentSession(null);
-    clearCurrentTurnState();
+    // セッション・中断状態・議論状態を一括クリア（イベント発行で各フックが購読して処理）
+    sessionEvent.emit('sessionReset');
   }, [
     isDiscussing,
     currentSessionRef,
@@ -196,8 +196,6 @@ export default function Home() {
     extensionMarkers,
     handleInterrupt,
     updateAndSaveSession,
-    setCurrentSession,
-    clearCurrentTurnState,
   ]);
 
   // セッションを選択
@@ -259,9 +257,8 @@ export default function Home() {
         extensionMarkers: turn.extensionMarkers,
       });
     } else {
-      // 中断状態がない場合は現在の表示をクリア
-      clearCurrentTurnState();
-      setInterruptedState(null);
+      // 中断状態がない場合は現在の表示をクリア（イベント発行で各フックが購読して処理）
+      sessionEvent.emit('discussionClear');
       // セッションに保存された参加者を復元
       if (session.participants && session.participants.length > 0) {
         restoreFromSession({
@@ -269,31 +266,28 @@ export default function Home() {
         });
       }
     }
-  }, [restoreFromSession, restoreDiscussionState, clearCurrentTurnState, setCurrentSession, setInterruptedState]);
+  }, [restoreFromSession, restoreDiscussionState, setCurrentSession]);
 
   // セッションを削除
   const handleDeleteSession = useCallback(async (id: string) => {
     await sessionManagerDeleteSession(id);
-    if (currentSession?.id === id) {
-      clearCurrentTurnState();
+    // 削除されたセッションが選択中または中断中の場合はクリア
+    const shouldClear = currentSession?.id === id || interruptedState?.sessionId === id;
+    if (shouldClear) {
+      sessionEvent.emit('sessionReset');
     }
-    // 削除されたセッションの中断状態もクリア
-    if (interruptedState?.sessionId === id) {
-      setInterruptedState(null);
-    }
-  }, [currentSession, interruptedState, sessionManagerDeleteSession, clearCurrentTurnState, setInterruptedState]);
+  }, [currentSession, interruptedState, sessionManagerDeleteSession]);
 
   // セッションを一括削除
   const handleBulkDeleteSessions = useCallback(async (ids: string[]) => {
     await sessionManagerBulkDeleteSessions(ids);
-    if (currentSession && ids.includes(currentSession.id)) {
-      clearCurrentTurnState();
+    // 削除されたセッションが選択中または中断中の場合はクリア
+    const shouldClear = (currentSession && ids.includes(currentSession.id)) ||
+                       (interruptedState && ids.includes(interruptedState.sessionId));
+    if (shouldClear) {
+      sessionEvent.emit('sessionReset');
     }
-    // 削除されたセッションの中断状態もクリア
-    if (interruptedState && ids.includes(interruptedState.sessionId)) {
-      setInterruptedState(null);
-    }
-  }, [currentSession, interruptedState, sessionManagerBulkDeleteSessions, clearCurrentTurnState, setInterruptedState]);
+  }, [currentSession, interruptedState, sessionManagerBulkDeleteSessions]);
 
   // セッションの名前を変更
   const handleRenameSession = useCallback(async (id: string, newTitle: string) => {
