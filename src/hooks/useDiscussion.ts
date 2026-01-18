@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   DiscussionMessage,
   DiscussionParticipant,
@@ -44,6 +44,7 @@ import {
   DiscussionConfig as OrchestrationConfig,
   DiscussionCallbacks as OrchestrationCallbacks,
 } from '@/lib/client-orchestration';
+import sessionEvent from '@/lib/session-event';
 
 export interface DiscussionUiProgress {
   currentRound: number;
@@ -386,6 +387,19 @@ export function useDiscussion(): UseDiscussionReturn {
     // 注: interruptRequestedRefはここでリセットしない
     // SSEストリーム処理が中断を検出して状態を保存するまで維持する必要がある
   }, [resetAllState]);
+
+  // sessionReset/discussionClearイベントを購読して議論状態をクリア
+  useEffect(() => {
+    const handler = () => {
+      clearCurrentTurnState();
+    };
+    sessionEvent.on('sessionReset', handler);
+    sessionEvent.on('discussionClear', handler);
+    return () => {
+      sessionEvent.off('sessionReset', handler);
+      sessionEvent.off('discussionClear', handler);
+    };
+  }, [clearCurrentTurnState]);
 
   const restoreDiscussionState = useCallback((params: RestoreDiscussionStateParams) => {
     // 全状態を初期化してからパラメータで上書き
@@ -1251,23 +1265,23 @@ export function useDiscussion(): UseDiscussionReturn {
             }
           }
 
-          // generatingフェーズでは参加者が切り替わるたびにstreamingMessageを更新
-          // （フェーズ変化時だけでなく、同一フェーズ内での参加者切り替え時も対応）
+          // generatingフェーズでは参加者またはラウンドが切り替わるたびにstreamingMessageを更新
+          // （フェーズ変化時だけでなく、同一フェーズ内での参加者/ラウンド切り替え時も対応）
           if (state.phase === 'generating') {
             const currentParticipant = participants[state.currentParticipantIndex];
             setStreamingMessage((prev) => {
-              // 参加者が同じ場合は更新不要（contentを維持）
-              if (prev?.participantId === currentParticipant?.id) {
-                return prev;
+              // 参加者またはラウンドが変わった場合は新しいstreamingMessageを作成
+              if (prev?.participantId !== currentParticipant?.id || prev?.round !== state.currentRound) {
+                return {
+                  messageId: '',
+                  participantId: currentParticipant?.id || '',
+                  content: '',
+                  provider: currentParticipant?.provider || '',
+                  round: state.currentRound,
+                };
               }
-              // 参加者が変わった場合は新しいstreamingMessageを作成
-              return {
-                messageId: '',
-                participantId: currentParticipant?.id || '',
-                content: '',
-                provider: currentParticipant?.provider || '',
-                round: state.currentRound,
-              };
+              // 参加者もラウンドも同じ場合は更新不要
+              return prev;
             });
           }
 
@@ -1631,23 +1645,23 @@ export function useDiscussion(): UseDiscussionReturn {
             }
           }
 
-          // generatingフェーズでは参加者が切り替わるたびにstreamingMessageを更新
-          // （フェーズ変化時だけでなく、同一フェーズ内での参加者切り替え時も対応）
+          // generatingフェーズでは参加者またはラウンドが切り替わるたびにstreamingMessageを更新
+          // （フェーズ変化時だけでなく、同一フェーズ内での参加者/ラウンド切り替え時も対応）
           if (state.phase === 'generating') {
             const currentParticipant = interruptedState.participants[state.currentParticipantIndex];
             setStreamingMessage((prev) => {
-              // 参加者が同じ場合は更新不要（contentを維持）
-              if (prev?.participantId === currentParticipant?.id) {
-                return prev;
+              // 参加者またはラウンドが変わった場合は新しいstreamingMessageを作成
+              if (prev?.participantId !== currentParticipant?.id || prev?.round !== state.currentRound) {
+                return {
+                  messageId: '',
+                  participantId: currentParticipant?.id || '',
+                  content: '',
+                  provider: currentParticipant?.provider || '',
+                  round: state.currentRound,
+                };
               }
-              // 参加者が変わった場合は新しいstreamingMessageを作成
-              return {
-                messageId: '',
-                participantId: currentParticipant?.id || '',
-                content: '',
-                provider: currentParticipant?.provider || '',
-                round: state.currentRound,
-              };
+              // 参加者もラウンドも同じ場合は更新不要
+              return prev;
             });
           }
 
