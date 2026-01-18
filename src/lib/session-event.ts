@@ -23,6 +23,8 @@ type SessionEvents = {
   sessionReset: void;
   /** 議論状態のみクリア（セッション選択時など） - セッションはそのまま */
   discussionClear: void;
+  /** トピック入力にフォーカス（新規議論ボタンクリック時など） */
+  focusTopicInput: void;
 };
 
 // シングルトンのイベントバス
