@@ -11,6 +11,7 @@ import {
 import { useInputForm } from '@/hooks/useInputForm';
 import { DiscussionOptionsModal } from './DiscussionOptionsModal';
 import { AttachedTextChip } from './AttachedTextChip';
+import sessionEvent from '@/lib/session-event';
 
 interface InputFormProps {
   onSubmit: (topic: string) => void;
@@ -124,6 +125,18 @@ export function InputForm({
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [adjustTextareaHeight]);
+
+  // 新規議論ボタンクリック時にフォーカス
+  useEffect(() => {
+    const handleFocus = () => {
+      // 少し遅延させてDOM更新後にフォーカス
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
+    };
+    sessionEvent.on('focusTopicInput', handleFocus);
+    return () => sessionEvent.off('focusTopicInput', handleFocus);
+  }, []);
 
   // 設定がカスタマイズされているかどうか
   const hasCustomSettings =

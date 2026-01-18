@@ -177,6 +177,8 @@ export default function Home() {
     }
     // セッション・中断状態・議論状態を一括クリア（イベント発行で各フックが購読して処理）
     sessionEvent.emit('sessionReset');
+    // トピック入力にフォーカス
+    sessionEvent.emit('focusTopicInput');
   }, [
     isDiscussing,
     currentSessionRef,
