@@ -25,6 +25,8 @@ type SessionEvents = {
   discussionClear: void;
   /** トピック入力にフォーカス（新規議論ボタンクリック時など） */
   focusTopicInput: void;
+  /** ロールエディタを開く（サイドバーメニューから） */
+  openRoleEditor: void;
 };
 
 // シングルトンのイベントバス

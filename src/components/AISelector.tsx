@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS, ParticipantRole, isCustomRoleId, ROLE_PRESETS } from '@/types';
 import { useAISelector, LATEST_MODEL_COUNT } from '@/hooks/useAISelector';
 import { useCustomRoles } from '@/hooks/useCustomRoles';
 import { ParticipantList, ProviderSection } from './ai-selector';
 import { RoleEditor } from './RoleEditor';
+import sessionEvent from '@/lib/session-event';
 
 interface AISelectorProps {
   participants: DiscussionParticipant[];
@@ -45,6 +46,13 @@ export function AISelector({
     deleteCustomRole,
     duplicateCustomRole,
   } = useCustomRoles();
+
+  // イベントバスからロールエディタを開く
+  useEffect(() => {
+    const handleOpenRoleEditor = () => setShowRoleEditor(true);
+    sessionEvent.on('openRoleEditor', handleOpenRoleEditor);
+    return () => sessionEvent.off('openRoleEditor', handleOpenRoleEditor);
+  }, []);
 
   // ロール更新時にロール情報を設定
   const handleUpdateRole = (id: string, role: ParticipantRole) => {
