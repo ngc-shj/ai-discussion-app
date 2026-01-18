@@ -305,7 +305,7 @@ export function RoleEditor({
                         </svg>
                       </button>
                     </div>
-                    <div className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded max-h-24 overflow-y-auto">
+                    <div className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded max-h-32 overflow-y-auto whitespace-pre-wrap">
                       {selectedPreset.prompt}
                     </div>
                   </div>
@@ -442,7 +442,7 @@ function RoleListItem({
           {/* 選択時に詳細表示 */}
           {isSelected && (
             <div className="mt-2 pt-2 border-t border-purple-500/30">
-              <div className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded max-h-24 overflow-y-auto">
+              <div className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded max-h-32 overflow-y-auto whitespace-pre-wrap">
                 {role.prompt}
               </div>
             </div>
