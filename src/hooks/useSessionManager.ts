@@ -93,6 +93,8 @@ export function useSessionManager(): UseSessionManagerState & UseSessionManagerA
 
   // 新しいセッションを開始（セッションと中断状態をクリア）
   const newSession = useCallback(() => {
+    // refも即座にクリア（非同期状態更新より先にrefをクリアしないと、新規議論開始時に古いセッションを参照してしまう）
+    currentSessionRef.current = null;
     setCurrentSession(null);
     setInterruptedStateInternal(null);
     clearInterruptedState();

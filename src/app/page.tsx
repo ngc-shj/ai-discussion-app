@@ -142,7 +142,7 @@ export default function Home() {
 
 
   // 新しいセッションを開始
-  const handleNewSession = useCallback(() => {
+  const handleNewSession = useCallback(async () => {
     // 議論中の場合は中断状態を保存してからクリア
     // 注: isSearching は isDiscussing のサブステート（検索中は必ず isDiscussing も true）
     // currentSessionRefを使用（Reactの状態更新が非同期のため、currentSessionがまだnullの場合がある）
@@ -172,7 +172,8 @@ export default function Home() {
         startMarker: startMarker || undefined,
         extensionMarkers: extensionMarkers.length > 0 ? extensionMarkers : undefined,
       };
-      updateAndSaveSession({ interruptedTurn });
+      // セッション保存完了を待ってからリセット（Reactの状態更新の競合を防ぐ）
+      await updateAndSaveSession({ interruptedTurn });
     }
     // セッション・中断状態・議論状態を一括クリア（イベント発行で各フックが購読して処理）
     sessionEvent.emit('sessionReset');
