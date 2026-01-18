@@ -348,30 +348,34 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
 
   return (
     <div className="space-y-4">
-      {/* ① Web検索ON/OFF（最上部に独立） */}
-      <div className="flex items-center justify-between py-1">
+      {/* ① Web検索ON/OFF（最上部に独立）- 行全体をクリック可能に */}
+      <button
+        type="button"
+        onClick={() => onSearchConfigChange({ ...searchConfig, enabled: !searchConfig.enabled })}
+        disabled={disabled}
+        className={`w-full flex items-center justify-between py-2 px-1 rounded-lg transition-colors ${
+          disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-700/30'
+        }`}
+        aria-label="Web検索を切り替え"
+      >
         <div className="flex items-center gap-2">
           <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <span className="text-sm font-medium text-gray-200">Web検索</span>
         </div>
-        <button
-          type="button"
-          onClick={() => onSearchConfigChange({ ...searchConfig, enabled: !searchConfig.enabled })}
-          disabled={disabled}
+        <div
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
             searchConfig.enabled ? 'bg-green-600' : 'bg-gray-600'
-          } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-          aria-label="Web検索を切り替え"
+          }`}
         >
           <span
             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
               searchConfig.enabled ? 'translate-x-6' : 'translate-x-1'
             }`}
           />
-        </button>
-      </div>
+        </div>
+      </button>
 
       {searchConfig.enabled && (
         <div className={`space-y-4 ${disabled ? 'opacity-50' : ''}`}>
@@ -619,21 +623,27 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
                 {/* ページ全文取得 */}
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs text-gray-400 shrink-0">ページ全文取得</label>
                     <button
                       type="button"
                       onClick={() => onSearchConfigChange({ ...searchConfig, fetchFullContent: !searchConfig.fetchFullContent })}
                       disabled={disabled}
                       aria-label="ページ全文取得を切り替え"
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
-                        searchConfig.fetchFullContent ? 'bg-green-600' : 'bg-gray-600'
-                      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      className={`flex items-center gap-2 px-1 py-0.5 rounded transition-colors shrink-0 ${
+                        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-700/30'
+                      }`}
                     >
-                      <span
-                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                          searchConfig.fetchFullContent ? 'translate-x-5' : 'translate-x-1'
+                      <span className="text-xs text-gray-400">ページ全文取得</span>
+                      <div
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          searchConfig.fetchFullContent ? 'bg-green-600' : 'bg-gray-600'
                         }`}
-                      />
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                            searchConfig.fetchFullContent ? 'translate-x-5' : 'translate-x-1'
+                          }`}
+                        />
+                      </div>
                     </button>
                     {searchConfig.fetchFullContent && (
                       <>
@@ -659,7 +669,6 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
                 {/* 関連性フィルタ */}
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs text-gray-400 shrink-0">関連性フィルタ</label>
                     <button
                       type="button"
                       onClick={() => onSearchConfigChange({
@@ -671,15 +680,22 @@ function SearchConfigSection({ disabled, searchConfig, onSearchConfigChange }: S
                       })}
                       disabled={disabled}
                       aria-label="関連性フィルタを切り替え"
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
-                        searchConfig.relevanceFilter?.enabled ? 'bg-purple-600' : 'bg-gray-600'
-                      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      className={`flex items-center gap-2 px-1 py-0.5 rounded transition-colors shrink-0 ${
+                        disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-700/30'
+                      }`}
                     >
-                      <span
-                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                          searchConfig.relevanceFilter?.enabled ? 'translate-x-5' : 'translate-x-1'
+                      <span className="text-xs text-gray-400">関連性フィルタ</span>
+                      <div
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          searchConfig.relevanceFilter?.enabled ? 'bg-purple-600' : 'bg-gray-600'
                         }`}
-                      />
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                            searchConfig.relevanceFilter?.enabled ? 'translate-x-5' : 'translate-x-1'
+                          }`}
+                        />
+                      </div>
                     </button>
                     {searchConfig.relevanceFilter?.enabled && (
                       <>
