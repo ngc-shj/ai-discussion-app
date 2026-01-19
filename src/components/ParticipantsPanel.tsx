@@ -105,57 +105,54 @@ export function ParticipantsPanel({
           </div>
 
           {/* 処理担当の説明 */}
-          <div className="shrink-0 text-xs text-gray-400 pt-3 mt-3 border-t border-gray-700 space-y-2">
-            <p className="font-medium text-gray-300">処理担当</p>
-            <div className="space-y-1">
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400 shrink-0 w-24">議論:</span>
-                <span className="text-gray-400">参加AI全員（ラウンドロビン）</span>
+          {(() => {
+            // 各タスクが有効かどうかを判定
+            const isKeywordEnabled = supportAgent?.tasks.find(t => t.task === 'keywordExtraction')?.enabled ?? false;
+            const isRelevanceEnabled = supportAgent?.tasks.find(t => t.task === 'relevanceScoring')?.enabled ?? false;
+            const isFollowupEnabled = supportAgent?.tasks.find(t => t.task === 'followupGeneration')?.enabled ?? false;
+            const participant1Name = participants.length > 0
+              ? participants[0].displayName || `${participants[0].provider}/${participants[0].model}`
+              : '参加AI 1番目';
+            const hasSupportAgentTask = isKeywordEnabled || isRelevanceEnabled || isFollowupEnabled;
+
+            return (
+              <div className="shrink-0 text-xs text-gray-400 pt-3 mt-3 border-t border-gray-700 space-y-2">
+                <p className="font-medium text-gray-300">処理担当</p>
+                <div className="space-y-1">
+                  <div className="flex items-start gap-2">
+                    <span className="text-purple-400 shrink-0 w-24">議論:</span>
+                    <span className="text-gray-400">参加AI全員（ラウンドロビン）</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-purple-400 shrink-0 w-24">統合回答:</span>
+                    <span className="text-blue-400">{participant1Name}</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-purple-400 shrink-0 w-24">キーワード生成:</span>
+                    <span className={isKeywordEnabled ? 'text-green-400' : 'text-blue-400'}>
+                      {isKeywordEnabled ? 'サポートエージェント' : participant1Name}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-purple-400 shrink-0 w-24">関連度評価:</span>
+                    <span className={isRelevanceEnabled ? 'text-green-400' : 'text-blue-400'}>
+                      {isRelevanceEnabled ? 'サポートエージェント' : participant1Name}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-purple-400 shrink-0 w-24">フォローアップ:</span>
+                    <span className={isFollowupEnabled ? 'text-green-400' : 'text-blue-400'}>
+                      {isFollowupEnabled ? 'サポートエージェント' : participant1Name}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 mt-2 space-y-0.5">
+                  <p><span className="text-blue-400">●</span> 参加AI 1番目が担当</p>
+                  {hasSupportAgentTask && <p><span className="text-green-400">●</span> サポートエージェントが担当</p>}
+                </div>
               </div>
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400 shrink-0 w-24">統合回答:</span>
-                <span className="text-blue-400">
-                  {participants.length > 0
-                    ? participants[0].displayName || `${participants[0].provider}/${participants[0].model}`
-                    : '参加AI 1番目'}
-                </span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400 shrink-0 w-24">キーワード生成:</span>
-                <span className={supportAgent ? 'text-green-400' : 'text-blue-400'}>
-                  {supportAgent
-                    ? 'サポートエージェント'
-                    : participants.length > 0
-                      ? participants[0].displayName || `${participants[0].provider}/${participants[0].model}`
-                      : '参加AI 1番目'}
-                </span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400 shrink-0 w-24">関連度評価:</span>
-                <span className={supportAgent ? 'text-green-400' : 'text-blue-400'}>
-                  {supportAgent
-                    ? 'サポートエージェント'
-                    : participants.length > 0
-                      ? participants[0].displayName || `${participants[0].provider}/${participants[0].model}`
-                      : '参加AI 1番目'}
-                </span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-purple-400 shrink-0 w-24">フォローアップ:</span>
-                <span className={supportAgent ? 'text-green-400' : 'text-blue-400'}>
-                  {supportAgent
-                    ? 'サポートエージェント'
-                    : participants.length > 0
-                      ? participants[0].displayName || `${participants[0].provider}/${participants[0].model}`
-                      : '参加AI 1番目'}
-                </span>
-              </div>
-            </div>
-            <div className="text-xs text-gray-500 mt-2 space-y-0.5">
-              <p><span className="text-blue-400">●</span> 参加AI 1番目が担当</p>
-              {supportAgent && <p><span className="text-green-400">●</span> サポートエージェントが担当</p>}
-            </div>
-          </div>
+            );
+          })()}
         </div>
       </div>
     </>
