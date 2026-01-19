@@ -52,6 +52,9 @@ export type {
   TerminationConfig,
   TerminationPreset,
   ExtendDiscussionConfig,
+  SupportTask,
+  SupportTaskConfig,
+  SupportAgentConfig,
 } from './config';
 export {
   TECH_LEVEL_PRESETS,
@@ -60,6 +63,8 @@ export {
   DISCUSSION_DEPTH_PRESETS,
   TERMINATION_PRESETS,
   SEARCH_ENGINE_PRESETS,
+  createDefaultSupportAgentConfig,
+  SUPPORT_TASK_LABELS,
 } from './config';
 
 // Follow-up types

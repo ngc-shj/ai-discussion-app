@@ -340,3 +340,62 @@ export interface ExtendDiscussionConfig {
   discussionDepth?: DiscussionDepth;  // 議論の深さ（オプション）
   directionGuide?: DirectionGuide;    // 方向性ガイド（オプション）
 }
+
+// ========================================
+// サポートエージェント設定
+// ========================================
+
+import { AIProviderType } from './provider';
+
+// サポートエージェントが実行するタスクの種類
+export type SupportTask =
+  | 'keywordExtraction'    // 検索キーワード抽出
+  | 'relevanceScoring'     // 関連度評価＋要約
+  | 'followupGeneration';  // フォローアップ質問生成
+
+// 各タスクの設定
+export interface SupportTaskConfig {
+  task: SupportTask;
+  enabled: boolean;
+  options?: {
+    relevanceThreshold?: number;  // 関連度評価の閾値（0-1、デフォルト0.5）
+    followupCount?: number;       // フォローアップ生成件数（デフォルト2）
+  };
+}
+
+// サポートエージェント全体の設定
+export interface SupportAgentConfig {
+  provider: AIProviderType;
+  modelId: string;
+  tasks: SupportTaskConfig[];
+}
+
+// サポートエージェントのデフォルト設定を生成
+export const createDefaultSupportAgentConfig = (
+  provider: AIProviderType,
+  modelId: string
+): SupportAgentConfig => ({
+  provider,
+  modelId,
+  tasks: [
+    { task: 'keywordExtraction', enabled: true },
+    { task: 'relevanceScoring', enabled: true, options: { relevanceThreshold: 0.5 } },
+    { task: 'followupGeneration', enabled: true, options: { followupCount: 2 } },
+  ],
+});
+
+// サポートタスクのラベル（UI表示用）
+export const SUPPORT_TASK_LABELS: Record<SupportTask, { name: string; description: string }> = {
+  keywordExtraction: {
+    name: 'キーワード抽出',
+    description: 'トピックから検索キーワードを生成',
+  },
+  relevanceScoring: {
+    name: '関連度評価＋要約',
+    description: '検索結果の関連性を判定し、重要な情報を抽出',
+  },
+  followupGeneration: {
+    name: 'フォローアップ生成',
+    description: '議論後の追加質問を提案',
+  },
+};

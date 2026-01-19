@@ -1,6 +1,6 @@
 'use client';
 
-import { AIProviderType, ModelInfo, DiscussionParticipant } from '@/types';
+import { AIProviderType, ModelInfo, DiscussionParticipant, SupportAgentConfig } from '@/types';
 import { AISelector } from './AISelector';
 
 interface ParticipantsPanelProps {
@@ -8,6 +8,8 @@ interface ParticipantsPanelProps {
   onParticipantsChange: (participants: DiscussionParticipant[]) => void;
   availableModels: Record<AIProviderType, ModelInfo[]>;
   availability: Record<AIProviderType, boolean>;
+  supportAgent: SupportAgentConfig | null;
+  onSupportAgentChange: (config: SupportAgentConfig | null) => void;
   disabled?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
@@ -19,6 +21,8 @@ export function ParticipantsPanel({
   onParticipantsChange,
   availableModels,
   availability,
+  supportAgent,
+  onSupportAgentChange,
   disabled,
   isOpen = true,
   onClose,
@@ -94,18 +98,63 @@ export function ParticipantsPanel({
               onParticipantsChange={onParticipantsChange}
               availableModels={availableModels}
               availability={availability}
+              supportAgent={supportAgent}
+              onSupportAgentChange={onSupportAgentChange}
               disabled={disabled}
             />
           </div>
 
-          <div className="shrink-0 text-sm text-gray-400 pt-2 mt-4 border-t border-gray-700">
-            <p className="mb-2">
-              <strong>ラウンドロビン形式</strong>
-            </p>
-            <p className="text-xs">
-              各AIが順番に発言し、前のAIの意見を踏まえて議論を深めます。
-              最後に全ての意見を統合した回答が生成されます。
-            </p>
+          {/* 処理担当の説明 */}
+          <div className="shrink-0 text-xs text-gray-400 pt-3 mt-3 border-t border-gray-700 space-y-2">
+            <p className="font-medium text-gray-300">処理担当</p>
+            <div className="space-y-1">
+              <div className="flex items-start gap-2">
+                <span className="text-purple-400 shrink-0 w-24">議論:</span>
+                <span className="text-gray-400">参加AI全員（ラウンドロビン）</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-purple-400 shrink-0 w-24">統合回答:</span>
+                <span className="text-blue-400">
+                  {participants.length > 0
+                    ? participants[0].displayName || `${participants[0].provider}/${participants[0].model}`
+                    : '参加AI 1番目'}
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-purple-400 shrink-0 w-24">キーワード生成:</span>
+                <span className={supportAgent ? 'text-green-400' : 'text-blue-400'}>
+                  {supportAgent
+                    ? 'サポートエージェント'
+                    : participants.length > 0
+                      ? participants[0].displayName || `${participants[0].provider}/${participants[0].model}`
+                      : '参加AI 1番目'}
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-purple-400 shrink-0 w-24">関連度評価:</span>
+                <span className={supportAgent ? 'text-green-400' : 'text-blue-400'}>
+                  {supportAgent
+                    ? 'サポートエージェント'
+                    : participants.length > 0
+                      ? participants[0].displayName || `${participants[0].provider}/${participants[0].model}`
+                      : '参加AI 1番目'}
+                </span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-purple-400 shrink-0 w-24">フォローアップ:</span>
+                <span className={supportAgent ? 'text-green-400' : 'text-blue-400'}>
+                  {supportAgent
+                    ? 'サポートエージェント'
+                    : participants.length > 0
+                      ? participants[0].displayName || `${participants[0].provider}/${participants[0].model}`
+                      : '参加AI 1番目'}
+                </span>
+              </div>
+            </div>
+            <div className="text-xs text-gray-500 mt-2 space-y-0.5">
+              <p><span className="text-blue-400">●</span> 参加AI 1番目が担当</p>
+              {supportAgent && <p><span className="text-green-400">●</span> サポートエージェントが担当</p>}
+            </div>
           </div>
         </div>
       </div>

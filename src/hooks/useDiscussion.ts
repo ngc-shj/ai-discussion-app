@@ -23,6 +23,7 @@ import {
   ExtendDiscussionConfig,
   StartMarker,
   ExtensionMarker,
+  SupportAgentConfig,
 } from '@/types';
 import {
   getAllSessions,
@@ -143,6 +144,7 @@ export interface StartDiscussionParams {
   discussionMode: DiscussionMode;
   discussionDepth: DiscussionDepth;
   directionGuide: DirectionGuide;
+  supportAgent: SupportAgentConfig | null;
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setCurrentSession: React.Dispatch<React.SetStateAction<DiscussionSession | null>>;
   setSessions: React.Dispatch<React.SetStateAction<DiscussionSession[]>>;
@@ -174,6 +176,7 @@ export interface FinalizeDiscussionParams {
   discussionDepth: DiscussionDepth;
   directionGuide: DirectionGuide;
   searchConfig?: SearchConfig;  // 統合前検索用
+  supportAgent?: SupportAgentConfig | null;
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   setInterruptedState: (state: InterruptedDiscussionSnapshot | null) => void;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
@@ -185,6 +188,7 @@ export interface TimedSearchParams {
   topic: string;
   searchConfig: SearchConfig;
   participants: DiscussionParticipant[];
+  supportAgent?: SupportAgentConfig | null;
   messages?: DiscussionMessage[];  // summary時に議論内容を渡す
   round?: number;  // eachRound時のラウンド番号
   existingResults?: SearchResult[];  // マージ用の既存結果
@@ -207,6 +211,7 @@ export interface GenerateFollowUpsParams {
   finalAnswer: string;
   participants: DiscussionParticipant[];
   userProfile: UserProfile;
+  supportAgent?: SupportAgentConfig | null;
   currentSessionRef: React.RefObject<DiscussionSession | null>;
   updateAndSaveSession: (updates: Partial<DiscussionSession>, options?: { async?: boolean }) => Promise<void>;
 }
@@ -447,6 +452,7 @@ export function useDiscussion(): UseDiscussionReturn {
         topic,
         searchConfig,
         participants,
+        supportAgent,
         messages,
         round,
         existingResults = [],
@@ -490,11 +496,16 @@ export function useDiscussion(): UseDiscussionReturn {
           completedKeywords: [],
         });
 
+        // サポートエージェントまたはparticipants[0]を使用
+        const keywordAgent = supportAgent
+          ? { provider: supportAgent.provider, model: supportAgent.modelId }
+          : participants[0];
+
         // AIにキーワードを生成させる
         const keywordsBody: Record<string, unknown> = {
           topic,
           timing,
-          participant: participants[0],
+          participant: keywordAgent,
           maxKeywords: searchConfig.maxKeywords || 1,
         };
         // summary時は議論内容も渡す
@@ -567,6 +578,11 @@ export function useDiscussion(): UseDiscussionReturn {
           currentKeyword: keyword,
         } : null);
 
+        // 関連度評価用のAI（サポートエージェントまたはparticipants[0]）
+        const relevanceAI = supportAgent
+          ? { provider: supportAgent.provider, model: supportAgent.modelId }
+          : { provider: participants[0]?.provider, model: participants[0]?.model };
+
         const searchResponse = await fetch('/api/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -581,8 +597,8 @@ export function useDiscussion(): UseDiscussionReturn {
             fullContentLimit: searchConfig.fullContentMaxResults,
             topic,
             relevanceFilter: searchConfig.relevanceFilter,
-            defaultAIProvider: participants[0]?.provider,
-            defaultAIModel: participants[0]?.model,
+            defaultAIProvider: relevanceAI.provider,
+            defaultAIModel: relevanceAI.model,
           }),
           signal: abortSignal,
         });
@@ -689,6 +705,7 @@ export function useDiscussion(): UseDiscussionReturn {
         discussionDepth,
         directionGuide,
         searchConfig,
+        supportAgent,
         currentSessionRef,
         setInterruptedState,
         updateAndSaveSession,
@@ -728,6 +745,7 @@ export function useDiscussion(): UseDiscussionReturn {
               topic: currentTopic,
               searchConfig,
               participants,
+              supportAgent,
               messages: currentMessages,
               abortSignal: abortControllerRef.current.signal,
               // 既存のキーワードがあれば渡す（resultsはundefinedだが、キーワードは生成済み）
@@ -925,6 +943,7 @@ export function useDiscussion(): UseDiscussionReturn {
                 finalAnswer: collectedFinalAnswer,
                 participants,
                 userProfile,
+                supportAgent,
               }),
               signal: abortControllerRef.current?.signal,
             });
@@ -1021,6 +1040,7 @@ export function useDiscussion(): UseDiscussionReturn {
         finalAnswer,
         participants,
         userProfile,
+        supportAgent,
         currentSessionRef,
         updateAndSaveSession,
       } = params;
@@ -1041,6 +1061,7 @@ export function useDiscussion(): UseDiscussionReturn {
             finalAnswer,
             participants,
             userProfile,
+            supportAgent,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -1106,6 +1127,7 @@ export function useDiscussion(): UseDiscussionReturn {
         discussionMode,
         discussionDepth,
         directionGuide,
+        supportAgent,
         currentSessionRef,
         setCurrentSession,
         setSessions,
@@ -1167,6 +1189,7 @@ export function useDiscussion(): UseDiscussionReturn {
         discussionMode,
         discussionDepth,
         directionGuide,
+        supportAgent,
         previousTurns: getPreviousTurns(session),
       };
 

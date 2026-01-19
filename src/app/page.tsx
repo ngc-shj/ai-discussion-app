@@ -40,6 +40,8 @@ export default function Home() {
     setDirectionGuide,
     terminationConfig,
     setTerminationConfig,
+    supportAgent,
+    setSupportAgent,
     restoreFromSession,
   } = useDiscussionSettings();
 
@@ -442,11 +444,12 @@ export default function Home() {
       discussionDepth,
       directionGuide,
       searchConfig,
+      supportAgent,
       currentSessionRef,
       setInterruptedState,
       updateAndSaveSession,
     });
-  }, [participants, userProfile, discussionMode, discussionDepth, directionGuide, searchConfig, currentSessionRef, setInterruptedState, updateAndSaveSession, finalizeDiscussion]);
+  }, [participants, userProfile, discussionMode, discussionDepth, directionGuide, searchConfig, supportAgent, currentSessionRef, setInterruptedState, updateAndSaveSession, finalizeDiscussion]);
 
   // フォローアップ質問を生成
   const handleGenerateFollowUps = useCallback(async (turnId: string, topic: string, finalAnswer: string) => {
@@ -456,10 +459,11 @@ export default function Home() {
       finalAnswer,
       participants,
       userProfile,
+      supportAgent,
       currentSessionRef,
       updateAndSaveSession,
     });
-  }, [participants, userProfile, currentSessionRef, updateAndSaveSession, generateFollowUps]);
+  }, [participants, userProfile, supportAgent, currentSessionRef, updateAndSaveSession, generateFollowUps]);
 
   // 中断した議論を再開
   const handleResumeDiscussion = useCallback(async () => {
@@ -501,13 +505,14 @@ export default function Home() {
       discussionMode,
       discussionDepth,
       directionGuide,
+      supportAgent,
       currentSessionRef,
       setCurrentSession,
       setSessions,
       setInterruptedState,
       updateAndSaveSession,
     });
-  }, [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, startDiscussion]);
+  }, [participants, terminationConfig, searchConfig, userProfile, discussionMode, discussionDepth, directionGuide, supportAgent, currentSessionRef, setCurrentSession, setSessions, setInterruptedState, updateAndSaveSession, startDiscussion]);
 
   // 無効化条件（useDiscussionから取得）
   const isSettingsDisabled = isProcessing;
@@ -739,6 +744,8 @@ export default function Home() {
             onParticipantsChange={setParticipants}
             availableModels={availableModels}
             availability={availability}
+            supportAgent={supportAgent}
+            onSupportAgentChange={setSupportAgent}
             disabled={isSettingsDisabled}
             onCollapse={() => setIsSettingsCollapsed(true)}
           />
@@ -768,6 +775,8 @@ export default function Home() {
           onParticipantsChange={setParticipants}
           availableModels={availableModels}
           availability={availability}
+          supportAgent={supportAgent}
+          onSupportAgentChange={setSupportAgent}
           disabled={isSettingsDisabled}
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}

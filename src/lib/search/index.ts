@@ -235,9 +235,10 @@ export async function performSearch(
     // Step 2: 関連性フィルタリング（AIベース）
     // fullContentがある場合はそれを使って判定し、関連部分のみを抽出
     if (config.relevanceFilter?.enabled && topic && processedResults.length > 0) {
-      // AIプロバイダー: config > defaultAI > 'claude' の優先順位
-      const aiProvider = (config.relevanceFilter.aiProvider || defaultAI?.provider || 'claude') as 'claude' | 'openai' | 'ollama' | 'gemini';
-      const aiModel = config.relevanceFilter.aiModel || defaultAI?.model;
+      // AIプロバイダー: defaultAI（サポートエージェント）> config > 'claude' の優先順位
+      // サポートエージェントが指定されている場合は最優先で使用
+      const aiProvider = (defaultAI?.provider || config.relevanceFilter.aiProvider || 'claude') as 'claude' | 'openai' | 'ollama' | 'gemini';
+      const aiModel = defaultAI?.model || config.relevanceFilter.aiModel;
 
       const filterResult = await filterByRelevance(processedResults, topic, {
         threshold: config.relevanceFilter.threshold,

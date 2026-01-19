@@ -11,6 +11,7 @@ import {
   DiscussionDepth,
   DirectionGuide,
   TerminationConfig,
+  SupportAgentConfig,
   generateParticipantId,
 } from '@/types';
 
@@ -23,6 +24,7 @@ const STORAGE_KEYS = {
   DEPTH: 'ai-discussion-depth',
   DIRECTION: 'ai-discussion-direction',
   TERMINATION: 'ai-discussion-termination',
+  SUPPORT_AGENT: 'ai-discussion-support-agent',
 } as const;
 
 // デフォルト値
@@ -61,6 +63,7 @@ export interface UseDiscussionSettingsState {
   discussionDepth: DiscussionDepth;
   directionGuide: DirectionGuide;
   terminationConfig: TerminationConfig;
+  supportAgent: SupportAgentConfig | null;
 }
 
 export interface UseDiscussionSettingsActions {
@@ -71,6 +74,7 @@ export interface UseDiscussionSettingsActions {
   setDiscussionDepth: (depth: DiscussionDepth) => void;
   setDirectionGuide: (guide: DirectionGuide) => void;
   setTerminationConfig: (config: TerminationConfig) => void;
+  setSupportAgent: (config: SupportAgentConfig | null) => void;
   restoreFromSession: (session: {
     participants: DiscussionParticipant[];
     rounds?: number;
@@ -79,6 +83,7 @@ export interface UseDiscussionSettingsActions {
     directionGuide?: DirectionGuide;
     terminationConfig?: TerminationConfig;
     userProfile?: UserProfile;
+    supportAgent?: SupportAgentConfig | null;
   }) => void;
 }
 
@@ -103,6 +108,7 @@ export function useDiscussionSettings(): UseDiscussionSettingsState & UseDiscuss
   const [discussionDepth, setDiscussionDepthState] = useState<DiscussionDepth>(3);
   const [directionGuide, setDirectionGuideState] = useState<DirectionGuide>(DEFAULT_DIRECTION_GUIDE);
   const [terminationConfig, setTerminationConfigState] = useState<TerminationConfig>(DEFAULT_TERMINATION_CONFIG);
+  const [supportAgent, setSupportAgentState] = useState<SupportAgentConfig | null>(null);
 
   // プロバイダーの可用性をチェック
   useEffect(() => {
@@ -210,6 +216,13 @@ export function useDiscussionSettings(): UseDiscussionSettingsState & UseDiscuss
         setTerminationConfigState({ ...DEFAULT_TERMINATION_CONFIG, ...JSON.parse(savedTermination) });
       } catch { /* ignore */ }
     }
+
+    const savedSupportAgent = localStorage.getItem(STORAGE_KEYS.SUPPORT_AGENT);
+    if (savedSupportAgent) {
+      try {
+        setSupportAgentState(JSON.parse(savedSupportAgent));
+      } catch { /* ignore */ }
+    }
   }, []);
 
   // 設定をローカルストレージに保存
@@ -243,6 +256,14 @@ export function useDiscussionSettings(): UseDiscussionSettingsState & UseDiscuss
     localStorage.setItem(STORAGE_KEYS.TERMINATION, JSON.stringify(terminationConfig));
   }, [terminationConfig]);
 
+  useEffect(() => {
+    if (supportAgent) {
+      localStorage.setItem(STORAGE_KEYS.SUPPORT_AGENT, JSON.stringify(supportAgent));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.SUPPORT_AGENT);
+    }
+  }, [supportAgent]);
+
   // セッターのラッパー
   const setParticipants = useCallback((p: DiscussionParticipant[]) => setParticipantsState(p), []);
   const setSearchConfig = useCallback((c: SearchConfig) => setSearchConfigState(c), []);
@@ -251,6 +272,7 @@ export function useDiscussionSettings(): UseDiscussionSettingsState & UseDiscuss
   const setDiscussionDepth = useCallback((d: DiscussionDepth) => setDiscussionDepthState(d), []);
   const setDirectionGuide = useCallback((g: DirectionGuide) => setDirectionGuideState(g), []);
   const setTerminationConfig = useCallback((c: TerminationConfig) => setTerminationConfigState(c), []);
+  const setSupportAgent = useCallback((c: SupportAgentConfig | null) => setSupportAgentState(c), []);
 
   // セッションから設定を復元
   const restoreFromSession = useCallback((session: {
@@ -261,6 +283,7 @@ export function useDiscussionSettings(): UseDiscussionSettingsState & UseDiscuss
     directionGuide?: DirectionGuide;
     terminationConfig?: TerminationConfig;
     userProfile?: UserProfile;
+    supportAgent?: SupportAgentConfig | null;
   }) => {
     if (session.participants.length > 0) {
       setParticipantsState(session.participants);
@@ -283,6 +306,9 @@ export function useDiscussionSettings(): UseDiscussionSettingsState & UseDiscuss
     if (session.userProfile) {
       setUserProfileState(session.userProfile);
     }
+    if (session.supportAgent !== undefined) {
+      setSupportAgentState(session.supportAgent);
+    }
   }, []);
 
   return {
@@ -296,6 +322,7 @@ export function useDiscussionSettings(): UseDiscussionSettingsState & UseDiscuss
     discussionDepth,
     directionGuide,
     terminationConfig,
+    supportAgent,
     // Actions
     setParticipants,
     setSearchConfig,
@@ -304,6 +331,7 @@ export function useDiscussionSettings(): UseDiscussionSettingsState & UseDiscuss
     setDiscussionDepth,
     setDirectionGuide,
     setTerminationConfig,
+    setSupportAgent,
     restoreFromSession,
   };
 }

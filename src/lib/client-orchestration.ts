@@ -19,6 +19,7 @@ import {
   DirectionGuide,
   PreviousTurnSummary,
   TerminationConfig,
+  SupportAgentConfig,
 } from '@/types';
 import { checkConsensus, checkTerminationKeywords } from '@/lib/termination';
 
@@ -53,6 +54,7 @@ export interface DiscussionConfig {
   discussionMode?: DiscussionMode;
   discussionDepth?: DiscussionDepth;
   directionGuide?: DirectionGuide;
+  supportAgent?: SupportAgentConfig | null;
   previousTurns?: PreviousTurnSummary[];
   initialSearchResults?: SearchResult[];
   terminationConfig?: TerminationConfig;
@@ -150,7 +152,7 @@ export async function generateSearchKeywords(
   topic: string,
   messages: DiscussionMessage[],
   timing: 'start' | 'round' | 'summary',
-  participant: DiscussionParticipant,
+  participant: { provider: string; model: string },
   maxKeywords?: number
 ): Promise<{ keywords: string[]; prompt?: string }> {
   const response = await fetch('/api/generate-search-keywords', {
@@ -163,8 +165,10 @@ export async function generateSearchKeywords(
         content: m.content,
       })),
       timing,
-      provider: participant.provider,
-      model: participant.model,
+      participant: {
+        provider: participant.provider,
+        model: participant.model,
+      },
       maxKeywords: maxKeywords ?? 1,
     }),
   });
@@ -347,7 +351,8 @@ export async function generateFollowUps(
   topic: string,
   finalAnswer: string,
   participants: DiscussionParticipant[],
-  userProfile?: UserProfile
+  userProfile?: UserProfile,
+  supportAgent?: SupportAgentConfig | null
 ): Promise<string[]> {
   const response = await fetch('/api/followups', {
     method: 'POST',
@@ -357,6 +362,7 @@ export async function generateFollowUps(
       finalAnswer,
       participants,
       userProfile,
+      supportAgent,
     }),
   });
 
@@ -388,6 +394,7 @@ interface ExecuteSearchParams {
   messages: DiscussionMessage[];
   participants: DiscussionParticipant[];
   searchConfig: SearchConfig;
+  supportAgent?: SupportAgentConfig | null;
   state: DiscussionState;
   callbacks: DiscussionCallbacks;
   updateState: (updates: Partial<DiscussionState>) => void;
@@ -412,6 +419,7 @@ async function executeSearchWithKeywords(
     messages,
     participants,
     searchConfig,
+    supportAgent,
     state,
     callbacks,
     updateState,
@@ -429,12 +437,17 @@ async function executeSearchWithKeywords(
   }
   updateState(phaseUpdate);
 
+  // サポートエージェントまたはparticipants[0]を使用
+  const keywordAgent = supportAgent
+    ? { provider: supportAgent.provider, model: supportAgent.modelId }
+    : participants[0];
+
   // 検索キーワードを生成
   const { keywords, prompt } = await generateSearchKeywords(
     topic,
     messages,
     timing,
-    participants[0],
+    keywordAgent,
     searchConfig.maxKeywords
   );
 
@@ -468,10 +481,10 @@ async function executeSearchWithKeywords(
   }
   updateState(searchingUpdate);
 
-  const defaultAI = {
-    provider: participants[0].provider,
-    model: participants[0].model,
-  };
+  // 関連度評価用のAI（サポートエージェントまたはparticipants[0]）
+  const relevanceAI = supportAgent
+    ? { provider: supportAgent.provider, model: supportAgent.modelId }
+    : { provider: participants[0].provider, model: participants[0].model };
 
   // 各キーワードで検索
   const uniqueNewResults: SearchResult[] = [];  // 新規結果（重複除外済み）
@@ -500,7 +513,7 @@ async function executeSearchWithKeywords(
       topic,
       timing,
       keywords,
-      defaultAI
+      relevanceAI
     );
 
     totalFetchedCount += fetchedResults.length;  // 取得件数をカウント
@@ -598,6 +611,7 @@ export async function runClientOrchestration(
         messages: [], // 開始時はメッセージなし
         participants: config.participants,
         searchConfig: config.searchConfig!,
+        supportAgent: config.supportAgent,
         state,
         callbacks,
         updateState,
@@ -638,6 +652,7 @@ export async function runClientOrchestration(
           messages: messagesBeforeCurrentRound.length > 0 ? messagesBeforeCurrentRound : state.messages,
           participants: config.participants,
           searchConfig: config.searchConfig!,
+          supportAgent: config.supportAgent,
           state,
           callbacks,
           updateState,
@@ -713,10 +728,10 @@ export async function runClientOrchestration(
           if (searchQueries && searchQueries.length > 0 && config.searchConfig) {
             updateState({ phase: 'searching' });
 
-            const defaultAI = {
-              provider: config.participants[0].provider,
-              model: config.participants[0].model,
-            };
+            // 関連度評価用のAI（サポートエージェントまたはparticipants[0]）
+            const relevanceAI = config.supportAgent
+              ? { provider: config.supportAgent.provider, model: config.supportAgent.modelId }
+              : { provider: config.participants[0].provider, model: config.participants[0].model };
 
             for (let i = 0; i < searchQueries.length; i++) {
               if (callbacks.shouldInterrupt()) {
@@ -732,7 +747,7 @@ export async function runClientOrchestration(
                   config.topic,
                   'round', // onDemandはラウンド中の検索として扱う
                   searchQueries,
-                  defaultAI
+                  relevanceAI
                 );
 
                 // 重複除去してマージ

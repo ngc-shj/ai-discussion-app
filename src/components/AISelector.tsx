@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AIProviderType, ModelInfo, DiscussionParticipant, DEFAULT_PROVIDERS, ParticipantRole, isCustomRoleId, ROLE_PRESETS } from '@/types';
+import { AIProviderType, ModelInfo, DiscussionParticipant, SupportAgentConfig, DEFAULT_PROVIDERS, ParticipantRole, isCustomRoleId, ROLE_PRESETS } from '@/types';
 import { useAISelector, LATEST_MODEL_COUNT } from '@/hooks/useAISelector';
 import { useCustomRoles } from '@/hooks/useCustomRoles';
-import { ParticipantList, ProviderSection } from './ai-selector';
+import { ParticipantList, ProviderSection, SupportAgentSection } from './ai-selector';
 import { RoleEditor } from './RoleEditor';
 import sessionEvent from '@/lib/session-event';
 
@@ -13,6 +13,8 @@ interface AISelectorProps {
   onParticipantsChange: (participants: DiscussionParticipant[]) => void;
   availableModels: Record<AIProviderType, ModelInfo[]>;
   availability: Record<AIProviderType, boolean>;
+  supportAgent: SupportAgentConfig | null;
+  onSupportAgentChange: (config: SupportAgentConfig | null) => void;
   disabled?: boolean;
 }
 
@@ -21,6 +23,8 @@ export function AISelector({
   onParticipantsChange,
   availableModels,
   availability,
+  supportAgent,
+  onSupportAgentChange,
   disabled,
 }: AISelectorProps) {
   const [showRoleEditor, setShowRoleEditor] = useState(false);
@@ -38,6 +42,23 @@ export function AISelector({
     getFilteredModels,
     getSelectedCountForProvider,
   } = useAISelector({ participants, onParticipantsChange });
+
+  // サポートエージェントを設定
+  const handleSetSupportAgent = (provider: AIProviderType, modelId: string) => {
+    const models = availableModels[provider] || [];
+    const model = models.find((m) => m.id === modelId);
+    if (model) {
+      onSupportAgentChange({
+        provider,
+        modelId,
+        tasks: supportAgent?.tasks || [
+          { task: 'keywordExtraction', enabled: true },
+          { task: 'relevanceScoring', enabled: true },
+          { task: 'followupGeneration', enabled: true },
+        ],
+      });
+    }
+  };
 
   const {
     customRoles,
@@ -183,16 +204,27 @@ export function AISelector({
                 selectedCount={getSelectedCountForProvider(provider.id)}
                 modelFilter={modelFilter}
                 disabled={disabled}
+                supportAgentModelId={supportAgent?.modelId}
+                supportAgentProvider={supportAgent?.provider}
                 onToggleExpanded={() => toggleExpanded(provider.id)}
                 onAddParticipant={(modelId, displayName, color) =>
                   addParticipant(provider.id, modelId, displayName, color)
                 }
+                onSetSupportAgent={(modelId) => handleSetSupportAgent(provider.id, modelId)}
                 getParticipantCount={(modelId) => getParticipantCountForModel(provider.id, modelId)}
               />
             );
           })}
         </div>
       </section>
+
+      {/* サポートエージェントセクション */}
+      <SupportAgentSection
+        supportAgent={supportAgent}
+        availableModels={availableModels}
+        disabled={disabled}
+        onSupportAgentChange={onSupportAgentChange}
+      />
 
       {/* ロール編集モーダル */}
       <RoleEditor

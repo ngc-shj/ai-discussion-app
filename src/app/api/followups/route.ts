@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { DiscussionParticipant, UserProfile } from '@/types';
+import { DiscussionParticipant, UserProfile, SupportAgentConfig } from '@/types';
 import { createProvider, createFollowUpPrompt, parseFollowUpResponse } from '@/lib/ai-providers';
 import { logger } from '@/lib/logger';
 
@@ -10,6 +10,7 @@ interface FollowupsRequest {
   finalAnswer: string;
   participants: DiscussionParticipant[];
   userProfile?: UserProfile;
+  supportAgent?: SupportAgentConfig | null;
 }
 
 export async function POST(request: NextRequest) {
@@ -24,19 +25,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { topic, finalAnswer, participants, userProfile } = body;
+    const { topic, finalAnswer, participants, userProfile, supportAgent } = body;
 
-    log.info('Followups request received', { topic, participantCount: participants.length });
+    log.info('Followups request received', { topic, participantCount: participants.length, hasSupportAgent: !!supportAgent });
 
     // Server-Sent Events を使用してリアルタイム更新
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // フォローアップ質問を生成
-          const followUpProvider = participants[0];
-          if (followUpProvider) {
-            const provider = createProvider(followUpProvider.provider, followUpProvider.model);
+          // フォローアップ質問を生成（サポートエージェントまたはparticipants[0]を使用）
+          const followUpAgent = supportAgent
+            ? { provider: supportAgent.provider, model: supportAgent.modelId }
+            : participants[0];
+          if (followUpAgent) {
+            const provider = createProvider(followUpAgent.provider, followUpAgent.model);
             const followUpPromptText = createFollowUpPrompt(topic, finalAnswer, userProfile);
             const followUpResponse = await provider.generate({ prompt: followUpPromptText });
 
