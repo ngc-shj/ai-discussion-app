@@ -232,7 +232,7 @@ export function ProviderSection({
                 return (
                   <div
                     key={model.id}
-                    className={`flex items-center gap-2 p-2 rounded hover:bg-gray-700/50 transition-colors ${
+                    className={`flex items-center gap-2 p-3 sm:p-2 min-h-[44px] rounded hover:bg-gray-700/50 transition-colors ${
                       isSupportAgent ? 'bg-purple-900/30 ring-1 ring-purple-500/50' : ''
                     }`}
                   >
@@ -262,7 +262,7 @@ export function ProviderSection({
                         e.target.value = '';
                       }}
                       disabled={disabled}
-                      className="shrink-0 w-20 px-1 py-0.5 text-xs bg-gray-700 text-gray-300 rounded border border-gray-600 focus:border-blue-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      className="shrink-0 w-24 sm:w-20 px-2 sm:px-1 py-1 sm:py-0.5 text-sm sm:text-xs bg-gray-700 text-gray-300 rounded border border-gray-600 focus:border-blue-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                       title="追加先を選択"
                     >
                       <option value="" disabled>追加...</option>
