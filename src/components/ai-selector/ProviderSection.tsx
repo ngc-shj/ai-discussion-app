@@ -20,8 +20,11 @@ interface ProviderSectionProps {
   selectedCount: number;
   modelFilter: ModelFilterType;
   disabled?: boolean;
+  supportAgentModelId?: string;
+  supportAgentProvider?: string;
   onToggleExpanded: () => void;
   onAddParticipant: (modelId: string, displayName: string, color: string) => void;
+  onSetSupportAgent: (modelId: string) => void;
   getParticipantCount: (modelId: string) => number;
 }
 
@@ -34,8 +37,11 @@ export function ProviderSection({
   selectedCount,
   modelFilter,
   disabled,
+  supportAgentModelId,
+  supportAgentProvider,
   onToggleExpanded,
   onAddParticipant,
+  onSetSupportAgent,
   getParticipantCount,
 }: ProviderSectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -221,11 +227,14 @@ export function ProviderSection({
                 const modelColor = provider.isLocal ? getLocalModelColor(model.id) : provider.color;
                 const displayName = model.name;
                 const count = getParticipantCount(model.id);
+                const isSupportAgent = supportAgentProvider === provider.id && supportAgentModelId === model.id;
 
                 return (
                   <div
                     key={model.id}
-                    className="flex items-center gap-2 p-2 rounded hover:bg-gray-700/50 transition-colors"
+                    className={`flex items-center gap-2 p-2 rounded hover:bg-gray-700/50 transition-colors ${
+                      isSupportAgent ? 'bg-purple-900/30 ring-1 ring-purple-500/50' : ''
+                    }`}
                   >
                     <div
                       className="w-3 h-3 rounded-full shrink-0"
@@ -234,21 +243,32 @@ export function ProviderSection({
                     <span className="text-sm text-gray-300 truncate flex-1" title={model.name}>
                       {model.name}
                     </span>
-                    {count > 0 && (
-                      <span className="text-xs text-blue-400">×{count}</span>
+                    {isSupportAgent && (
+                      <span className="text-xs text-purple-400 shrink-0">サポート</span>
                     )}
-                    {/* 追加ボタン */}
-                    <button
-                      type="button"
-                      onClick={() => onAddParticipant(model.id, displayName, modelColor)}
+                    {count > 0 && (
+                      <span className="text-xs text-blue-400 shrink-0">×{count}</span>
+                    )}
+                    {/* ロール選択ドロップダウン + 追加ボタン */}
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === 'participant') {
+                          onAddParticipant(model.id, displayName, modelColor);
+                        } else if (value === 'support') {
+                          onSetSupportAgent(model.id);
+                        }
+                        e.target.value = '';
+                      }}
                       disabled={disabled}
-                      className="p-1 text-gray-400 hover:text-green-400 hover:bg-gray-600 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="参加者として追加"
+                      className="shrink-0 w-20 px-1 py-0.5 text-xs bg-gray-700 text-gray-300 rounded border border-gray-600 focus:border-blue-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      title="追加先を選択"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                    </button>
+                      <option value="" disabled>追加...</option>
+                      <option value="participant">参加者</option>
+                      <option value="support">{isSupportAgent ? 'サポート✓' : 'サポート'}</option>
+                    </select>
                   </div>
                 );
               })}

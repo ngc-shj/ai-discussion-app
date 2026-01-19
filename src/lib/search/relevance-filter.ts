@@ -201,6 +201,7 @@ export async function filterByRelevance(
     topic,
     resultCount: results.length,
     provider: aiProvider,
+    model: aiModel,
     threshold,
     hasFullContent: results.some(r => !!r.fullContent),
     searchTiming: searchContext?.timing || 'start',
