@@ -101,7 +101,7 @@ export function AISelector({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* 参加者セクション - 固定 */}
       <section className="shrink-0 pb-4">
         <div className="flex items-center justify-between mb-2">
@@ -128,8 +128,8 @@ export function AISelector({
         />
       </section>
 
-      {/* モデル一覧セクション - スクロール */}
-      <section className="flex-1 min-h-0 flex flex-col">
+      {/* モデル一覧セクション */}
+      <section className="flex flex-col">
         <div className="flex items-center justify-between mb-2 shrink-0">
           <h3 className="text-sm font-medium text-gray-300">モデル一覧</h3>
           <p className="text-xs text-gray-500">クリックで参加者に追加</p>
@@ -187,7 +187,7 @@ export function AISelector({
           </label>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div className="space-y-2 pr-1">
           {DEFAULT_PROVIDERS.map((provider) => {
             const isAvailable = availability[provider.id];
             const allModels = availableModels[provider.id] || [];

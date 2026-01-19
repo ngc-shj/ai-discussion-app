@@ -90,9 +90,9 @@ export function ParticipantsPanel({
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           {/* AI選択 */}
-          <div className="flex-1 min-h-0 bg-indigo-900/20 rounded-lg p-3 border border-indigo-800/30 overflow-hidden">
+          <div className="bg-indigo-900/20 rounded-lg p-3 border border-indigo-800/30">
             <AISelector
               participants={participants}
               onParticipantsChange={onParticipantsChange}
