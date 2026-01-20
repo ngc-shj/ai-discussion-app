@@ -379,80 +379,59 @@ export function AISelector({
       <section className="bg-green-900/20 rounded-lg overflow-hidden border border-green-800/30">
         {/* ヘッダー（クリックで開閉） */}
         <div className={`px-3 ${isSupportExpanded ? 'pb-0' : 'pb-3'}`}>
-          <button
-            type="button"
-            onClick={() => setIsSupportExpanded(!isSupportExpanded)}
-            disabled={disabled}
-            className={`w-full flex items-center gap-2 p-2 transition-colors disabled:opacity-50 ${
-              isSupportExpanded
-                ? 'bg-gray-800/50 text-green-300 rounded-t-lg'
-                : 'rounded hover:bg-green-800/30 text-gray-300 hover:text-green-200'
-            }`}
-          >
-            <svg
-              className={`w-4 h-4 transition-transform ${isSupportExpanded ? 'rotate-90' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className={`flex items-center gap-2 p-2 transition-colors ${
+            isSupportExpanded
+              ? 'bg-gray-800/50 text-green-300 rounded-t-lg'
+              : 'rounded hover:bg-green-800/30 text-gray-300 hover:text-green-200'
+          }`}>
+            <button
+              type="button"
+              onClick={() => setIsSupportExpanded(!isSupportExpanded)}
+              disabled={disabled}
+              className="flex items-center gap-2 flex-1 min-w-0 disabled:opacity-50"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            <span className="text-sm font-medium">サポートエージェント</span>
-            {supportAgent ? (
-              <span className="text-xs text-green-300 truncate flex-1">
-                {getSupportAgentPreview()}
-              </span>
-            ) : (
-              <span className="text-xs text-gray-500 flex-1">未設定</span>
-            )}
+              <svg
+                className={`w-4 h-4 transition-transform shrink-0 ${isSupportExpanded ? 'rotate-90' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-sm font-medium shrink-0">サポートエージェント</span>
+              {supportAgent ? (
+                <span className="text-xs text-green-300 truncate flex-1">
+                  {getSupportAgentPreview()}
+                </span>
+              ) : (
+                <span className="text-xs text-gray-500 flex-1">未設定</span>
+              )}
+            </button>
             {supportAgent && (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onSupportAgentChange(null); }}
+                onClick={() => onSupportAgentChange(null)}
                 disabled={disabled}
-                className="text-xs text-red-400 hover:text-red-300 bg-red-900/30 px-2 py-0.5 rounded transition-colors disabled:opacity-50"
+                className="text-xs text-red-400 hover:text-red-300 bg-red-900/30 px-2 py-0.5 rounded transition-colors disabled:opacity-50 shrink-0"
                 title="サポートエージェントを解除"
               >
                 解除
               </button>
             )}
-          </button>
+          </div>
           {/* 展開時のコンテンツ */}
           {isSupportExpanded && (
-            <div className="bg-gray-800/50 rounded-b-lg p-3 space-y-3">
-              {/* サポートエージェント詳細設定（タスク設定） - 設定済みの場合のみ表示 */}
-              {supportAgent && (
-                <SupportAgentSection
-                  supportAgent={supportAgent}
-                  availableModels={availableModels}
-                  disabled={disabled}
-                  onSupportAgentChange={onSupportAgentChange}
-                />
-              )}
-              {/* モデル選択トリガー + モデルピッカー */}
-              <div className={isSupportModelPickerExpanded ? '' : ''}>
-                <button
-                  type="button"
-                  onClick={() => setIsSupportModelPickerExpanded(!isSupportModelPickerExpanded)}
-                  disabled={disabled}
-                  className={`w-full flex items-center gap-2 p-2 transition-colors disabled:opacity-50 ${
-                    isSupportModelPickerExpanded
-                      ? 'bg-gray-700/50 text-green-300 rounded-t-lg'
-                      : 'rounded hover:bg-gray-700/30 text-gray-400 hover:text-gray-300'
-                  }`}
-                >
-                  <svg
-                    className={`w-4 h-4 transition-transform ${isSupportModelPickerExpanded ? 'rotate-90' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                  <span className="text-xs">{supportAgent ? 'モデルを変更' : 'モデルを選択'}</span>
-                </button>
-                {isSupportModelPickerExpanded && renderModelPicker()}
-              </div>
+            <div className="bg-gray-800/50 rounded-b-lg p-3">
+              {/* サポートエージェント詳細設定（モデル名、モデル選択、タスク設定） */}
+              <SupportAgentSection
+                supportAgent={supportAgent}
+                availableModels={availableModels}
+                disabled={disabled}
+                onSupportAgentChange={onSupportAgentChange}
+                isModelPickerExpanded={isSupportModelPickerExpanded}
+                onToggleModelPicker={() => setIsSupportModelPickerExpanded(!isSupportModelPickerExpanded)}
+                modelPicker={renderModelPicker()}
+              />
             </div>
           )}
         </div>

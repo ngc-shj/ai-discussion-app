@@ -65,6 +65,7 @@ export {
   SEARCH_ENGINE_PRESETS,
   createDefaultSupportAgentConfig,
   SUPPORT_TASK_LABELS,
+  DEFAULT_SUPPORT_TASKS,
 } from './config';
 
 // Follow-up types
