@@ -23,13 +23,11 @@ const STORAGE_KEY = 'ai-discussion-model-filter-settings';
 // 設定の型
 interface ModelFilterSettings {
   modelFilter: ModelFilterType;
-  showAllLocalSizes: boolean;
 }
 
 // デフォルト設定
 const DEFAULT_SETTINGS: ModelFilterSettings = {
   modelFilter: 'latest-generation',
-  showAllLocalSizes: true,
 };
 
 // 設定を読み込む
@@ -41,7 +39,6 @@ function loadSettings(): ModelFilterSettings {
     const parsed = JSON.parse(stored);
     return {
       modelFilter: parsed.modelFilter ?? DEFAULT_SETTINGS.modelFilter,
-      showAllLocalSizes: parsed.showAllLocalSizes ?? DEFAULT_SETTINGS.showAllLocalSizes,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -79,7 +76,6 @@ function extractModelFamily(modelId: string): string {
 
   // Ollama/ローカルモデル: コロンがある場合はその前の部分をファミリーとして使用
   // 例: deepseek-r1:8b -> deepseek-r1, llama3.2:7b -> llama3.2
-  // ※ showAllLocalSizesがONの場合はgetFilteredModelsでスキップされる
   if (id.includes(':')) {
     return id.split(':')[0];
   }
@@ -309,15 +305,6 @@ function filterLatestGeneration(models: ModelInfo[]): ModelInfo[] {
   return result.map(([, model]) => model);
 }
 
-// ファミリーでソートのみ（グループ化はしない）
-function sortByFamily(models: ModelInfo[]): ModelInfo[] {
-  return [...models].sort((a, b) => {
-    const familyA = extractModelFamily(a.id);
-    const familyB = extractModelFamily(b.id);
-    return getFamilySortKey(familyA).localeCompare(getFamilySortKey(familyB));
-  });
-}
-
 export interface UseAISelectorProps {
   participants: DiscussionParticipant[];
   onParticipantsChange: (participants: DiscussionParticipant[]) => void;
@@ -327,12 +314,10 @@ export interface UseAISelectorReturn {
   // State
   expandedProviders: Record<AIProviderType, boolean>;
   modelFilter: ModelFilterType;
-  showAllLocalSizes: boolean;
 
   // Actions
   toggleExpanded: (providerId: AIProviderType) => void;
   setModelFilter: (value: ModelFilterType) => void;
-  setShowAllLocalSizes: (value: boolean) => void;
   addParticipant: (
     provider: AIProviderType,
     model: string,
@@ -361,30 +346,24 @@ export function useAISelector({
   });
   const [isLoaded, setIsLoaded] = useState(false);
   const [modelFilter, setModelFilterState] = useState<ModelFilterType>(DEFAULT_SETTINGS.modelFilter);
-  const [showAllLocalSizes, setShowAllLocalSizesState] = useState<boolean>(DEFAULT_SETTINGS.showAllLocalSizes);
 
   // 初期ロード
   useEffect(() => {
     const settings = loadSettings();
     setModelFilterState(settings.modelFilter);
-    setShowAllLocalSizesState(settings.showAllLocalSizes);
     setIsLoaded(true);
   }, []);
 
   // 設定変更時に保存
   useEffect(() => {
     if (isLoaded) {
-      saveSettings({ modelFilter, showAllLocalSizes });
+      saveSettings({ modelFilter });
     }
-  }, [modelFilter, showAllLocalSizes, isLoaded]);
+  }, [modelFilter, isLoaded]);
 
   // ラッパー関数
   const setModelFilter = useCallback((value: ModelFilterType) => {
     setModelFilterState(value);
-  }, []);
-
-  const setShowAllLocalSizes = useCallback((value: boolean) => {
-    setShowAllLocalSizesState(value);
   }, []);
 
   const toggleExpanded = useCallback((providerId: AIProviderType) => {
@@ -449,12 +428,13 @@ export function useAISelector({
       const providerConfig = DEFAULT_PROVIDERS.find((p) => p.id === provider);
       const isLocalProvider = providerConfig?.isLocal ?? false;
 
+      // ローカルプロバイダー（Ollama）は常に全モデル表示
+      if (isLocalProvider) {
+        return models;
+      }
+
       switch (modelFilter) {
         case 'latest-generation':
-          // ローカルプロバイダーで「全サイズ表示」がONの場合はグループ化をスキップ（ソートのみ）
-          if (isLocalProvider && showAllLocalSizes) {
-            return sortByFamily(models);
-          }
           return filterLatestGeneration(models);
         case 'latest-5':
           return models.slice(0, LATEST_MODEL_COUNT);
@@ -463,7 +443,7 @@ export function useAISelector({
           return models;
       }
     },
-    [modelFilter, showAllLocalSizes]
+    [modelFilter]
   );
 
   const getSelectedCountForProvider = useCallback(
@@ -476,10 +456,8 @@ export function useAISelector({
   return {
     expandedProviders,
     modelFilter,
-    showAllLocalSizes,
     toggleExpanded,
     setModelFilter,
-    setShowAllLocalSizes,
     addParticipant,
     removeParticipant,
     updateParticipantRole,
