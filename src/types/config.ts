@@ -370,6 +370,13 @@ export interface SupportAgentConfig {
   tasks: SupportTaskConfig[];
 }
 
+// サポートタスクのデフォルト設定
+export const DEFAULT_SUPPORT_TASKS: SupportTaskConfig[] = [
+  { task: 'keywordExtraction', enabled: true },
+  { task: 'relevanceScoring', enabled: true, options: { relevanceThreshold: 0.5 } },
+  { task: 'followupGeneration', enabled: true, options: { followupCount: 2 } },
+];
+
 // サポートエージェントのデフォルト設定を生成
 export const createDefaultSupportAgentConfig = (
   provider: AIProviderType,
@@ -377,11 +384,7 @@ export const createDefaultSupportAgentConfig = (
 ): SupportAgentConfig => ({
   provider,
   modelId,
-  tasks: [
-    { task: 'keywordExtraction', enabled: true },
-    { task: 'relevanceScoring', enabled: true, options: { relevanceThreshold: 0.5 } },
-    { task: 'followupGeneration', enabled: true, options: { followupCount: 2 } },
-  ],
+  tasks: DEFAULT_SUPPORT_TASKS.map((t) => ({ ...t })),
 });
 
 // サポートタスクのラベル（UI表示用）
