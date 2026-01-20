@@ -378,7 +378,7 @@ export function AISelector({
       {/* サポートエージェントセクション - 緑系（処理担当の色と統一） */}
       <section className="bg-green-900/20 rounded-lg overflow-hidden border border-green-800/30">
         {/* ヘッダー（クリックで開閉） */}
-        <div className={`px-3 ${isSupportExpanded ? 'pb-0' : 'pb-3'}`}>
+        <div className={`px-3 pt-3 ${isSupportExpanded ? 'pb-0' : 'pb-3'}`}>
           <div className={`flex items-center gap-2 p-2 transition-colors ${
             isSupportExpanded
               ? 'bg-gray-800/50 text-green-300 rounded-t-lg'
