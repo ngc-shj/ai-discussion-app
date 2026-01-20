@@ -17,19 +17,13 @@ export interface AIProviderConfig {
 }
 
 // プロバイダーのデフォルト設定
+// クラウドモデルを左側、ローカルモデル（Ollama）を右端に配置
 export const DEFAULT_PROVIDERS: AIProviderConfig[] = [
   {
     id: 'claude',
     name: 'Claude',
     color: '#D97706',
     defaultModel: 'claude-sonnet-4-20250514',
-  },
-  {
-    id: 'ollama',
-    name: 'Ollama',
-    color: '#059669',
-    defaultModel: 'gpt-oss:20b',
-    isLocal: true,
   },
   {
     id: 'openai',
@@ -42,6 +36,13 @@ export const DEFAULT_PROVIDERS: AIProviderConfig[] = [
     name: 'Gemini',
     color: '#4285F4',
     defaultModel: 'gemini-1.5-flash',
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama',
+    color: '#059669',
+    defaultModel: 'gpt-oss:20b',
+    isLocal: true,
   },
 ];
 

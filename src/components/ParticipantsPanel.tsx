@@ -90,21 +90,19 @@ export function ParticipantsPanel({
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          {/* AI選択 */}
-          <div className="bg-indigo-900/20 rounded-lg p-3 border border-indigo-800/30">
-            <AISelector
-              participants={participants}
-              onParticipantsChange={onParticipantsChange}
-              availableModels={availableModels}
-              availability={availability}
-              supportAgent={supportAgent}
-              onSupportAgentChange={onSupportAgentChange}
-              disabled={disabled}
-            />
-          </div>
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
+          {/* AI選択（参加者 + サポートエージェント） */}
+          <AISelector
+            participants={participants}
+            onParticipantsChange={onParticipantsChange}
+            availableModels={availableModels}
+            availability={availability}
+            supportAgent={supportAgent}
+            onSupportAgentChange={onSupportAgentChange}
+            disabled={disabled}
+          />
 
-          {/* 処理担当の説明 */}
+          {/* 処理担当の説明 - 独立した内枠 */}
           {(() => {
             // 各タスクが有効かどうかを判定
             const isKeywordEnabled = supportAgent?.tasks.find(t => t.task === 'keywordExtraction')?.enabled ?? false;
@@ -115,8 +113,18 @@ export function ParticipantsPanel({
               : '参加AI 1番目';
             const hasSupportAgentTask = isKeywordEnabled || isRelevanceEnabled || isFollowupEnabled;
 
+            // サポートエージェントの表示名を取得（「サポートエージェント(モデル名)」形式）
+            const getSupportAgentDisplay = () => {
+              if (!supportAgent) return '';
+              const models = availableModels[supportAgent.provider] || [];
+              const model = models.find((m) => m.id === supportAgent.modelId);
+              const modelName = model?.name || supportAgent.modelId;
+              return `サポートエージェント(${modelName})`;
+            };
+            const supportAgentDisplay = getSupportAgentDisplay();
+
             return (
-              <div className="shrink-0 text-xs text-gray-400 pt-3 mt-3 border-t border-gray-700 space-y-2">
+              <div className="bg-gray-800 rounded-lg p-3 text-xs text-gray-400 space-y-2">
                 <p className="font-medium text-gray-300">処理担当</p>
                 <div className="space-y-1">
                   <div className="flex items-start gap-2">
@@ -130,19 +138,19 @@ export function ParticipantsPanel({
                   <div className="flex items-start gap-2">
                     <span className="text-purple-400 shrink-0 w-24">キーワード生成:</span>
                     <span className={isKeywordEnabled ? 'text-green-400' : 'text-blue-400'}>
-                      {isKeywordEnabled ? 'サポートエージェント' : participant1Name}
+                      {isKeywordEnabled ? supportAgentDisplay : participant1Name}
                     </span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-purple-400 shrink-0 w-24">関連度評価:</span>
                     <span className={isRelevanceEnabled ? 'text-green-400' : 'text-blue-400'}>
-                      {isRelevanceEnabled ? 'サポートエージェント' : participant1Name}
+                      {isRelevanceEnabled ? supportAgentDisplay : participant1Name}
                     </span>
                   </div>
                   <div className="flex items-start gap-2">
                     <span className="text-purple-400 shrink-0 w-24">フォローアップ:</span>
                     <span className={isFollowupEnabled ? 'text-green-400' : 'text-blue-400'}>
-                      {isFollowupEnabled ? 'サポートエージェント' : participant1Name}
+                      {isFollowupEnabled ? supportAgentDisplay : participant1Name}
                     </span>
                   </div>
                 </div>
