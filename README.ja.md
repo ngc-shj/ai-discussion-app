@@ -139,6 +139,43 @@ npm run dev
 
 ブラウザで [http://localhost:3000](http://localhost:3000) を開く。
 
+## Docker セットアップ（代替方法）
+
+Dockerを使用してアプリケーションを実行することもできます:
+
+### クイックスタート
+
+```bash
+# .envファイルを作成
+cp .env.example .env
+# .envを編集してAPIキーを設定
+
+# アプリを起動
+docker compose up -d app
+```
+
+ブラウザで [http://localhost:3000](http://localhost:3000) を開く。
+
+### オプションサービスとの起動
+
+```bash
+# Ollama（ローカルLLM）と一緒に起動
+docker compose --profile ollama up -d
+
+# SearXNG（検索エンジン）と一緒に起動
+docker compose --profile search up -d
+
+# 全サービスを起動
+docker compose --profile full up -d
+```
+
+### ソースからビルド
+
+```bash
+docker compose build app
+docker compose up -d app
+```
+
 ## プロバイダー別セットアップ詳細
 
 ### Ollama（ローカルモデル）

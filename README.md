@@ -139,6 +139,43 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## Docker Setup (Alternative)
+
+You can also run the application using Docker:
+
+### Quick Start
+
+```bash
+# Create .env file
+cp .env.example .env
+# Edit .env and set your API keys
+
+# Start the app
+docker compose up -d app
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### With Optional Services
+
+```bash
+# Start with Ollama (local LLM)
+docker compose --profile ollama up -d
+
+# Start with SearXNG (search engine)
+docker compose --profile search up -d
+
+# Start all services
+docker compose --profile full up -d
+```
+
+### Build from Source
+
+```bash
+docker compose build app
+docker compose up -d app
+```
+
 ## Provider Setup Details
 
 ### Ollama (Local Models)
