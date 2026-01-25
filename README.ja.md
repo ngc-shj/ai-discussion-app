@@ -159,7 +159,7 @@ docker compose up -d app
 ### オプションサービスとの起動
 
 ```bash
-# Ollama（ローカルLLM）と一緒に起動
+# OllamaをDockerで起動
 docker compose --profile ollama up -d
 
 # SearXNG（検索エンジン）と一緒に起動
@@ -167,6 +167,24 @@ docker compose --profile search up -d
 
 # 全サービスを起動
 docker compose --profile full up -d
+```
+
+### ホスト側のOllamaを使用
+
+Ollamaがホストマシン（Docker外）で動作している場合、`host.docker.internal`経由で接続できます:
+
+```bash
+# デフォルト設定でhost.docker.internalを使用
+docker compose up -d app
+
+# または.envで明示的に設定
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+```
+
+Docker内のOllamaを使用する場合は以下を設定:
+
+```bash
+OLLAMA_BASE_URL=http://ollama:11434
 ```
 
 ### ソースからビルド
