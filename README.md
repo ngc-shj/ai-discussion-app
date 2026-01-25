@@ -159,7 +159,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ### With Optional Services
 
 ```bash
-# Start with Ollama (local LLM)
+# Start with Ollama in Docker
 docker compose --profile ollama up -d
 
 # Start with SearXNG (search engine)
@@ -167,6 +167,24 @@ docker compose --profile search up -d
 
 # Start all services
 docker compose --profile full up -d
+```
+
+### Using Host Ollama
+
+If Ollama is running on your host machine (not in Docker), the app can connect to it via `host.docker.internal`:
+
+```bash
+# Default configuration already uses host.docker.internal
+docker compose up -d app
+
+# Or explicitly set in .env
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+```
+
+To use Ollama running in Docker instead, set:
+
+```bash
+OLLAMA_BASE_URL=http://ollama:11434
 ```
 
 ### Build from Source
